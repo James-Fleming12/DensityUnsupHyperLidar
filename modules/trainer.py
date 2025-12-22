@@ -32,6 +32,351 @@ def save_checkpoint(to_save, logdir, suffix=""):
     torch.save(to_save, logdir +
                "/SENet" + suffix)
 
+class TrainingPipeline():
+    """
+    Simple change that will save the model with the best validation loss to "/models/model.pth" instead of logs
+    """
+    def __init__(self, ARCH, DATA, datadir, logdir, path=None):
+        # parameters
+        self.ARCH = ARCH
+        self.DATA = DATA
+        self.datadir = datadir
+        self.log = logdir
+        self.path = path
+
+        self.batch_time_t = AverageMeter()
+        self.data_time_t = AverageMeter()
+        self.batch_time_e = AverageMeter()
+        self.epoch = 0
+
+        # put logger where it belongs
+
+        self.info = {"train_loss": 0,
+                     "train_acc": 0,
+                     "train_iou": 0,
+                     "valid_loss": 0,
+                     "valid_acc": 0,
+                     "valid_iou": 0,
+                     "best_train_iou": 0,
+                     "best_val_iou": 0}
+
+        # get the data
+        from dataset.kitti.parser import Parser
+        self.parser = Parser(root=self.datadir,
+                                          train_sequences=self.DATA["split"]["train"], # self.DATA["split"]["valid"] + self.DATA["split"]["train"] if finetune with valid
+                                          valid_sequences=self.DATA["split"]["valid"],
+                                          test_sequences=None,
+                                          labels=self.DATA["labels"],
+                                          color_map=self.DATA["color_map"],
+                                          learning_map=self.DATA["learning_map"],
+                                          learning_map_inv=self.DATA["learning_map_inv"],
+                                          sensor=self.ARCH["dataset"]["sensor"],
+                                          max_points=self.ARCH["dataset"]["max_points"],
+                                          batch_size=self.ARCH["train"]["batch_size"],
+                                          workers=self.ARCH["train"]["workers"],
+                                          gt=True,
+                                          shuffle_train=True)
+
+        # weights for loss (and bias)
+
+        epsilon_w = self.ARCH["train"]["epsilon_w"]
+        content = torch.zeros(self.parser.get_n_classes(), dtype=torch.float)
+        for cl, freq in DATA["content"].items():
+            x_cl = self.parser.to_xentropy(cl)  # map actual class to xentropy class
+            content[x_cl] += freq
+        self.loss_w = 1 / (content + epsilon_w)  # get weights
+
+        # power_value = 0.25
+        # self.loss_w = np.power(self.loss_w, power_value) * np.power(10, 1 - power_value)
+
+        for x_cl, w in enumerate(self.loss_w):  # ignore the ones necessary to ignore
+            if DATA["learning_ignore"][x_cl]:
+                # don't weigh
+                self.loss_w[x_cl] = 0
+        print("Loss weights from content: ", self.loss_w.data)
+
+        with torch.no_grad():
+            if self.ARCH["train"]["pipeline"] == "hardnet":
+                from modules.network.HarDNet import HarDNet
+                self.model = HarDNet(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
+
+            if self.ARCH["train"]["pipeline"] == "res":
+                from modules.network.ResNet import ResNet_34
+                self.model = ResNet_34(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
+
+                def convert_relu_to_softplus(model, act):
+                    for child_name, child in model.named_children():
+                        if isinstance(child, nn.LeakyReLU):
+                            setattr(model, child_name, act)
+                        else:
+                            convert_relu_to_softplus(child, act)
+                if self.ARCH["train"]["act"] == "Hardswish":
+                    convert_relu_to_softplus(self.model, nn.Hardswish())
+                elif self.ARCH["train"]["act"] == "SiLU":
+                    convert_relu_to_softplus(self.model, nn.SiLU())
+
+            if self.ARCH["train"]["pipeline"] == "fid":
+                from modules.network.Fid import ResNet_34
+                self.model = ResNet_34(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
+
+                if self.ARCH["train"]["act"] == "Hardswish":
+                    convert_relu_to_softplus(self.model, nn.Hardswish())
+                elif self.ARCH["train"]["act"] == "SiLU":
+                    convert_relu_to_softplus(self.model, nn.SiLU())
+
+        save_to_log(self.log, 'model.txt', str(self.model))
+        pytorch_total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        print("Number of parameters: ", pytorch_total_params/1000000, "M")
+        save_to_log(self.log, 'model.txt', "Number of parameters: %.5f M" %(pytorch_total_params/1000000))
+        self.tb_logger = SummaryWriter(log_dir=self.log, flush_secs=20)
+
+        # GPU?
+        self.gpu = False
+        self.multi_gpu = False
+        self.n_gpus = 0
+        self.model_single = self.model
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("Training in device: ", self.device)
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            cudnn.benchmark = True
+            cudnn.fastest = True
+            self.gpu = True
+            self.n_gpus = 1
+            self.model.cuda()
+        if torch.cuda.is_available() and torch.cuda.device_count() > 1:
+            print("Let's use", torch.cuda.device_count(), "GPUs!")
+            self.model = nn.DataParallel(self.model)  # spread in gpus
+            self.model = convert_model(self.model).cuda()  # sync batchnorm
+            self.model_single = self.model.module  # single model to get weight names
+            self.multi_gpu = True
+            self.n_gpus = torch.cuda.device_count()
+
+
+        self.criterion = nn.NLLLoss(weight=self.loss_w).to(self.device)
+        self.ls = Lovasz_softmax(ignore=0).to(self.device)
+        from modules.losses.boundary_loss import BoundaryLoss
+        self.bd = BoundaryLoss().to(self.device)
+        # loss as dataparallel too (more images in batch)
+        if self.n_gpus > 1:
+            self.criterion = nn.DataParallel(self.criterion).cuda()  # spread in gpus
+            self.ls = nn.DataParallel(self.ls).cuda()
+
+        # self.optimizer = optim.AdamW(self.model.parameters(), lr=0.0001, weight_decay=0.0005)
+        # from modules.adam_policy import MyLR
+        # self.scheduler = MyLR(optimizer=self.optimizer, cycle=30)
+        # print(self.optimizer)
+
+        if self.ARCH["train"]["scheduler"] == "consine":
+            length = self.parser.get_train_size()
+            dict = self.ARCH["train"]["consine"]
+            self.optimizer = optim.SGD(self.model.parameters(),
+                                       lr=dict["min_lr"],
+                                       momentum=self.ARCH["train"]["momentum"],
+                                       weight_decay=self.ARCH["train"]["w_decay"])
+            self.scheduler = CosineAnnealingWarmUpRestarts(optimizer=self.optimizer,
+                                                           T_0=dict["first_cycle"] * length, T_mult=dict["cycle"],
+                                                           eta_max=dict["max_lr"],
+                                                           T_up=dict["wup_epochs"]*length, gamma=dict["gamma"])
+
+        else:
+            self.optimizer = optim.SGD(self.model.parameters(),
+                                       lr=self.ARCH["train"]["decay"]["lr"],
+                                       momentum=self.ARCH["train"]["momentum"],
+                                       weight_decay=self.ARCH["train"]["w_decay"])
+            steps_per_epoch = self.parser.get_train_size()
+            up_steps = int(self.ARCH["train"]["decay"]["wup_epochs"] * steps_per_epoch)
+            final_decay = self.ARCH["train"]["decay"]["lr_decay"] ** (1 / steps_per_epoch)
+            self.scheduler = warmupLR(optimizer=self.optimizer,
+                                      lr=self.ARCH["train"]["decay"]["lr"],
+                                      warmup_steps=up_steps,
+                                      momentum=self.ARCH["train"]["momentum"],
+                                      decay=final_decay)
+
+        if self.path is not None:
+            torch.nn.Module.dump_patches = True
+            w_dict = torch.load(path + "/SENet",
+                                map_location=lambda storage, loc: storage)
+            self.model.load_state_dict(w_dict['state_dict'], strict=True)
+            # self.optimizer.load_state_dict(w_dict['optimizer'])
+            # self.epoch = w_dict['epoch'] + 1
+            # self.scheduler.load_state_dict(w_dict['scheduler'])
+            print("dict epoch:", w_dict['epoch'])
+            # self.info = w_dict['info']
+            print("info", w_dict['info'])
+
+    def calculate_estimate(self, epoch, iter):
+        estimate = int((self.data_time_t.avg + self.batch_time_t.avg) * \
+                       (self.parser.get_train_size() * self.ARCH['train']['max_epochs'] - (
+                               iter + 1 + epoch * self.parser.get_train_size()))) + \
+                   int(self.batch_time_e.avg * self.parser.get_valid_size() * (
+                           self.ARCH['train']['max_epochs'] - (epoch)))
+        return str(datetime.timedelta(seconds=estimate))
+
+    @staticmethod
+    def get_mpl_colormap(cmap_name):
+        cmap = plt.get_cmap(cmap_name)
+        # Initialize the matplotlib color map
+        sm = plt.cm.ScalarMappable(cmap=cmap)
+        # Obtain linear color range
+        color_range = sm.to_rgba(np.linspace(0, 1, 256), bytes=True)[:, 2::-1]
+        return color_range.reshape(256, 1, 3)
+
+    @staticmethod
+    def make_log_img(depth, mask, pred, gt, color_fn):
+        # input should be [depth, pred, gt]
+        # make range image (normalized to 0,1 for saving)
+        depth = (cv2.normalize(depth, None, alpha=0, beta=1,
+                               norm_type=cv2.NORM_MINMAX,
+                               dtype=cv2.CV_32F) * 255.0).astype(np.uint8)
+        out_img = cv2.applyColorMap(
+            depth, Trainer.get_mpl_colormap('viridis')) * mask[..., None]
+        # make label prediction
+        pred_color = color_fn((pred * mask).astype(np.int32))
+        out_img = np.concatenate([out_img, pred_color], axis=0)
+        # make label gt
+        gt_color = color_fn(gt)
+        out_img = np.concatenate([out_img, gt_color], axis=0)
+        return (out_img).astype(np.uint8)
+
+    @staticmethod
+    def save_to_log(logdir, logger, info, epoch, w_summary=False, model=None, img_summary=False, imgs=[]):
+        # save scalars
+        for tag, value in info.items():
+            logger.add_scalar(tag, value, epoch)
+
+        # save summaries of weights and biases
+        if w_summary and model:
+            for tag, value in model.named_parameters():
+                tag = tag.replace('.', '/')
+                logger.histo_summary(tag, value.data.cpu().numpy(), epoch)
+                if value.grad is not None:
+                    logger.histo_summary(
+                        tag + '/grad', value.grad.data.cpu().numpy(), epoch)
+
+        if img_summary and len(imgs) > 0:
+            directory = os.path.join(logdir, "predictions")
+            if not os.path.isdir(directory):
+                os.makedirs(directory)
+            for i, img in enumerate(imgs):
+                name = os.path.join(directory, str(i) + ".png")
+                cv2.imwrite(name, img)
+
+    def train(self):
+
+        self.ignore_class = []
+        for i, w in enumerate(self.loss_w):
+            if w < 1e-10:
+                self.ignore_class.append(i)
+                print("Ignoring class ", i, " in IoU evaluation")
+        self.evaluator = iouEval(self.parser.get_n_classes(),
+                                 self.device, self.ignore_class)
+        save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        if self.path is not None:
+            acc, iou, loss, rand_img = self.validate(val_loader=self.parser.get_valid_set(),
+                                             model=self.model,
+                                             criterion=self.criterion,
+                                             evaluator=self.evaluator,
+                                             class_func=self.parser.get_xentropy_class_string,
+                                             color_fn=self.parser.to_color,
+                                             save_scans=self.ARCH["train"]["save_scans"])
+
+        # train for n epochs
+        for epoch in range(self.epoch, self.ARCH["train"]["max_epochs"]):
+            # train for 1 epoch
+
+            acc, iou, loss = self.train_epoch(train_loader=self.parser.get_train_set(),
+                                                           model=self.model,
+                                                           criterion=self.criterion,
+                                                           optimizer=self.optimizer,
+                                                           epoch=epoch,
+                                                           evaluator=self.evaluator,
+                                                           scheduler=self.scheduler,
+                                                           color_fn=self.parser.to_color,
+                                                           report=self.ARCH["train"]["report_batch"],
+                                                           show_scans=self.ARCH["train"]["show_scans"])
+
+
+            # update info
+            self.info["train_loss"] = loss
+            self.info["train_acc"] = acc
+            self.info["train_iou"] = iou
+
+            # remember best iou and save checkpoint
+            state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
+                     'optimizer': self.optimizer.state_dict(),
+                     'info': self.info,
+                     'scheduler': self.scheduler.state_dict()
+                     }
+            save_checkpoint(state, self.log, suffix="")
+            # save_checkpoint(state, self.log, suffix=""+str(epoch))
+
+            if self.info['train_iou'] > self.info['best_train_iou']:
+                save_to_log(self.log, 'log.txt', "Best mean iou in training set so far, save model!")
+                print("Best mean iou in training set so far, save model!")
+                self.info['best_train_iou'] = self.info['train_iou']
+                state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
+                         'optimizer': self.optimizer.state_dict(),
+                         'info': self.info,
+                         'scheduler': self.scheduler.state_dict()
+                         }
+                save_checkpoint(state, self.log, suffix="_train_best")
+
+            if epoch % self.ARCH["train"]["report_epoch"] == 0:
+                # evaluate on validation set
+                print("*" * 80)
+                acc, iou, loss, rand_img = self.validate(val_loader=self.parser.get_valid_set(),
+                                                         model=self.model,
+                                                         criterion=self.criterion,
+                                                         evaluator=self.evaluator,
+                                                         class_func=self.parser.get_xentropy_class_string,
+                                                         color_fn=self.parser.to_color,
+                                                         save_scans=self.ARCH["train"]["save_scans"])
+
+                # update info
+                self.info["valid_loss"] = loss
+                self.info["valid_acc"] = acc
+                self.info["valid_iou"] = iou
+
+            # remember best iou and save checkpoint
+            if self.info['valid_iou'] > self.info['best_val_iou']:
+                save_to_log(self.log, 'log.txt', "Best mean iou in validation so far, save model!")
+                print("Best mean iou in validation so far, save model!")
+                print("*" * 80)
+                self.info['best_val_iou'] = self.info['valid_iou']
+
+                models_dir = "/models"
+
+                best_model_path = os.path.join(models_dir, "model.pth")
+                torch.save({
+                    'epoch': epoch,
+                    'state_dict': self.model.state_dict(),
+                    'info': self.info
+                }, best_model_path)
+                print(f"Saved best validation model to {best_model_path}")
+
+                # save the weights!
+                state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
+                         'optimizer': self.optimizer.state_dict(),
+                         'info': self.info,
+                         'scheduler': self.scheduler.state_dict()
+                         }
+                save_checkpoint(state, self.log, suffix="_valid_best")
+
+            print("*" * 80)
+
+            # save to log
+            Trainer.save_to_log(logdir=self.log,
+                                logger=self.tb_logger,
+                                info=self.info,
+                                epoch=epoch,
+                                w_summary=self.ARCH["train"]["save_summary"],
+                                model=self.model_single,
+                                img_summary=self.ARCH["train"]["save_scans"],
+                                imgs=rand_img)
+            save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        print('Finished Training')
+        save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        return self.model
 
 class Trainer():
     def __init__(self, ARCH, DATA, datadir, logdir, path=None):

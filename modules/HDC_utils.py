@@ -253,8 +253,11 @@ class Model(nn.Module):
 def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
+def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
+    return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
+
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
+    def __init__(self, ARCH, modeldir, num_classes, device):
         super(Model, self).__init__()
 
         self.device = device
@@ -306,22 +309,7 @@ class DensityModel(nn.Module):
             self.gpu = True
             self.net.cuda()
 
-        self.hd_encoder = hd_encoder
-        if self.hd_encoder == 'rp':
-            self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
-
-        elif self.hd_encoder == 'idlevel':
-            self.value = embeddings.Level(num_levels, self.hd_dim, 
-                                          randomness=randomness)
-            print("self.value", self.value.weight.shape)
-            self.position = embeddings.Random(self.input_dim, self.hd_dim)
-            print("self.position", self.position.weight.shape)
-
-        elif self.hd_encoder == 'nonlinear':
-            self.nonlinear_projection = embeddings.Sinusoid(self.input_dim, self.hd_dim)
-        
-        else:
-            self.hd_dim = self.input_dim
+        self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
 
         self.classify = nn.Linear(self.hd_dim, self.num_classes, bias=False)
         self.classify_sample_cnt = torch.zeros((self.num_classes, 1)).to(self.device)
