@@ -16,35 +16,133 @@ Seeding is performed using a binning technique for scalability.
 #           Gael Varoquaux <gael.varoquaux@normalesup.org>
 #           Martino Sorbaro <martino.sorbaro@ed.ac.uk>
 
+import time
 import numpy as np
-import warnings
 import math
 
-from collections import defaultdict
-from sklearn.externals import six
 from sklearn.utils.validation import check_is_fitted
 from sklearn.utils import check_random_state, gen_batches, check_array
 from sklearn.base import BaseEstimator, ClusterMixin
 from sklearn.neighbors import NearestNeighbors
 from sklearn.metrics.pairwise import pairwise_distances_argmin
-from joblib import Parallel
-from joblib import delayed
 
 from random import shuffle
 
 import math
-import operator
 
 import numpy as np
-import matplotlib.pyplot as plt
 
 import torch
-from torch import exp, sqrt
+from torch import exp
 
 #seeds number intital
 SEED_NUM = 128
 L=2
 H=8
+
+def mean_shift_binary(X, bandwidth=None, seeds=None, cluster_all=True, GPU=True):
+    X = (X > 0.5).astype(np.uint8)
+
+    if bandwidth is None:
+        bandwidth = estimate_bandwidth_binary(X)
+    if not (0 < bandwidth <= 1):
+        raise ValueError("bandwidth must be in (0,1] for Hamming distance")
+
+    if seeds is None:
+        seeds = gpu_seed_generator_binary(X)
+
+    centers, density = meanshift_torch_binary(X, seeds, bandwidth)
+
+    nbrs = NearestNeighbors(radius=bandwidth, metric="hamming")
+    nbrs.fit(centers)
+
+    unique = np.ones(len(centers), dtype=bool)
+    for i, c in enumerate(centers):
+        if unique[i]:
+            idxs = nbrs.radius_neighbors([c], return_distance=False)[0]
+            unique[idxs] = False
+            unique[i] = True
+
+    cluster_centers = centers[unique]
+
+    nbrs = NearestNeighbors(n_neighbors=1, metric="hamming")
+    nbrs.fit(cluster_centers)
+    distances, labels = nbrs.kneighbors(X)
+
+    if not cluster_all:
+        labels[distances.flatten() > bandwidth] = -1
+
+    return cluster_centers, labels.flatten()
+
+def meanshift_torch_binary(data, seed, bandwidth, max_iter=300):
+    """
+    Binary mean-shift using normalized Hamming distance and majority vote.
+    """
+    X = torch.from_numpy(data).to(torch.uint8).cuda()
+    S = torch.from_numpy(seed).to(torch.uint8).cuda()
+
+    D = X.shape[1]
+    tol = 1e-3
+
+    for _ in range(max_iter):
+        hamming = torch.bitwise_xor(
+            S[:, None, :], X[None, :, :]
+        ).sum(dim=2).float() / D
+
+        weight = (hamming <= bandwidth).float()
+
+        wsum = weight.sum(dim=1, keepdim=True)
+        wsum = torch.clamp(wsum, min=1.0)
+
+        avg = (weight @ X.float()) / wsum
+        S_new = (avg > 0.5).to(torch.uint8)
+
+        flip_frac = (
+            torch.bitwise_xor(S, S_new).sum(dim=1).float() / D
+        ).mean()
+
+        S = S_new
+        if flip_frac < tol:
+            break
+
+    hamming = torch.bitwise_xor(S[:, None, :], X[None, :, :]).sum(dim=2).float() / D
+
+    p_num = (hamming <= bandwidth).sum(dim=1).tolist()
+
+    return S.cpu().numpy(), p_num
+
+def gpu_seed_generator_binary(codes):
+    idx = np.random.permutation(len(codes))[:SEED_NUM]
+    return (codes[idx] > 0.5).astype(np.uint8)
+
+def get_binary_density_centroids(binary_vectors, bandwidth=0.2):
+    """Get density centroids for binary hypervectors"""
+    binary_vectors = (binary_vectors > 0.5).astype(np.uint8)
+
+    cluster_centers, labels = mean_shift_binary(
+        X=binary_vectors,
+        bandwidth=bandwidth,
+        GPU=True
+    )
+    return cluster_centers, labels
+
+def estimate_bandwidth_binary(X, quantile=0.3, n_samples=500):
+    X = (X > 0.5).astype(np.uint8)
+
+    n = min(n_samples, X.shape[0])
+    idx = np.random.choice(X.shape[0], n, replace=False)
+    Xs = X[idx]
+
+    k = max(1, int(n * quantile))
+
+    nbrs = NearestNeighbors(n_neighbors=k, metric="hamming")
+    nbrs.fit(Xs)
+
+    distances, _ = nbrs.kneighbors(Xs)
+
+    bandwidth = np.median(distances[:, -1])
+
+    return float(np.clip(bandwidth, 1e-3, 1.0))
 
 def cos_batch(a, b):
     #return sqrt(((a[None,:] - b[:,None]) ** 2).sum(2))
@@ -230,8 +328,6 @@ def mean_shift_cosine(X, bandwidth=None, seeds=None,
 
     labels : array, shape=[n_samples]
         Cluster labels for each point.
-
-
     """
 
     if bandwidth is None:
@@ -318,8 +414,6 @@ def mean_shift_cosine(X, bandwidth=None, seeds=None,
                 seeds = gpu_seed_adjust(X)#seeds are too few, adjsut
         
         return cluster_centers, labels
-
-
 
 class MeanShiftCosine(BaseEstimator, ClusterMixin):
     """Mean shift clustering using a flat kernel.
@@ -427,3 +521,104 @@ class MeanShiftCosine(BaseEstimator, ClusterMixin):
         check_is_fitted(self, "cluster_centers_")
 
         return pairwise_distances_argmin(X, self.cluster_centers_)
+    
+def test_binary_mean_shift():
+    """Test function with binary hypervectors"""
+
+    print("=" * 60)
+    print("Testing Binary Mean Shift with 20 Hypervectors")
+    print("=" * 60)
+
+    if not torch.cuda.is_available():
+        print("⚠️  CUDA not available! This test requires GPU.")
+        return
+
+    # Reproducibility
+    np.random.seed(42)
+
+    n_bits = 64
+
+    # -------------------------
+    # Create clean base clusters
+    # -------------------------
+    base1 = np.random.randint(0, 2, (1, n_bits), dtype=np.uint8)
+    base2 = np.random.randint(0, 2, (1, n_bits), dtype=np.uint8)
+    base3 = np.random.randint(0, 2, (1, n_bits), dtype=np.uint8)
+
+    def noisy_copies(base, n, flip_prob):
+        noise = (np.random.rand(n, n_bits) < flip_prob).astype(np.uint8)
+        return np.bitwise_xor(base.repeat(n, axis=0), noise)
+
+    # Three clusters with different noise levels
+    cluster1 = noisy_copies(base1, 7, flip_prob=0.10)
+    cluster2 = noisy_copies(base2, 8, flip_prob=0.20)
+    cluster3 = noisy_copies(base3, 5, flip_prob=0.40)
+
+    # Combine
+    binary_vectors = np.vstack([cluster1, cluster2, cluster3]).astype(np.uint8)
+
+    print(f"Generated {binary_vectors.shape[0]} binary vectors")
+    print(f"Vector shape: {binary_vectors.shape}")
+    print(f"Sample vector (first 10 bits): {binary_vectors[0, :10]}")
+
+    # -------------------------
+    # Test 1: Auto bandwidth
+    # -------------------------
+    print("\n1. Testing with auto bandwidth estimation:")
+    try:
+        bandwidth = estimate_bandwidth_binary(binary_vectors)
+        print(f"   Estimated bandwidth: {bandwidth:.3f}")
+
+        start = time.time()
+        centroids, labels = get_binary_density_centroids(
+            binary_vectors, bandwidth=bandwidth
+        )
+        elapsed = time.time() - start
+
+        print(f"   Found {len(centroids)} clusters")
+        print(f"   Labels: {labels}")
+        print(f"   Label histogram: {np.bincount(labels + 1)}")
+        print(f"   Time: {elapsed:.4f} seconds")
+
+        for i, c in enumerate(centroids):
+            print(f"   Centroid {i} (first 10 bits): {c[:10]}")
+
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+
+    # -------------------------
+    # Test 2: Moderate bandwidth
+    # -------------------------
+    print("\n2. Testing with bandwidth = 0.25:")
+    try:
+        centroids, labels = get_binary_density_centroids(
+            binary_vectors, bandwidth=0.25
+        )
+        print(f"   Found {len(centroids)} clusters")
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+
+    # -------------------------
+    # Test 3: Small bandwidth
+    # -------------------------
+    print("\n3. Testing with small bandwidth = 0.1:")
+    try:
+        centroids, labels = get_binary_density_centroids(
+            binary_vectors, bandwidth=0.1
+        )
+        print(f"   Found {len(centroids)} clusters (expected more)")
+    except Exception as e:
+        print(f"   ❌ Error: {e}")
+
+    print("\n" + "=" * 60)
+    print("Test Complete!")
+    print("=" * 60)
+
+def main():
+    """Main entry point"""
+    print("Binary Hypervector Density Centroid Finder")
+    print(f"CUDA Available: {torch.cuda.is_available()}")
+    test_binary_mean_shift()
+
+if __name__ == "__main__":
+    main()
