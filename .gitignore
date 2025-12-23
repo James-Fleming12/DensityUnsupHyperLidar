@@ -2,3 +2,6 @@ dense_dataset_semantic/*
 nuscenes_kitti/*
 v1.0-mini/*
 nuscenes_kitti/*
+logs/*
+common/*
+*.pyc
