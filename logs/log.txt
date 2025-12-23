@@ -1,0 +1,33 @@
+2025-12-23 11:19:53
+2025-12-23 11:20:38
+2025-12-23 11:21:40
+2025-12-23 11:23:30
+Lr: 1.000e-04 | Epoch: [0][0/26] | Time 4.665 (4.665) | Data 0.140 (0.140) | Loss 21.8923 (21.8923) | Bd 3.9732 (3.9732) | acc 0.037 (0.037) | IoU 0.014 (0.014) | [3:28:07]
+Best mean iou in training set so far, save model!
+Validation set:
+Time avg per batch 0.199
+Loss avg 11.9543
+Jaccard avg 0.9749
+WCE avg 10.9794
+Acc avg 0.052
+IoU avg 0.007
+IoU class 0 [noise] = 0.000
+IoU class 1 [movable_object.barrier] = 0.000
+IoU class 2 [vehicle.bicycle] = 0.000
+IoU class 3 [vehicle.bus.bendy] = 0.012
+IoU class 4 [vehicle.car] = 0.001
+IoU class 5 [vehicle.construction] = 0.000
+IoU class 6 [vehicle.motorcycle] = 0.000
+IoU class 7 [human.pedestrian.adult] = 0.001
+IoU class 8 [movable_object.trafficcone] = 0.000
+IoU class 9 [vehicle.trailer] = 0.000
+IoU class 10 [vehicle.truck] = 0.000
+IoU class 11 [flat.driveable_surface] = 0.003
+IoU class 12 [flat.other] = 0.021
+IoU class 13 [flat.sidewalk] = 0.001
+IoU class 14 [flat.terrain] = 0.065
+IoU class 15 [static.manmade] = 0.000
+IoU class 16 [static.vegetation] = 0.000
+Best mean iou in validation so far, save model!
+2025-12-23 11:23:42
+Lr: 1.000e-02 | Epoch: [1][0/26] | Time 0.365 (0.346) | Data 0.193 (0.015) | Loss 19.3520 (19.3520) | Bd 3.9619 (3.9619) | acc 0.060 (0.060) | IoU 0.040 (0.040) | [0:19:44]
