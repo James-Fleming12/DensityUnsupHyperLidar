@@ -7,6 +7,7 @@ from modules.HDC_utils import DensityModel
 from faster_mean_shift.mean_shift_cosine_gpu import get_binary_density_centroids
 from modules.trainer import Trainer, TrainingPipeline
 from modules.Basic_HD import DenseHDTrainer
+from modules.ioueval import iouEval
 
 from dataset.export_semantickitti import KittiConverter
 
@@ -56,6 +57,15 @@ def train_hdc(ARCH, DATA):
                         shuffle_train=True)
     
     dataloader = parser.get_train_set()
+    val_loader = parser.get_valid_set() # val_loader is empty???
+
+    ignore = []
+    for cl, ign in DATA['learning_ignore'].items():
+        if ign:
+            x_cl = int(cl)
+            ignore.append(x_cl)
+
+    evaluator = iouEval(NUM_CLASSES, device, ignore)
 
     model = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
     trainer = DenseHDTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, hd_dim=HD_DIM)
@@ -64,6 +74,8 @@ def train_hdc(ARCH, DATA):
 
     for i in range(MAX_HDC_EPOCHS):
         trainer.retrain(dataloader, model, i+1)
+
+    trainer.validate(val_loader, model, evaluator)
 
 def main():
     try:
