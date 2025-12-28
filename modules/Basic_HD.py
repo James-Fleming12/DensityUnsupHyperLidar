@@ -10,21 +10,19 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
-from modules.HDC_utils import set_model
+from modules.HDC_utils import set_dense_model, set_model
 from modules.ioueval import *
 import torch.backends.cudnn as cudnn
 from postproc.KNN import KNN
 from common.avgmeter import *
 
-
 from torchhd import functional
 from torchhd import embeddings
-
 
 VAL_CNT = 10
 
 class DenseHDTrainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, modeldir):
+    def __init__(self, ARCH, DATA, datadir, logdir, modeldir, hd_dim = 10000):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -34,6 +32,7 @@ class DenseHDTrainer():
         self.logdir = logdir
         self.modeldir = modeldir
         self.epochs = 20
+        self.hd_dim = hd_dim
 
         from dataset.kitti.parser import Parser
         self.parser = Parser(root=self.datadir,
@@ -63,10 +62,7 @@ class DenseHDTrainer():
                 self.loss_w[x_cl] = 0
         print("Loss weights from content: ", self.loss_w.data)
 
-        # build model and criterion
-        # self.model = model
-        # concatenate the encoder and the head
-        self.model = set_model(ARCH, modeldir, 'rp', 0, 0, self.num_classes, self.device)
+        self.model = set_dense_model(ARCH, modeldir, 'rp', 0, 0, self.num_classes, self.device, hd_dim=self.hd_dim)
         print(self.parser.get_n_classes())
         self.post = None
         if self.ARCH["post"]["KNN"]["use"]:
@@ -127,36 +123,21 @@ class DenseHDTrainer():
             train_time = []
             self.is_wrong_list = [None] * len(train_loader)  # store the wrong classification for each batch
             for i, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(tqdm(train_loader, desc="Training")):
-                # print(labels.detach().cpu().tolist())
-                # print(images.shape, labels.shape)
-                # if i > 10: # for debug
-                #     break
-                # proj_range = proj_range[0, :npoints]
-                # unproj_range = unproj_range[0, :npoints]
                 path_seq = path_seq[0]
                 path_name = path_name[0]
 
-                if self.gpu:
-                    proj_in = proj_in.cuda()
-                    proj_mask = proj_mask.cuda()
-                    # if self.post:
-                    #     proj_range = proj_range.cuda()
-                    #     unproj_range = unproj_range.cuda()
-
-                # samples_hv = self.model.encode(proj_in, self.mask) # (bsz*size, hd_dim)
-                start = time.time()
-                samples_hv, _, _ = self.model.encode(proj_in, self.mask)
-                samples_hv = samples_hv.to(model.classify_weights.dtype)
-
-                # samples_hv = samples_hv.float()
-                #proj_labels shape: torch.Size([1, 64, 512])
-                proj_labels = proj_labels.view(-1)  # shape: (btsz*64*512, 1)
+                proj_in = proj_in.to(self.device)
+                proj_mask = proj_mask.to(self.device)
                 proj_labels = proj_labels.to(self.device)
-                
-                # Debug - manually update the labels to the corresponding class
-                # for i in range(samples_hv.shape[0]):
-                #     model.classify_weights[proj_labels[i]] += samples_hv[i]
-                #     model.classify_sample_cnt[proj_labels[i]] += 1
+
+                start = time.time()
+                samples_hv, _, _ = self.model.encode_chunked(proj_in, self.mask)
+                samples_hv = samples_hv.to(model.classify_weights.dtype)
+                samples_hv = samples_hv.to(self.device)
+                model.classify_weights.data = model.classify_weights.data.to(self.device)
+
+                proj_labels = proj_labels.view(-1)
+                proj_labels = proj_labels.to(self.device)
                 
                 model.classify_weights.index_add_(0, proj_labels, samples_hv)
                 if torch.cuda.is_available():
@@ -166,9 +147,7 @@ class DenseHDTrainer():
                 start = time.time()
 
                 predictions =self.model.get_predictions(samples_hv)
-                # print("predictions: ", predictions) #torch.Size([32768, 20])
-                argmax = predictions.argmax(dim=1) # (bsz*size, 1)
-                # self.is_wrong_list[i] = proj_labels != argmax
+                argmax = predictions.argmax(dim=1)
 
                 is_wrong = proj_labels != argmax
                 proj_labels = proj_labels[is_wrong]
@@ -176,45 +155,11 @@ class DenseHDTrainer():
                 samples_hv = samples_hv[is_wrong]
                 samples_hv = samples_hv.to(model.classify_weights.dtype)
 
-                # # Pick the loss by the wrong
-                # self.is_wrong_list[i] = proj_labels != argmax
-                # loss = nn.CrossEntropyLoss(weight=self.loss_w.to(self.device))(predictions, proj_labels)
-                # self.is_wrong_list[i] *= loss
-
-                # Pick the loss by the Wy^X - WyX
-                # Compute dot products
-                # true_scores = torch.sum(model.classify_weights[proj_labels] * samples_hv, dim=1)      # shape: [wrong_size]
-                # wrong_scores = torch.sum(model.classify_weights[argmax] * samples_hv, dim=1) # shape: [wrong_size]
                 true_scores = predictions[is_wrong, proj_labels]  # shape: [wrong_size]
                 wrong_scores = predictions[is_wrong, argmax]  # shape: [wrong_size]
-                # # losses = wrong_scores - true_scores  # shape: [wrong_size]
                 losses = wrong_scores - true_scores  # shape: [wrong_size]
-                # predictions 100:C
-                # is_wrong 100:1 -> 
-                # predictions[is_wrong]  50:C
-                # proj_labels[is_wrong] 50:1
 
-                # losses = true_scores - wrong_scores          # shape: [wrong_size]
-                # if losses.sum().item() < 0:
-                # print("Warning: negative losses detected, this is not expected")
-                # print("proj_labels: ", proj_labels)
-                # print("argmax: ", argmax)
-                # print("samples_hv: ", samples_hv)
-                # print("true_scores: ", true_scores)
-                # print("wrong_scores: ", wrong_scores)
-                # print("losses: ", losses)
-                # print("Check the is_wrong shape", is_wrong.shape)
-                # print("Check the losses shape", losses.shape)
-                # print("Check the self.is_wrong_list[i] shape", self.is_wrong_list[i].shape)
-                # assert self.is_wrong_list[i].shape == is_wrong.shape
-                # Initialize if needed — make sure it's a FloatTensor
-                # if self.is_wrong_list[i] is None or self.is_wrong_list[i].shape != is_wrong.shape:
-                #     self.is_wrong_list[i] = torch.zeros_like(is_wrong, dtype=losses.dtype)
-                # self.is_wrong_list[i][is_wrong] = losses
-                # print("is_wrong shape: ", is_wrong.shape)
                 self.is_wrong_list[i] = is_wrong
-                # print(losses.min(), losses.max())
-
 
             model.classify.weight[:] = F.normalize(model.classify_weights)
             print("sum of is_wrong_list: ", sum([x.sum().item() for x in self.is_wrong_list if x is not None]))
@@ -228,27 +173,17 @@ class DenseHDTrainer():
         if self.gpu:
             torch.cuda.empty_cache()
         with torch.no_grad():
-            # for idx, (images, labels) in enumerate(train_loader):
-            idx = 0  # batch index
             cur_class = -1
             total_miss = 0
             retrain_time = []
-            for i, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(tqdm(train_loader, desc="Retraining")):
-                # print(labels.detach().cpu().tolist())
-                # print(images.shape, labels.shape)
-                # if i > 10: # for debug
-                #     break
-                # proj_range = proj_range[0, :npoints]
-                # unproj_range = unproj_range[0, :npoints]
+            for i, (proj_in, _, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _)  in enumerate(tqdm(train_loader, desc="Retraining")):
                 path_seq = path_seq[0]
                 path_name = path_name[0]
 
                 if self.gpu:
                     proj_in = proj_in.cuda()
                     proj_mask = proj_mask.cuda()
-                    # if self.post:
-                    #     proj_range = proj_range.cuda()
-                    #     unproj_range = unproj_range.cuda()
+
                 start = time.time()
                 model.classify.weight[:] = F.normalize(model.classify_weights)
                 # print("Number of wrongs:", self.is_wrong_list[i].sum().item())
@@ -265,19 +200,12 @@ class DenseHDTrainer():
                 if is_wrong.sum().item() == 0:
                     continue
 
-                # Check wrong classification number here and update the classify weights
                 total_miss += is_wrong.sum().item()
                 proj_labels = proj_labels[is_wrong]
                 argmax = argmax[is_wrong]
                 samples_hv = samples_hv[is_wrong]
                 samples_hv = samples_hv.to(model.classify_weights.dtype)
-                # n
-                # Y(c) = a(hd*c)x(hd) + b
-                # a (c*hd)[prj_labedls] -> n*1*hd
-                # x = n*hd
-                # Y = n * (sum(hd))
-                # true_scores = torch.sum(model.classify_weights[proj_labels] * samples_hv, dim=1)      # shape: [wrong_size]
-                # wrong_scores = torch.sum(model.classify_weights[argmax] * samples_hv, dim=1) # shape: [wrong_size]
+
                 true_scores = predictions[is_wrong, proj_labels]  # shape: [wrong_size]
                 wrong_scores = predictions[is_wrong, argmax]  # shape: [wrong_size
                 losses = wrong_scores - true_scores  # shape: [wrong_size]
@@ -290,29 +218,15 @@ class DenseHDTrainer():
                     print("wrong_scores: ", wrong_scores)
                     print("losses: ", losses)
 
-                # losses = true_scores - wrong_scores          # shape: [wrong_size]
-                # print(losses.min(), losses.max())
-                # self.is_wrong_list[i][is_wrong] = losses
                 wrong_indices_within_selected = is_wrong.nonzero(as_tuple=False).squeeze()
                 actual_wrong_indices = indices[wrong_indices_within_selected]
-                # self.is_wrong_list[i][actual_wrong_indices] = losses.to(self.is_wrong_list[i].dtype)
-                # print("actual_wrong_indices: ", actual_wrong_indices.shape)
-                # print("wrong_indices_within_selected: ", wrong_indices_within_selected.shape)
-                # print("is_wrong: ", is_wrong.shape)
-                # print("self.is_wrong_list[i]: ", self.is_wrong_list[i].shape)
-                # print("indices: ", indices.shape)
-                # # print("is_wrong_list number of wrong: ", self.is_wrong_list[i].nonzero(as_tuple=False).squeeze().sum().item())
-                # print("Number of wrongs:", self.is_wrong_list[i].sum().item())
+
                 self.is_wrong_list[i][actual_wrong_indices] = True
-                # print("is_wrong_list number of wrong: ", self.is_wrong_list[i].nonzero(as_tuple=False).squeeze().sum().item())
-                # print("Number of wrongs:", self.is_wrong_list[i].sum().item())
-
 
                 model.classify_weights.index_add_(0, proj_labels, samples_hv)
                 model.classify_weights.index_add_(0, proj_labels, samples_hv)
                 model.classify_weights.index_add_(0, argmax, -samples_hv)
                 model.classify_weights.index_add_(0, argmax, -samples_hv)
-                # model.classify.weight[:] = F.normalize(model.classify_weights)
 
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
@@ -320,7 +234,6 @@ class DenseHDTrainer():
                 retrain_time.append(res)
                 start = time.time()
 
-                # print("Finish one batch, update classify weights")
             print("total_miss: ", total_miss)
             print("sum of is_wrong_list: ", sum([x.sum().item() for x in self.is_wrong_list if x is not None]))
             print("Mean HDC retraining time:{}\t std:{}".format(np.mean(retrain_time), np.std(retrain_time)))
@@ -338,75 +251,29 @@ class DenseHDTrainer():
         validation_time = []
         class_func=self.parser.get_xentropy_class_string,
         with torch.no_grad():
-            for i, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(tqdm(val_loader, desc="Validation")):
-                # p_x = p_x[0, :npoints]
-                # p_y = p_y[0, :npoints]
-                # proj_range = proj_range[0, :npoints]
-                # unproj_range = unproj_range[0, :npoints]
+            for _, (proj_in, _, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in enumerate(tqdm(val_loader, desc="Validation")):
                 path_seq = path_seq[0]
                 path_name = path_name[0]
                 B, C, H, W = proj_in.shape[0], proj_in.shape[1], proj_in.shape[2], proj_in.shape[3]
 
-                # print("labels import correct: ", proj_labels) #torch.Size([1, 64, 512])
-
                 if self.gpu:
                     proj_in = proj_in.cuda()
-                    # p_x = p_x.cuda()
-                    # p_y = p_y.cuda()
-                    # if self.post:
-                    #     proj_range = proj_range.cuda()
-                    #     unproj_range = unproj_range.cuda()
+
                 start = time.time()
-                # print("proj_in shape: ", proj_in.shape) #torch.Size([1, 5, 64, 512])
                 predictions, _, _, _ = model(proj_in, self.mask)
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
                 res = time.time() - start
                 validation_time.append(res)
                 start = time.time()
-                # print("predictions shape: ", predictions.shape) #torch.Size([32768, 20])
-                #print('outputs', outputs)
 
-                predictions = predictions.view(B, H, W, self.num_classes)  # (1, H, W, C)
-                predictions = predictions.permute(0, 3, 1, 2)        # → (1, C, H, W)
-                # print("predictions shape: ", predictions.shape) #torch.Size([1, 20, 64, 512])
+                predictions = predictions.view(B, H, W, self.num_classes)
+                predictions = predictions.permute(0, 3, 1, 2)
                 argmax = predictions.argmax(dim=1)
                 argmax = argmax.squeeze(0) 
-                # print("argmax shape: ", argmax.shape) #torch.Size([1, 64, 512])
                 proj_labels = proj_labels.to(self.device)
-                # print("proj_labels shape: ", proj_labels.shape) #torch.Size([1, 64, 512])
-                # print("argmax shape: ", argmax.shape) #torch.Size([64, 512])
-                # print("proj_labels: ", proj_labels)
-                # print("argmax: ", argmax)
                 evaluator.addBatch(argmax, proj_labels)
 
-                # if torch.cuda.is_available():
-                #     torch.cuda.synchronize()
-                # if self.post:
-                #     # knn postproc
-                #     unproj_argmax = self.post(proj_range,
-                #                             unproj_range,
-                #                             argmax,
-                #                             p_x,
-                #                             p_y)
-                # else:
-                #     # put in original pointcloud using indexes
-                #     unproj_argmax = argmax[p_y, p_x]
-
-                # # measure elapsed time
-                # if torch.cuda.is_available():
-                #     torch.cuda.synchronize()
-                # # save scan
-                # # get the first scan in batch and project scan
-                # pred_np = unproj_argmax.cpu().numpy()
-                # pred_np = pred_np.reshape((-1)).astype(np.int32)
-
-                # # map to original label
-                # pred_np = to_orig_fn(pred_np)
-                # # save scan
-                # path = os.path.join(self.logdir, "sequences",
-                #                     path_seq, "predictions", path_name)
-                # pred_np.tofile(path)
             print("Mean HDC validation time:{}\t std:{}".format(np.mean(validation_time), np.std(validation_time)))
         accuracy = evaluator.getacc()
         jaccard, class_jaccard = evaluator.getIoU()

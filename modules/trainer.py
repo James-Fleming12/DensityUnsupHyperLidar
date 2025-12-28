@@ -124,10 +124,10 @@ class TrainingPipeline():
                 elif self.ARCH["train"]["act"] == "SiLU":
                     convert_relu_to_softplus(self.model, nn.SiLU())
 
-        save_to_log(self.log, 'model.txt', str(self.model))
+        # save_to_log(self.log, 'model.txt', str(self.model))
         pytorch_total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        print("Number of parameters: ", pytorch_total_params/1000000, "M")
-        save_to_log(self.log, 'model.txt', "Number of parameters: %.5f M" %(pytorch_total_params/1000000))
+        # print("Number of parameters: ", pytorch_total_params/1000000, "M")
+        # save_to_log(self.log, 'model.txt', "Number of parameters: %.5f M" %(pytorch_total_params/1000000))
         self.tb_logger = SummaryWriter(log_dir=self.log, flush_secs=20)
 
         # GPU?
@@ -270,7 +270,7 @@ class TrainingPipeline():
                 print("Ignoring class ", i, " in IoU evaluation")
         self.evaluator = iouEval(self.parser.get_n_classes(),
                                  self.device, self.ignore_class)
-        save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        # save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         if self.path is not None:
             acc, iou, loss, rand_img = self.validate(val_loader=self.parser.get_valid_set(),
                                              model=self.model,
@@ -307,7 +307,7 @@ class TrainingPipeline():
                      'info': self.info,
                      'scheduler': self.scheduler.state_dict()
                      }
-            save_checkpoint(state, self.log, suffix="")
+            # save_checkpoint(state, self.log, suffix="")
             # save_checkpoint(state, self.log, suffix=""+str(epoch))
 
             if self.info['train_iou'] > self.info['best_train_iou']:
@@ -467,10 +467,10 @@ class Trainer():
                 elif self.ARCH["train"]["act"] == "SiLU":
                     convert_relu_to_softplus(self.model, nn.SiLU())
 
-        save_to_log(self.log, 'model.txt', str(self.model))
+        # save_to_log(self.log, 'model.txt', str(self.model))
         pytorch_total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         print("Number of parameters: ", pytorch_total_params/1000000, "M")
-        save_to_log(self.log, 'model.txt', "Number of parameters: %.5f M" %(pytorch_total_params/1000000))
+        # save_to_log(self.log, 'model.txt', "Number of parameters: %.5f M" %(pytorch_total_params/1000000))
         self.tb_logger = SummaryWriter(log_dir=self.log, flush_secs=20)
 
         # GPU?
@@ -614,7 +614,7 @@ class Trainer():
                 print("Ignoring class ", i, " in IoU evaluation")
         self.evaluator = iouEval(self.parser.get_n_classes(),
                                  self.device, self.ignore_class)
-        save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        # save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         if self.path is not None:
             acc, iou, loss, rand_img = self.validate(val_loader=self.parser.get_valid_set(),
                                              model=self.model,
@@ -655,7 +655,7 @@ class Trainer():
             # save_checkpoint(state, self.log, suffix=""+str(epoch))
 
             if self.info['train_iou'] > self.info['best_train_iou']:
-                save_to_log(self.log, 'log.txt', "Best mean iou in training set so far, save model!")
+                # save_to_log(self.log, 'log.txt', "Best mean iou in training set so far, save model!")
                 print("Best mean iou in training set so far, save model!")
                 self.info['best_train_iou'] = self.info['train_iou']
                 state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
@@ -683,7 +683,7 @@ class Trainer():
 
             # remember best iou and save checkpoint
             if self.info['valid_iou'] > self.info['best_val_iou']:
-                save_to_log(self.log, 'log.txt', "Best mean iou in validation so far, save model!")
+                # save_to_log(self.log, 'log.txt', "Best mean iou in validation so far, save model!")
                 print("Best mean iou in validation so far, save model!")
                 print("*" * 80)
                 self.info['best_val_iou'] = self.info['valid_iou']
@@ -699,17 +699,17 @@ class Trainer():
             print("*" * 80)
 
             # save to log
-            Trainer.save_to_log(logdir=self.log,
-                                logger=self.tb_logger,
-                                info=self.info,
-                                epoch=epoch,
-                                w_summary=self.ARCH["train"]["save_summary"],
-                                model=self.model_single,
-                                img_summary=self.ARCH["train"]["save_scans"],
-                                imgs=rand_img)
-            save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+            # Trainer.save_to_log(logdir=self.log,
+            #                     logger=self.tb_logger,
+            #                     info=self.info,
+            #                     epoch=epoch,
+            #                     w_summary=self.ARCH["train"]["save_summary"],
+            #                     model=self.model_single,
+            #                     img_summary=self.ARCH["train"]["save_scans"],
+            #                     imgs=rand_img)
+            # save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         print('Finished Training')
-        save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        # save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         return
 
     def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
@@ -829,46 +829,46 @@ class Trainer():
             for g in self.optimizer.param_groups:
                 lr = g["lr"]
 
-            if show_scans:
-                if i % self.ARCH["train"]["save_batch"] == 0:
-                    # get the first scan in batch and project points
-                    mask_np = proj_mask[0].cpu().numpy()
-                    depth_np = in_vol[0][0].cpu().numpy()
-                    pred_np = argmax[0].cpu().numpy()
-                    gt_np = proj_labels[0].cpu().numpy()
-                    out = Trainer.make_log_img(depth_np, mask_np, pred_np, gt_np, color_fn)
+            # if show_scans:
+            #     if i % self.ARCH["train"]["save_batch"] == 0:
+            #         # get the first scan in batch and project points
+            #         mask_np = proj_mask[0].cpu().numpy()
+            #         depth_np = in_vol[0][0].cpu().numpy()
+            #         pred_np = argmax[0].cpu().numpy()
+            #         gt_np = proj_labels[0].cpu().numpy()
+            #         out = Trainer.make_log_img(depth_np, mask_np, pred_np, gt_np, color_fn)
 
-                    directory = os.path.join(self.log, "train-predictions")
-                    if not os.path.isdir(directory):
-                        os.makedirs(directory)
-                    name = os.path.join(directory, str(i) + ".png")
-                    cv2.imwrite(name, out)
+            #         directory = os.path.join(self.log, "train-predictions")
+            #         if not os.path.isdir(directory):
+            #             os.makedirs(directory)
+            #         name = os.path.join(directory, str(i) + ".png")
+            #         cv2.imwrite(name, out)
 
 
-            if i % self.ARCH["train"]["report_batch"] == 0:
-                print('Lr: {lr:.3e} | '
-                      'Epoch: [{0}][{1}/{2}] | '
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                      'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                      'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                      'Bd {bd.val:.4f} ({bd.avg:.4f}) | '
-                      'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                      'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
-                    epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                    data_time=self.data_time_t, loss=losses, bd=bd, acc=acc, iou=iou, lr=lr,
-                    estim=self.calculate_estimate(epoch, i)))
+            # if i % self.ARCH["train"]["report_batch"] == 0:
+            #     print('Lr: {lr:.3e} | '
+            #           'Epoch: [{0}][{1}/{2}] | '
+            #           'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
+            #           'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+            #           'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
+            #           'Bd {bd.val:.4f} ({bd.avg:.4f}) | '
+            #           'acc {acc.val:.3f} ({acc.avg:.3f}) | '
+            #           'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
+            #         epoch, i, len(train_loader), batch_time=self.batch_time_t,
+            #         data_time=self.data_time_t, loss=losses, bd=bd, acc=acc, iou=iou, lr=lr,
+            #         estim=self.calculate_estimate(epoch, i)))
 
-                save_to_log(self.log, 'log.txt', 'Lr: {lr:.3e} | '
-                                                 'Epoch: [{0}][{1}/{2}] | '
-                                                 'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
-                                                 'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
-                                                 'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
-                                                 'Bd {bd.val:.4f} ({bd.avg:.4f}) | '
-                                                 'acc {acc.val:.3f} ({acc.avg:.3f}) | '
-                                                 'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
-                    epoch, i, len(train_loader), batch_time=self.batch_time_t,
-                    data_time=self.data_time_t, loss=losses, bd=bd, acc=acc, iou=iou, lr=lr,
-                    estim=self.calculate_estimate(epoch, i)))
+            #     save_to_log(self.log, 'log.txt', 'Lr: {lr:.3e} | '
+            #                                      'Epoch: [{0}][{1}/{2}] | '
+            #                                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f}) | '
+            #                                      'Data {data_time.val:.3f} ({data_time.avg:.3f}) | '
+            #                                      'Loss {loss.val:.4f} ({loss.avg:.4f}) | '
+            #                                      'Bd {bd.val:.4f} ({bd.avg:.4f}) | '
+            #                                      'acc {acc.val:.3f} ({acc.avg:.3f}) | '
+            #                                      'IoU {iou.val:.3f} ({iou.avg:.3f}) | [{estim}]'.format(
+            #         epoch, i, len(train_loader), batch_time=self.batch_time_t,
+            #         data_time=self.data_time_t, loss=losses, bd=bd, acc=acc, iou=iou, lr=lr,
+            #         estim=self.calculate_estimate(epoch, i)))
             # step scheduler
             scheduler.step()
         # scheduler.step()
@@ -930,18 +930,18 @@ class Trainer():
 
 
 
-                if save_scans:
-                    # get the first scan in batch and project points
-                    mask_np = proj_mask[0].cpu().numpy()
-                    depth_np = in_vol[0][0].cpu().numpy()
-                    pred_np = argmax[0].cpu().numpy()
-                    gt_np = proj_labels[0].cpu().numpy()
-                    out = Trainer.make_log_img(depth_np,
-                                               mask_np,
-                                               pred_np,
-                                               gt_np,
-                                               color_fn)
-                    rand_imgs.append(out)
+                # if save_scans:
+                #     # get the first scan in batch and project points
+                #     mask_np = proj_mask[0].cpu().numpy()
+                #     depth_np = in_vol[0][0].cpu().numpy()
+                #     pred_np = argmax[0].cpu().numpy()
+                #     gt_np = proj_labels[0].cpu().numpy()
+                #     out = Trainer.make_log_img(depth_np,
+                #                                mask_np,
+                #                                pred_np,
+                #                                gt_np,
+                #                                color_fn)
+                #     rand_imgs.append(out)
 
                 # measure elapsed time
                 self.batch_time_e.update(time.time() - end)
@@ -952,36 +952,36 @@ class Trainer():
             acc.update(accuracy.item(), in_vol.size(0))
             iou.update(jaccard.item(), in_vol.size(0))
             # print the results
-            print("Mean CNN inference time:{}\t std:{}".format(np.mean(validation_time), np.std(validation_time)))
-            print('Validation set:\n'
-                  'Time avg per batch {batch_time.avg:.3f}\n'
-                  'Loss avg {loss.avg:.4f}\n'
-                  'Jaccard avg {jac.avg:.4f}\n'
-                  'WCE avg {wces.avg:.4f}\n'
-                  'Acc avg {acc.avg:.3f}\n'
-                  'IoU avg {iou.avg:.3f}'.format(batch_time=self.batch_time_e,
-                                                 loss=losses,
-                                                 jac=jaccs,
-                                                 wces=wces,
-                                                 acc=acc, iou=iou))
+            # print("Mean CNN inference time:{}\t std:{}".format(np.mean(validation_time), np.std(validation_time)))
+            # print('Validation set:\n'
+            #       'Time avg per batch {batch_time.avg:.3f}\n'
+            #       'Loss avg {loss.avg:.4f}\n'
+            #       'Jaccard avg {jac.avg:.4f}\n'
+            #       'WCE avg {wces.avg:.4f}\n'
+            #       'Acc avg {acc.avg:.3f}\n'
+            #       'IoU avg {iou.avg:.3f}'.format(batch_time=self.batch_time_e,
+            #                                      loss=losses,
+            #                                      jac=jaccs,
+            #                                      wces=wces,
+            #                                      acc=acc, iou=iou))
 
-            save_to_log(self.log, 'log.txt', 'Validation set:\n'
-                                             'Time avg per batch {batch_time.avg:.3f}\n'
-                                             'Loss avg {loss.avg:.4f}\n'
-                                             'Jaccard avg {jac.avg:.4f}\n'
-                                             'WCE avg {wces.avg:.4f}\n'
-                                             'Acc avg {acc.avg:.3f}\n'
-                                             'IoU avg {iou.avg:.3f}'.format(batch_time=self.batch_time_e,
-                                                                            loss=losses,
-                                                                            jac=jaccs,
-                                                                            wces=wces,
-                                                                            acc=acc, iou=iou))
+            # save_to_log(self.log, 'log.txt', 'Validation set:\n'
+            #                                  'Time avg per batch {batch_time.avg:.3f}\n'
+            #                                  'Loss avg {loss.avg:.4f}\n'
+            #                                  'Jaccard avg {jac.avg:.4f}\n'
+            #                                  'WCE avg {wces.avg:.4f}\n'
+            #                                  'Acc avg {acc.avg:.3f}\n'
+            #                                  'IoU avg {iou.avg:.3f}'.format(batch_time=self.batch_time_e,
+            #                                                                 loss=losses,
+            #                                                                 jac=jaccs,
+            #                                                                 wces=wces,
+            #                                                                 acc=acc, iou=iou))
             # print also classwise
             for i, jacc in enumerate(class_jaccard):
-                print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-                    i=i, class_str=class_func(i), jacc=jacc))
-                save_to_log(self.log, 'log.txt', 'IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-                    i=i, class_str=class_func(i), jacc=jacc))
+                # print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
+                #     i=i, class_str=class_func(i), jacc=jacc))
+                # save_to_log(self.log, 'log.txt', 'IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
+                #     i=i, class_str=class_func(i), jacc=jacc))
                 self.info["valid_classes/" + class_func(i)] = jacc
 
 

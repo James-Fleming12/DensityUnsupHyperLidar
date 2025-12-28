@@ -5,3 +5,4 @@ nuscenes_kitti/*
 logs/*
 common/*
 *.pyc
+/logs/*

@@ -28,15 +28,11 @@ class Model(nn.Module):
             torch.nn.Module.dump_patches = True
             if self.ARCH["train"]["pipeline"] == "hardnet":
                 from modules.network.HarDNet import HarDNet
-                # 20 is the self.num_classes but setup as 20 from the semantic-kitti.yaml
-                # Under nusceneces, it is 17 classes but still setup as 20
-                self.net = HarDNet(20, self.ARCH["train"]["aux_loss"])
+                self.net = HarDNet(self.num_classes, self.ARCH["train"]["aux_loss"])
 
             if self.ARCH["train"]["pipeline"] == "res":
                 from modules.network.ResNet import ResNet_34
-                # 20 is the self.num_classes but setup as 20 from the semantic-kitti.yaml
-                # Under nusceneces, it is 17 classes but still setup as 20
-                self.net = ResNet_34(20, self.ARCH["train"]["aux_loss"])
+                self.net = ResNet_34(self.num_classes, self.ARCH["train"]["aux_loss"])
 
                 def convert_relu_to_softplus(model, act):
                     for child_name, child in model.named_children():
@@ -95,6 +91,7 @@ class Model(nn.Module):
         # self.classify_weights is the sum of all hypervectors, so its scale
         # accounts the number of samples in this class/cluster
         self.classify_weights = copy.deepcopy(self.classify.weight)
+        self.classify_weights.to(self.device)
         # print(self.classify_weights.shape)  # size num_class x HD dim
 
 
@@ -253,17 +250,17 @@ class Model(nn.Module):
 def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
-def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
-    return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
+def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, hd_dim=10000):
+    return DensityModel(ARCH, modeldir, num_classes, device, hd_dim=hd_dim)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, num_classes, device):
-        super(Model, self).__init__()
+    def __init__(self, ARCH, modeldir, num_classes, device, hd_dim=10000):
+        super(DensityModel, self).__init__()
 
         self.device = device
 
         self.num_classes = num_classes
-        self.hd_dim = 10000
+        self.hd_dim = hd_dim
         self.temperature = 0.01
 
         self.flatten = torch.nn.Flatten()
@@ -275,11 +272,11 @@ class DensityModel(nn.Module):
             torch.nn.Module.dump_patches = True
             if self.ARCH["train"]["pipeline"] == "hardnet":
                 from modules.network.HarDNet import HarDNet
-                self.net = HarDNet(20, self.ARCH["train"]["aux_loss"])
+                self.net = HarDNet(self.num_classes, self.ARCH["train"]["aux_loss"])
 
             if self.ARCH["train"]["pipeline"] == "res":
                 from modules.network.ResNet import ResNet_34
-                self.net = ResNet_34(20, self.ARCH["train"]["aux_loss"])
+                self.net = ResNet_34(self.num_classes, self.ARCH["train"]["aux_loss"])
 
                 def convert_relu_to_softplus(model, act):
                     for child_name, child in model.named_children():
@@ -322,8 +319,8 @@ class DensityModel(nn.Module):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
-        with torch.amp.autocast(enabled=True):
-            x = self.net(x, True)
+        # with torch.amp.autocast(self.device, enabled=True):
+        x = self.net(x, True)
 
         x = x.permute(0, 2, 3, 1)
         x = x.reshape(-1, 128)
@@ -349,28 +346,82 @@ class DensityModel(nn.Module):
             selected_indices = torch.arange(x.shape[0], device=x.device)  # use all data
         sample_hv = torch.zeros((x.shape[0], self.hd_dim), device=self.device, dtype=x.dtype)
 
-        if self.hd_encoder == 'rp':
-            if x.dtype != self.projection.weight.dtype:
-                self.projection = self.projection.to(x.dtype).to(self.device)
-            sample_hv[:, mask] = self.projection(x)[:, mask]
-
-        elif self.hd_encoder == 'idlevel':
-            tmp_hv = functional.bind(self.position.weight[:, mask],
-                                     self.value(x)[:, :, mask])
-            sample_hv[:, mask] = functional.multiset(tmp_hv)
-        elif self.hd_encoder == 'nonlinear':
-            sample_hv[:, mask] = self.nonlinear_projection(x)[:, mask]
-        else:
-            return x
+        if x.dtype != self.projection.weight.dtype:
+            self.projection = self.projection.to(x.dtype).to(self.device)
+        sample_hv[:, mask] = self.projection(x)[:, mask]
 
         sample_hv[:, mask] = functional.hard_quantize(sample_hv[:, mask])
+        return sample_hv, selected_indices, is_wrong
+    
+    def encode_chunked(self, x, mask=None, PERCENTAGE=None, is_wrong=None, chunk_size=5000):
+        """
+        Memory-efficient encode that processes data in chunks.
+        """
+        if mask is None:
+            mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
+
+        with torch.amp.autocast(self.device.type, enabled=True):
+            x = self.net(x, True)
+
+        x = x.permute(0, 2, 3, 1)
+        x = x.reshape(-1, 128)
+        
+        total_points = x.shape[0]
+        
+        if PERCENTAGE is not None:
+            num_samples = int(total_points * PERCENTAGE)
+            
+            if is_wrong is not None:
+                wrong_indices = torch.nonzero(is_wrong, as_tuple=False).squeeze()
+                if wrong_indices.numel() >= num_samples:
+                    selected_indices = wrong_indices[torch.randperm(
+                        wrong_indices.shape[0], device=x.device)[:num_samples]]
+                    is_wrong[selected_indices] = False
+                else:
+                    non_wrong_indices = torch.nonzero(~is_wrong, as_tuple=False).squeeze()
+                    remaining = num_samples - wrong_indices.numel()
+                    fill_indices = non_wrong_indices[torch.randperm(
+                        non_wrong_indices.shape[0], device=x.device)[:remaining]]
+                    selected_indices = torch.cat([wrong_indices, fill_indices], dim=0)
+                    is_wrong[selected_indices] = False
+            else:
+                selected_indices = torch.randperm(total_points, device=x.device)[:num_samples]
+            
+            selected_indices, _ = selected_indices.sort()
+            x = x[selected_indices]
+            total_points = x.shape[0]
+        else:
+            selected_indices = torch.arange(total_points, device=x.device)
+        
+        sample_hv = torch.zeros((total_points, self.hd_dim), 
+                            device=self.device, dtype=torch.float16 if self.device.type == 'cuda' else torch.float32)
+
+        if x.dtype != self.projection.weight.dtype:
+            self.projection = self.projection.to(x.dtype).to(self.device)
+
+        for chunk_start in range(0, total_points, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, total_points)
+
+            x_chunk = x[chunk_start:chunk_end]
+
+            with torch.amp.autocast(self.device.type, enabled=True):
+                projected_chunk = self.projection(x_chunk)
+
+            sample_hv[chunk_start:chunk_end, mask] = projected_chunk[:, mask]
+
+            del projected_chunk, x_chunk
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+
+        sample_hv[:, mask] = functional.hard_quantize(sample_hv[:, mask])
+        
         return sample_hv, selected_indices, is_wrong
 
     def forward(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
-        enc, indices, is_wrong_left = self.encode(x, mask, PERCENTAGE, is_wrong)
+        enc, indices, is_wrong_left = self.encode_chunked(x, mask, PERCENTAGE, is_wrong)
         if enc.dtype != self.classify.weight.dtype:
             self.classify = self.classify.to(enc.dtype)
         logits = self.classify(F.normalize(enc))
