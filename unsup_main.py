@@ -17,6 +17,9 @@ LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
 MAX_EPOCHS = 10
+MAX_HDC_EPOCHS = 10
+
+HD_DIM = 5000
 
 def convert_dataset():
     converter = KittiConverter(
@@ -54,10 +57,13 @@ def train_hdc(ARCH, DATA):
     
     dataloader = parser.get_train_set()
 
-    model = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=2000, device=device)
-    trainer = DenseHDTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, hd_dim=2000)
+    model = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
+    trainer = DenseHDTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, hd_dim=HD_DIM)
 
     trainer.train(dataloader, model)
+
+    for i in range(MAX_HDC_EPOCHS):
+        trainer.retrain(dataloader, model, i+1)
 
 def main():
     try:

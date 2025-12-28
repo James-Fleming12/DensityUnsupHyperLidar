@@ -308,7 +308,7 @@ class DensityModel(nn.Module):
 
         self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
 
-        self.classify = nn.Linear(self.hd_dim, self.num_classes, bias=False)
+        self.classify = nn.Linear(self.hd_dim, self.num_classes, bias=False, device=self.device)
         self.classify_sample_cnt = torch.zeros((self.num_classes, 1)).to(self.device)
 
         self.classify.weight.data.fill_(0.0)

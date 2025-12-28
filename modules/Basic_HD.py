@@ -176,7 +176,7 @@ class DenseHDTrainer():
             cur_class = -1
             total_miss = 0
             retrain_time = []
-            for i, (proj_in, _, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _)  in enumerate(tqdm(train_loader, desc="Retraining")):
+            for i, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(tqdm(train_loader, desc="Retraining")):
                 path_seq = path_seq[0]
                 path_name = path_name[0]
 
@@ -186,16 +186,13 @@ class DenseHDTrainer():
 
                 start = time.time()
                 model.classify.weight[:] = F.normalize(model.classify_weights)
-                # print("Number of wrongs:", self.is_wrong_list[i].sum().item())
                 predictions, samples_hv, indices, self.is_wrong_list[i] = model(proj_in, self.mask, None, self.is_wrong_list[i])
-                argmax = predictions.argmax(dim=1) # (bsz*size, 1)
-                # #proj_labels shape: torch.Size([1, 64, 512])
-                proj_labels = proj_labels.view(-1)  # shape: (btsz*64*512, 1) 
+                argmax = predictions.argmax(dim=1)
+                proj_labels = proj_labels.view(-1)
                 proj_labels = proj_labels.to(self.device)
-                proj_labels = proj_labels[indices]  # map to the sampled hypervectors
+                proj_labels = proj_labels[indices]
 
                 is_wrong = proj_labels != argmax
-                # self.is_wrong_list[i][indices[is_wrong]] = True
                 
                 if is_wrong.sum().item() == 0:
                     continue
