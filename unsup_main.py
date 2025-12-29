@@ -22,6 +22,8 @@ MAX_HDC_EPOCHS = 10
 
 HD_DIM = 5000
 
+HDC_SAVE_PATH = "logs/hdc.pth"
+
 def convert_dataset():
     converter = KittiConverter(
         nusc_dir=NU_DATA_DIR,
@@ -38,7 +40,7 @@ def train_extractor(ARCH, DATA):
     trainer = Trainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
     trainer.train()
 
-def train_hdc(ARCH, DATA):
+def train_hdc(ARCH, DATA) -> DensityModel:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     parser = Parser(root=DATA_DIR,
@@ -75,7 +77,36 @@ def train_hdc(ARCH, DATA):
     for i in range(MAX_HDC_EPOCHS):
         trainer.retrain(dataloader, model, i+1)
 
-    trainer.validate(val_loader, model, evaluator)
+    torch.save(model, HDC_SAVE_PATH)
+
+    # trainer.validate(val_loader, model, evaluator)
+
+    return model
+
+def test_init(ARCH, DATA):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    parser = Parser(root=DATA_DIR,
+                        train_sequences=DATA["split"]["train"], # self.DATA["split"]["valid"] + self.DATA["split"]["train"] if finetune with valid
+                        valid_sequences=DATA["split"]["valid"],
+                        test_sequences=None,
+                        labels=DATA["labels"],
+                        color_map=DATA["color_map"],
+                        learning_map=DATA["learning_map"],
+                        learning_map_inv=DATA["learning_map_inv"],
+                        sensor=ARCH["dataset"]["sensor"],
+                        max_points=ARCH["dataset"]["max_points"],
+                        batch_size=ARCH["train"]["batch_size"],
+                        workers=ARCH["train"]["workers"],
+                        gt=True,
+                        shuffle_train=True)
+    
+    dataloader = parser.get_train_set()
+
+    model = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
+    model: DensityModel = torch.load(HDC_SAVE_PATH, weights_only=False)
+
+    model.init_subclusters(dataloader)
 
 def main():
     try:
@@ -93,7 +124,8 @@ def main():
 
     # convert_dataset()
     # train_extractor(ARCH, DATA)
-    train_hdc(ARCH, DATA)
+    # hdc = train_hdc(ARCH, DATA)
+    test_init(ARCH, DATA)
 
 if __name__=="__main__":
     main()

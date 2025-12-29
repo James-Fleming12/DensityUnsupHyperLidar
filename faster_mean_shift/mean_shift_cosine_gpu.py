@@ -41,8 +41,6 @@ L=2
 H=8
 
 def mean_shift_binary(X, bandwidth=None, seeds=None, cluster_all=True, GPU=True):
-    X = (X > 0.5).astype(np.uint8)
-
     if bandwidth is None:
         bandwidth = estimate_bandwidth_binary(X)
     if not (0 < bandwidth <= 1):

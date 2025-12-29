@@ -7,6 +7,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from faster_mean_shift.mean_shift_cosine_gpu import mean_shift_binary
+
 class Model(nn.Module):
     def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
         super(Model, self).__init__()
@@ -254,7 +256,7 @@ def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_clas
     return DensityModel(ARCH, modeldir, num_classes, device, hd_dim=hd_dim)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, num_classes, device, hd_dim=10000):
+    def __init__(self, ARCH, modeldir, num_classes, device, hd_dim=10000, max_subclusters = 5):
         super(DensityModel, self).__init__()
 
         self.device = device
@@ -315,6 +317,13 @@ class DensityModel(nn.Module):
 
         self.classify_weights = copy.deepcopy(self.classify.weight)
 
+        # density subcluster initialization
+        self.num_subclusters = max_subclusters
+        self.subclusters = nn.Parameter(torch.zeros(self.num_classes * self.num_subclusters, self.hd_dim, device=self.device))
+        self.subclusters.data.fill_(0.0)
+
+        self.subcluster_to_class = torch.repeat_interleave(torch.arange(self.num_classes, device=self.device), self.num_subclusters)
+
     def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
@@ -352,70 +361,81 @@ class DensityModel(nn.Module):
 
         sample_hv[:, mask] = functional.hard_quantize(sample_hv[:, mask])
         return sample_hv, selected_indices, is_wrong
-    
-    def encode_chunked(self, x, mask=None, PERCENTAGE=None, is_wrong=None, chunk_size=5000):
-        """
-        Memory-efficient encode that processes data in chunks.
-        """
+        
+    def encode_chunked(self, x, mask=None, chunk_size=1000, projection_chunk_size=5000):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
-        with torch.amp.autocast(self.device.type, enabled=True):
-            x = self.net(x, True)
+        self._clear_memory()
 
-        x = x.permute(0, 2, 3, 1)
-        x = x.reshape(-1, 128)
+        batch_size = x.shape[0]
+        all_embeddings = []
         
-        total_points = x.shape[0]
-        
-        if PERCENTAGE is not None:
-            num_samples = int(total_points * PERCENTAGE)
+        for i in range(0, batch_size, chunk_size):
+            end_i = min(i + chunk_size, batch_size)
+            x_chunk = x[i:end_i]
             
-            if is_wrong is not None:
-                wrong_indices = torch.nonzero(is_wrong, as_tuple=False).squeeze()
-                if wrong_indices.numel() >= num_samples:
-                    selected_indices = wrong_indices[torch.randperm(
-                        wrong_indices.shape[0], device=x.device)[:num_samples]]
-                    is_wrong[selected_indices] = False
-                else:
-                    non_wrong_indices = torch.nonzero(~is_wrong, as_tuple=False).squeeze()
-                    remaining = num_samples - wrong_indices.numel()
-                    fill_indices = non_wrong_indices[torch.randperm(
-                        non_wrong_indices.shape[0], device=x.device)[:remaining]]
-                    selected_indices = torch.cat([wrong_indices, fill_indices], dim=0)
-                    is_wrong[selected_indices] = False
-            else:
-                selected_indices = torch.randperm(total_points, device=x.device)[:num_samples]
-            
-            selected_indices, _ = selected_indices.sort()
-            x = x[selected_indices]
-            total_points = x.shape[0]
-        else:
-            selected_indices = torch.arange(total_points, device=x.device)
-        
-        sample_hv = torch.zeros((total_points, self.hd_dim), 
-                            device=self.device, dtype=torch.float16 if self.device.type == 'cuda' else torch.float32)
-
-        if x.dtype != self.projection.weight.dtype:
-            self.projection = self.projection.to(x.dtype).to(self.device)
-
-        for chunk_start in range(0, total_points, chunk_size):
-            chunk_end = min(chunk_start + chunk_size, total_points)
-
-            x_chunk = x[chunk_start:chunk_end]
-
             with torch.amp.autocast(self.device.type, enabled=True):
-                projected_chunk = self.projection(x_chunk)
-
-            sample_hv[chunk_start:chunk_end, mask] = projected_chunk[:, mask]
-
-            del projected_chunk, x_chunk
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-
-        sample_hv[:, mask] = functional.hard_quantize(sample_hv[:, mask])
+                emb_chunk = self.net(x_chunk, True)
+            
+            emb_chunk = emb_chunk.permute(0, 2, 3, 1)
+            emb_chunk = emb_chunk.reshape(-1, 128)
+            all_embeddings.append(emb_chunk)
+            
+            del emb_chunk
+            self._clear_memory()
         
-        return sample_hv, selected_indices, is_wrong
+        x = torch.cat(all_embeddings, dim=0)
+        del all_embeddings
+
+        total_points = x.shape[0]
+        sample_hv = torch.zeros((total_points, self.hd_dim), device=self.device, dtype=torch.float16)
+
+        for proj_start in range(0, total_points, projection_chunk_size):
+            proj_end = min(proj_start + projection_chunk_size, total_points)
+            x_chunk = x[proj_start:proj_end]
+
+            for inner_start in range(0, x_chunk.shape[0], 1000):
+                inner_end = min(inner_start + 1000, x_chunk.shape[0])
+                x_inner = x_chunk[inner_start:inner_end]
+                
+                with torch.amp.autocast(self.device.type, enabled=True):
+                    projected_inner = self.projection(x_inner)
+
+                projected_inner[:, mask] = self._quantize_tiny_chunks(projected_inner[:, mask])
+                sample_hv[proj_start + inner_start:proj_start + inner_end, mask] = projected_inner[:, mask]
+                
+                del projected_inner, x_inner
+                self._clear_memory()
+            
+            del x_chunk
+            self._clear_memory()
+
+        del x
+        self._clear_memory()
+        
+        return sample_hv, torch.arange(total_points, device=self.device), None
+
+    def _quantize_tiny_chunks(self, tensor, max_chunk_elements=100000):
+        """Quantize in very small chunks to minimize memory."""
+        if tensor.numel() <= max_chunk_elements:
+            return torch.where(tensor > 0, 1, -1).to(tensor.dtype)
+        
+        result = torch.empty_like(tensor)
+        rows = tensor.shape[0]
+        cols = tensor.shape[1]
+
+        chunk_rows = max(1, max_chunk_elements // cols)
+        
+        for i in range(0, rows, chunk_rows):
+            end_i = min(i + chunk_rows, rows)
+            chunk = tensor[i:end_i]
+            result[i:end_i] = torch.where(chunk > 0, 1, -1)
+            
+            if (i // chunk_rows) % 10 == 0 and torch.cuda.is_available():
+                self._clear_memory()
+        
+        return result
 
     def forward(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
         if mask is None:
@@ -459,3 +479,153 @@ class DensityModel(nn.Module):
         if self.method == 'LifeHDsemi':
             pair_simil[:self.num_classes, :self.num_classes] = torch.eye(self.num_classes)
         return pair_simil.detach().cpu().numpy(), class_hv.detach().cpu().numpy()
+    
+    def init_subclusters(self, dataloader, bandwidth=None, chunk_size=5000):
+        self.eval()
+        num_sub_per_cluster = self.num_subclusters
+
+        print(f"Collecting embeddings for {self.num_classes} classes")
+
+        all_subcluster_centers = []
+        all_subcluster_classes = []
+        
+        for class_id in range(self.num_classes):
+            print(f"Processing class {class_id}...")
+
+            class_embeddings = []
+            with torch.no_grad():
+                for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, npoints) in enumerate(dataloader):
+                    if batch_idx >= 1:  # Only process 2 batches
+                        break
+
+                    proj_in = proj_in.to(self.device)
+                    proj_labels = proj_labels.to(self.device)
+
+                    for chunk_start in range(0, len(proj_in), chunk_size):
+                        chunk_end = min(chunk_start + chunk_size, len(proj_in))
+                        
+                        proj_in_chunk = proj_in[chunk_start:chunk_end]
+                        proj_labels_chunk = proj_labels[chunk_start:chunk_end]
+                        proj_labels_chunk = proj_labels_chunk.flatten()
+                        
+                        enc, _, _ = self.encode_chunked(proj_in_chunk)
+
+                        class_mask = proj_labels_chunk == class_id
+                        if torch.any(class_mask):
+                            class_embeddings.append(enc[class_mask])
+
+                        self._clear_memory()
+
+                    print(f"Finished Batch {batch_idx}")
+                    self._clear_memory()
+
+            if not class_embeddings:
+                print(f"  No data for class {class_id}, skipping")
+                continue
+            
+            class_emb = torch.cat(class_embeddings, dim=0)
+            # class_emb_np = class_emb.copy().numpy()
+            # del class_emb, class_embeddings
+            # self._clear_memory()
+
+            # print(f"LIMITING TO 100 ELEMENTS FOR TESTING")
+            # class_emb = class_emb[:100]
+
+            print(f"  Found {len(class_emb)} samples")
+
+            subclusters_for_class = self._process_single_class(
+                class_emb, class_id, num_sub_per_cluster, bandwidth
+            )
+            
+            all_subcluster_centers.extend(subclusters_for_class)
+            all_subcluster_classes.extend([class_id] * len(subclusters_for_class))
+
+            del class_emb, class_embeddings
+            self._clear_memory()
+
+        self._load_subclusters(all_subcluster_centers, all_subcluster_classes)
+
+    def _load_subclusters(self, centers_list, classes_list):
+        """Load subclusters into model parameters with memory efficiency."""
+        if not centers_list:
+            print("Warning: No subclusters to load")
+            return
+        
+        total_centers = len(centers_list)
+
+        for i in range(total_centers):
+            if isinstance(centers_list[i], torch.Tensor):
+                centers_list[i] = torch.sign(centers_list[i].to(self.device))
+            else:
+                centers_list[i] = torch.sign(torch.tensor(
+                    centers_list[i], device=self.device, dtype=torch.float16
+                ))
+
+        with torch.no_grad():
+            for i in range(0, total_centers, 100):
+                end_idx = min(i + 100, total_centers)
+                batch = torch.stack(centers_list[i:end_idx], dim=0)
+                self.subclusters.data[i:end_idx] = batch
+
+                del batch
+                if i % 500 == 0:
+                    self._clear_memory()
+
+    def _clear_memory(self):
+        """Aggressive memory clearing."""
+        # import gc
+        # gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+
+    def _process_single_class(self, class_emb, class_id, num_sub_per_cluster, bandwidth):
+        """Process a single class to generate its subclusters."""
+        if len(class_emb) == 0:
+            return []
+
+        # if len(class_emb) > 10000:
+        #     class_emb_np = self._embeddings_to_numpy_chunked(class_emb)
+        # else:
+        class_emb_np = class_emb.cpu().numpy()
+        
+        cluster_centers, _ = mean_shift_binary(
+            X=class_emb_np,
+            bandwidth=bandwidth,
+        )
+        
+        num_clusters_found = len(cluster_centers)
+        print(f"  Found {num_clusters_found} clusters")
+
+        subclusters = []
+        if num_clusters_found <= num_sub_per_cluster:
+            for center in cluster_centers:
+                center_tensor = torch.tensor(center, device=self.device, dtype=torch.float16)  # Use half precision
+                subclusters.append(center_tensor)
+        else: # randomly select subclusters if there are too many
+            selected_indices = torch.randperm(num_clusters_found, device=self.device)[:num_sub_per_cluster]
+            for idx in selected_indices:
+                center = torch.tensor(cluster_centers[idx], device=self.device, dtype=torch.float16)
+                subclusters.append(center)
+
+        return subclusters
+
+    def get_max_subcluster_similarity(self, enc, class_id):
+        """
+        Get maximum similarity to subclusters.
+        """
+        enc_norm = F.normalize(enc)
+        subclusters_norm = F.normalize(self.subclusters)
+    
+        mask = self.subcluster_to_class == class_id
+        relevant_subclusters = subclusters_norm[mask]
+        
+        if len(relevant_subclusters) == 0:
+            return torch.zeros(enc.shape[0], device=enc.device), None
+            
+        similarities = torch.matmul(enc_norm, relevant_subclusters.T)
+        max_similarities, relative_indices = torch.max(similarities, dim=1)
+
+        absolute_indices = torch.nonzero(mask)[relative_indices, 0]
+        
+        return max_similarities, absolute_indices
