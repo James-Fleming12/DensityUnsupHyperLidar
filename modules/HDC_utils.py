@@ -511,8 +511,6 @@ class DensityModel(nn.Module):
                         class_embeddings.append(class_enc)
                         total_samples += class_enc.shape[0]
 
-                        self._clear_memory()
-
                     del proj_in, proj_labels
                     self._clear_memory()
                     
