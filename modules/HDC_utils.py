@@ -480,7 +480,10 @@ class DensityModel(nn.Module):
             pair_simil[:self.num_classes, :self.num_classes] = torch.eye(self.num_classes)
         return pair_simil.detach().cpu().numpy(), class_hv.detach().cpu().numpy()
     
-    def init_subclusters(self, dataloader, bandwidth=None, chunk_size=5000):
+    def init_subclusters(self, dataloader, bandwidth=None, chunk_size=2000, max_samples_per_class=5000):
+        """
+        Initialize subclusters
+        """
         self.eval()
         num_sub_per_cluster = self.num_subclusters
 
@@ -493,102 +496,68 @@ class DensityModel(nn.Module):
             print(f"Processing class {class_id}...")
 
             class_embeddings = []
+            total_samples = 0
+            
             with torch.no_grad():
                 for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, npoints) in enumerate(dataloader):
-                    if batch_idx >= 1:  # Only process 2 batches
-                        break
-
                     proj_in = proj_in.to(self.device)
-                    proj_labels = proj_labels.to(self.device)
+                    proj_labels = proj_labels.to(self.device).flatten()
 
-                    for chunk_start in range(0, len(proj_in), chunk_size):
-                        chunk_end = min(chunk_start + chunk_size, len(proj_in))
-                        
-                        proj_in_chunk = proj_in[chunk_start:chunk_end]
-                        proj_labels_chunk = proj_labels[chunk_start:chunk_end]
-                        proj_labels_chunk = proj_labels_chunk.flatten()
-                        
-                        enc, _, _ = self.encode_chunked(proj_in_chunk)
+                    enc, _, _ = self.encode_chunked(proj_in)
 
-                        class_mask = proj_labels_chunk == class_id
-                        if torch.any(class_mask):
-                            class_embeddings.append(enc[class_mask])
+                    class_mask = proj_labels == class_id
+                    if torch.any(class_mask):
+                        class_enc = enc[class_mask].cpu().half()
+                        class_embeddings.append(class_enc)
+                        total_samples += class_enc.shape[0]
 
                         self._clear_memory()
 
-                    print(f"Finished Batch {batch_idx}")
+                    del proj_in, proj_labels
                     self._clear_memory()
+                    
+                    print(f"  Batch {batch_idx}: collected {total_samples} samples so far")
+                    
+                    if total_samples >= max_samples_per_class:
+                        break
 
             if not class_embeddings:
                 print(f"  No data for class {class_id}, skipping")
                 continue
+
+            class_emb_cpu = torch.cat(class_embeddings, dim=0)
+
+            if len(class_emb_cpu) > max_samples_per_class:
+                indices = torch.randperm(len(class_emb_cpu))[:max_samples_per_class]
+                class_emb_cpu = class_emb_cpu[indices]
             
-            class_emb = torch.cat(class_embeddings, dim=0)
-            # class_emb_np = class_emb.copy().numpy()
-            # del class_emb, class_embeddings
-            # self._clear_memory()
+            print(f"  Using {len(class_emb_cpu)} samples for clustering")
 
-            # print(f"LIMITING TO 100 ELEMENTS FOR TESTING")
-            # class_emb = class_emb[:100]
+            class_emb_np = class_emb_cpu.numpy()
 
-            print(f"  Found {len(class_emb)} samples")
-
+            del class_emb_cpu, class_embeddings
+            self._clear_memory()
+            
             subclusters_for_class = self._process_single_class(
-                class_emb, class_id, num_sub_per_cluster, bandwidth
+                class_emb_np, class_id, num_sub_per_cluster, bandwidth
             )
             
             all_subcluster_centers.extend(subclusters_for_class)
             all_subcluster_classes.extend([class_id] * len(subclusters_for_class))
 
-            del class_emb, class_embeddings
+            del class_emb_np
             self._clear_memory()
 
         self._load_subclusters(all_subcluster_centers, all_subcluster_classes)
+        print("Subcluster initialization complete")
 
-    def _load_subclusters(self, centers_list, classes_list):
-        """Load subclusters into model parameters with memory efficiency."""
-        if not centers_list:
-            print("Warning: No subclusters to load")
-            return
-        
-        total_centers = len(centers_list)
 
-        for i in range(total_centers):
-            if isinstance(centers_list[i], torch.Tensor):
-                centers_list[i] = torch.sign(centers_list[i].to(self.device))
-            else:
-                centers_list[i] = torch.sign(torch.tensor(
-                    centers_list[i], device=self.device, dtype=torch.float16
-                ))
-
-        with torch.no_grad():
-            for i in range(0, total_centers, 100):
-                end_idx = min(i + 100, total_centers)
-                batch = torch.stack(centers_list[i:end_idx], dim=0)
-                self.subclusters.data[i:end_idx] = batch
-
-                del batch
-                if i % 500 == 0:
-                    self._clear_memory()
-
-    def _clear_memory(self):
-        """Aggressive memory clearing."""
-        # import gc
-        # gc.collect()
-        if torch.cuda.is_available():
-            torch.cuda.synchronize()
-            torch.cuda.empty_cache()
-
-    def _process_single_class(self, class_emb, class_id, num_sub_per_cluster, bandwidth):
+    def _process_single_class(self, class_emb_np, class_id, num_sub_per_cluster, bandwidth):
         """Process a single class to generate its subclusters."""
-        if len(class_emb) == 0:
+        if len(class_emb_np) == 0:
             return []
-
-        # if len(class_emb) > 10000:
-        #     class_emb_np = self._embeddings_to_numpy_chunked(class_emb)
-        # else:
-        class_emb_np = class_emb.cpu().numpy()
         
+        print(f"  Running mean shift on {len(class_emb_np)} samples...")
         cluster_centers, _ = mean_shift_binary(
             X=class_emb_np,
             bandwidth=bandwidth,
@@ -600,15 +569,53 @@ class DensityModel(nn.Module):
         subclusters = []
         if num_clusters_found <= num_sub_per_cluster:
             for center in cluster_centers:
-                center_tensor = torch.tensor(center, device=self.device, dtype=torch.float16)  # Use half precision
+                center_tensor = torch.tensor(center, device='cpu', dtype=torch.float16)
                 subclusters.append(center_tensor)
-        else: # randomly select subclusters if there are too many
-            selected_indices = torch.randperm(num_clusters_found, device=self.device)[:num_sub_per_cluster]
-            for idx in selected_indices:
-                center = torch.tensor(cluster_centers[idx], device=self.device, dtype=torch.float16)
+        else:
+            indices = np.random.choice(num_clusters_found, num_sub_per_cluster, replace=False)
+            for idx in indices:
+                center = torch.tensor(cluster_centers[idx], device='cpu', dtype=torch.float16)
                 subclusters.append(center)
 
         return subclusters
+
+    def _load_subclusters(self, centers_list, classes_list):
+        """Load subclusters into model parameters with memory efficiency."""
+        if not centers_list:
+            print("Warning: No subclusters to load")
+            return
+        
+        total_centers = len(centers_list)
+        print(f"Loading {total_centers} subclusters into model...")
+
+        with torch.no_grad():
+            batch_size = 100
+            for i in range(0, total_centers, batch_size):
+                end_idx = min(i + batch_size, total_centers)
+
+                batch = torch.stack([
+                    torch.sign(c.to(self.device)) if c.device.type == 'cpu' 
+                    else torch.sign(c) 
+                    for c in centers_list[i:end_idx]
+                ])
+                
+                self.subclusters.data[i:end_idx] = batch
+
+                del batch
+                if i % 500 == 0:
+                    self._clear_memory()
+                    print(f"  Loaded {end_idx}/{total_centers} subclusters")
+        
+        print("All subclusters loaded")
+
+
+    def _clear_memory(self):
+        """Aggressive memory clearing."""
+        # import gc
+        # gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
 
     def get_max_subcluster_similarity(self, enc, class_id):
         """

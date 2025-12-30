@@ -72,40 +72,81 @@ def mean_shift_binary(X, bandwidth=None, seeds=None, cluster_all=True, GPU=True)
 
     return cluster_centers, labels.flatten()
 
-def meanshift_torch_binary(data, seed, bandwidth, max_iter=300):
+def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000):
     """
-    Binary mean-shift using normalized Hamming distance and majority vote.
+    Memory-efficient binary mean-shift using batched computation.
     """
     X = torch.from_numpy(data).to(torch.uint8).cuda()
     S = torch.from_numpy(seed).to(torch.uint8).cuda()
 
     D = X.shape[1]
+    n_seeds = S.shape[0]
+    n_samples = X.shape[0]
     tol = 1e-3
 
-    for _ in range(max_iter):
-        hamming = torch.bitwise_xor(
-            S[:, None, :], X[None, :, :]
-        ).sum(dim=2).float() / D
+    for iteration in range(max_iter):
+        all_weights = []
+        all_weighted_sums = []
+        
+        for batch_start in range(0, n_samples, batch_size):
+            batch_end = min(batch_start + batch_size, n_samples)
+            X_batch = X[batch_start:batch_end]
+            
+            hamming = torch.bitwise_xor(
+                S[:, None, :], X_batch[None, :, :]
+            ).sum(dim=2).float() / D
+            
+            weight = (hamming <= bandwidth).float()
+            
+            weighted_sum = weight @ X_batch.float()
+            
+            all_weights.append(weight.sum(dim=1, keepdim=True))
+            all_weighted_sums.append(weighted_sum)
+            
+            del X_batch, hamming, weight, weighted_sum
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
 
-        weight = (hamming <= bandwidth).float()
+        total_weights = torch.stack(all_weights, dim=0).sum(dim=0)
+        total_weighted_sums = torch.stack(all_weighted_sums, dim=0).sum(dim=0)
+        
+        total_weights = torch.clamp(total_weights, min=1.0)
 
-        wsum = weight.sum(dim=1, keepdim=True)
-        wsum = torch.clamp(wsum, min=1.0)
-
-        avg = (weight @ X.float()) / wsum
+        avg = total_weighted_sums / total_weights
         S_new = (avg > 0.5).to(torch.uint8)
 
         flip_frac = (
             torch.bitwise_xor(S, S_new).sum(dim=1).float() / D
         ).mean()
-
+        
         S = S_new
+
+        del all_weights, all_weighted_sums, total_weights, total_weighted_sums, avg
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+        
         if flip_frac < tol:
+            print(f"  Converged at iteration {iteration}")
             break
 
-    hamming = torch.bitwise_xor(S[:, None, :], X[None, :, :]).sum(dim=2).float() / D
-
-    p_num = (hamming <= bandwidth).sum(dim=1).tolist()
+    density_counts = torch.zeros(n_seeds, dtype=torch.long, device=S.device)
+    
+    for batch_start in range(0, n_samples, batch_size):
+        batch_end = min(batch_start + batch_size, n_samples)
+        X_batch = X[batch_start:batch_end]
+        
+        hamming = torch.bitwise_xor(
+            S[:, None, :], X_batch[None, :, :]
+        ).sum(dim=2).float() / D
+        
+        within_bandwidth = (hamming <= bandwidth)
+        density_counts += within_bandwidth.sum(dim=1)
+        
+        del X_batch, hamming, within_bandwidth
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+    
+    p_num = density_counts.cpu().tolist()
 
     return S.cpu().numpy(), p_num
 
