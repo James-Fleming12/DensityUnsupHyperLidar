@@ -40,38 +40,6 @@ SEED_NUM = 128
 L=2
 H=8
 
-def mean_shift_binary(X, bandwidth=None, seeds=None, cluster_all=True, GPU=True):
-    if bandwidth is None:
-        bandwidth = estimate_bandwidth_binary(X)
-    if not (0 < bandwidth <= 1):
-        raise ValueError("bandwidth must be in (0,1] for Hamming distance")
-
-    if seeds is None:
-        seeds = gpu_seed_generator_binary(X)
-
-    centers, density = meanshift_torch_binary(X, seeds, bandwidth)
-
-    nbrs = NearestNeighbors(radius=bandwidth, metric="hamming")
-    nbrs.fit(centers)
-
-    unique = np.ones(len(centers), dtype=bool)
-    for i, c in enumerate(centers):
-        if unique[i]:
-            idxs = nbrs.radius_neighbors([c], return_distance=False)[0]
-            unique[idxs] = False
-            unique[i] = True
-
-    cluster_centers = centers[unique]
-
-    nbrs = NearestNeighbors(n_neighbors=1, metric="hamming")
-    nbrs.fit(cluster_centers)
-    distances, labels = nbrs.kneighbors(X)
-
-    if not cluster_all:
-        labels[distances.flatten() > bandwidth] = -1
-
-    return cluster_centers, labels.flatten()
-
 def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000):
     """
     Memory-efficient binary mean-shift using batched computation.
@@ -84,6 +52,7 @@ def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000)
     n_samples = X.shape[0]
     tol = 1e-3
 
+    # mean shift iterations (seed movement)
     for iteration in range(max_iter):
         all_weights = []
         all_weighted_sums = []
@@ -91,13 +60,16 @@ def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000)
         for batch_start in range(0, n_samples, batch_size):
             batch_end = min(batch_start + batch_size, n_samples)
             X_batch = X[batch_start:batch_end]
-            
+
             hamming = torch.bitwise_xor(
                 S[:, None, :], X_batch[None, :, :]
             ).sum(dim=2).float() / D
-            
+
+            if batch_start == 0 and iteration == 0:
+                within_bandwidth = (hamming <= bandwidth).float().sum().item()
+
             weight = (hamming <= bandwidth).float()
-            
+
             weighted_sum = weight @ X_batch.float()
             
             all_weights.append(weight.sum(dim=1, keepdim=True))
@@ -115,10 +87,9 @@ def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000)
         avg = total_weighted_sums / total_weights
         S_new = (avg > 0.5).to(torch.uint8)
 
-        flip_frac = (
-            torch.bitwise_xor(S, S_new).sum(dim=1).float() / D
-        ).mean()
-        
+        seed_movement = torch.bitwise_xor(S, S_new).sum(dim=1).float() / D # convergence check
+        flip_frac = seed_movement.mean()
+
         S = S_new
 
         del all_weights, all_weighted_sums, total_weights, total_weighted_sums, avg
@@ -126,9 +97,9 @@ def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000)
             torch.cuda.empty_cache()
         
         if flip_frac < tol:
-            print(f"  Converged at iteration {iteration}")
             break
 
+    # compute final densities (attracted points per seed)
     density_counts = torch.zeros(n_seeds, dtype=torch.long, device=S.device)
     
     for batch_start in range(0, n_samples, batch_size):
@@ -145,14 +116,76 @@ def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000)
         del X_batch, hamming, within_bandwidth
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-    
-    p_num = density_counts.cpu().tolist()
 
-    return S.cpu().numpy(), p_num
+    # filter low-density seeds
+    min_density_threshold = max(3, n_samples // 100)
+    valid_mask = density_counts >= min_density_threshold
+    
+    if valid_mask.sum() < 5: # keep at least 5
+        top_k = min(5, n_seeds)
+        top_indices = torch.topk(density_counts, top_k).indices
+        valid_mask[top_indices] = True
+
+    # final extraction
+    if valid_mask.any():
+        S_filtered = S[valid_mask].cpu().numpy()
+        p_num_filtered = density_counts[valid_mask].cpu().tolist()
+    else:
+        top_idx = density_counts.argmax()
+        S_filtered = S[top_idx:top_idx+1].cpu().numpy()
+        p_num_filtered = [density_counts[top_idx].item()]
+
+    return S_filtered, p_num_filtered
+
+def mean_shift_binary(X, bandwidth=None, dedup_scale=0.1, seeds=None, cluster_all=True, GPU=True):
+    if bandwidth is None:
+        bandwidth = estimate_bandwidth_binary(X)
+    if not (0 < bandwidth <= 1):
+        raise ValueError("bandwidth must be in (0,1] for Hamming distance")
+
+    X_binary = (X > 0.5).astype(np.uint8)
+    
+    if seeds is None:
+        seeds = gpu_seed_generator_binary(X_binary)
+
+    centers, density = meanshift_torch_binary(X_binary, seeds, bandwidth)
+    
+    if len(centers) == 0:
+        centers = X_binary[np.random.randint(0, len(X_binary), 1)]
+    
+    # deduplication of similar centers (removes similar)
+    dedup_radius = bandwidth * dedup_scale
+    
+    nbrs = NearestNeighbors(radius=dedup_radius, metric="hamming")
+    nbrs.fit(centers)
+
+    unique = np.ones(len(centers), dtype=bool)
+    for i, c in enumerate(centers):
+        if unique[i]:
+            idxs = nbrs.radius_neighbors([c], return_distance=False)[0]
+            unique[idxs] = False
+            unique[i] = True
+    
+    cluster_centers = centers[unique]
+
+    return cluster_centers
 
 def gpu_seed_generator_binary(codes):
-    idx = np.random.permutation(len(codes))[:SEED_NUM]
-    return (codes[idx] > 0.5).astype(np.uint8)
+    """Generate diverse seeds for binary mean shift"""
+    n_samples, n_features = codes.shape
+    
+    n_seeds = min(128, max(32, n_samples // 10))
+
+    # ensure seed diversity
+    if n_samples > n_seeds * 2:
+        step = max(1, n_samples // n_seeds)
+        idx = np.arange(0, n_samples, step)[:n_seeds]
+    else:
+        idx = np.random.permutation(len(codes))[:n_seeds]
+
+    seeds = (codes[idx] > 0.5).astype(np.uint8)
+
+    return seeds
 
 def get_binary_density_centroids(binary_vectors, bandwidth=0.2):
     """Get density centroids for binary hypervectors"""
@@ -165,7 +198,7 @@ def get_binary_density_centroids(binary_vectors, bandwidth=0.2):
     )
     return cluster_centers, labels
 
-def estimate_bandwidth_binary(X, quantile=0.3, n_samples=500):
+def estimate_bandwidth_binary(X, quantile=0.3, n_samples=500, bandwidth_multiplier=0.3):
     X = (X > 0.5).astype(np.uint8)
 
     n = min(n_samples, X.shape[0])
@@ -181,7 +214,10 @@ def estimate_bandwidth_binary(X, quantile=0.3, n_samples=500):
 
     bandwidth = np.median(distances[:, -1])
 
-    return float(np.clip(bandwidth, 1e-3, 1.0))
+    bandwidth = bandwidth * bandwidth_multiplier
+    bandwidth = max(0.05, min(0.2, bandwidth))
+    
+    return float(bandwidth)
 
 def cos_batch(a, b):
     #return sqrt(((a[None,:] - b[:,None]) ** 2).sum(2))

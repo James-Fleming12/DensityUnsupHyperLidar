@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from faster_mean_shift.mean_shift_cosine_gpu import mean_shift_binary
+from faster_mean_shift.mean_shift_cosine_gpu import estimate_bandwidth_binary, mean_shift_binary
 
 class Model(nn.Module):
     def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
@@ -529,15 +529,26 @@ class DensityModel(nn.Module):
                 indices = torch.randperm(len(class_emb_cpu))[:max_samples_per_class]
                 class_emb_cpu = class_emb_cpu[indices]
             
-            print(f"  Using {len(class_emb_cpu)} samples for clustering")
-
             class_emb_np = class_emb_cpu.numpy()
+
+            if bandwidth is None:
+                estimated_bandwidth = estimate_bandwidth_binary(
+                    class_emb_np, 
+                    quantile=0.2,
+                    n_samples=min(500, len(class_emb_np))
+                )
+                print(f"  Using Estimated bandwidth for class {class_id}: {estimated_bandwidth:.4f}")
+                class_bandwidth = estimated_bandwidth
+            else:
+                class_bandwidth = bandwidth
+            
+            print(f"  Using {len(class_emb_np)} samples for clustering")
 
             del class_emb_cpu, class_embeddings
             self._clear_memory()
             
             subclusters_for_class = self._process_single_class(
-                class_emb_np, class_id, num_sub_per_cluster, bandwidth
+                class_emb_np, class_id, num_sub_per_cluster, class_bandwidth
             )
             
             all_subcluster_centers.extend(subclusters_for_class)
@@ -549,14 +560,13 @@ class DensityModel(nn.Module):
         self._load_subclusters(all_subcluster_centers, all_subcluster_classes)
         print("Subcluster initialization complete")
 
-
     def _process_single_class(self, class_emb_np, class_id, num_sub_per_cluster, bandwidth):
         """Process a single class to generate its subclusters."""
         if len(class_emb_np) == 0:
             return []
         
         print(f"  Running mean shift on {len(class_emb_np)} samples...")
-        cluster_centers, _ = mean_shift_binary(
+        cluster_centers = mean_shift_binary(
             X=class_emb_np,
             bandwidth=bandwidth,
         )
