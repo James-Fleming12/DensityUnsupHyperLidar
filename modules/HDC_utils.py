@@ -627,20 +627,86 @@ class DensityModel(nn.Module):
 
     def get_max_subcluster_similarity(self, enc, class_id):
         """
-        Get maximum similarity to subclusters.
+        Get maximum similarity [0,1] to subclusters using Hamming distance.
         """
-        enc_norm = F.normalize(enc)
-        subclusters_norm = F.normalize(self.subclusters)
-    
+        enc_binary = torch.sign(enc)
+        
         mask = self.subcluster_to_class == class_id
-        relevant_subclusters = subclusters_norm[mask]
+        relevant_subclusters = self.subclusters[mask]
         
         if len(relevant_subclusters) == 0:
             return torch.zeros(enc.shape[0], device=enc.device), None
-            
-        similarities = torch.matmul(enc_norm, relevant_subclusters.T)
+
+        dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
+
+        hd_dim = enc_binary.shape[1]
+        similarities = (1.0 + dot_products / hd_dim) / 2.0
+
         max_similarities, relative_indices = torch.max(similarities, dim=1)
 
         absolute_indices = torch.nonzero(mask)[relative_indices, 0]
         
         return max_similarities, absolute_indices
+    
+    def get_max_subcluster_similarity(self, enc, class_id, distance_sensitivity=1.0):
+        """
+        Get maximum similarity [0,1] to subclusters using Hamming distance.
+        distance_sensitivity introduces a power law which scales with similarity = base_similarity ** (1 / distance_sensitivity)
+        """
+        enc_binary = torch.sign(enc)
+        
+        mask = self.subcluster_to_class == class_id
+        relevant_subclusters = self.subclusters[mask]
+        
+        if len(relevant_subclusters) == 0:
+            return torch.zeros(enc.shape[0], device=enc.device), None
+
+        hd_dim = enc_binary.shape[1]
+
+        dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
+
+        base_similarity = (dot_products + hd_dim) / (2 * hd_dim)
+
+        if distance_sensitivity == 0.0:
+            scaled_similarity = torch.where(
+                base_similarity > 0.5,
+                torch.tensor(1.0, device=enc.device),
+                base_similarity * 2.0
+            )
+        elif distance_sensitivity == 1.0:
+            scaled_similarity = base_similarity
+        else:
+            exponent = 1.0 / max(distance_sensitivity, 0.001)
+            scaled_similarity = base_similarity ** exponent
+
+        max_similarities, relative_indices = torch.max(scaled_similarity, dim=1)
+        absolute_indices = torch.nonzero(mask)[relative_indices, 0]
+        
+        return max_similarities, absolute_indices
+
+    def update(self, x):
+        """x being a single datapoint"""
+        enc, _, _ = self.encode(x)
+        for hv in enc:
+            hv = hv.unsqueeze(0)
+
+            pred = self.get_predictions(hv)
+            pred_id = torch.argmax(pred)
+            current_prototype = self.classify_weights[pred_id:pred_id+1]
+
+            subcluster_sims, _ = self.get_max_subcluster_similarity(hv, pred_id)
+
+            disagreements = (current_prototype * enc) == -1
+            num_disagreements = disagreements.sum().item()
+            if num_disagreements == 0: continue
+
+            num_bits_to_flip = int(subcluster_sims[0].item() * num_disagreements)
+
+            disagree_indices = torch.nonzero(disagreements, as_tuple=True)[1]
+
+            flip_indices = disagree_indices[torch.randperm(len(disagree_indices), device=self.device)[:num_bits_to_flip]]
+
+            new_prototype = current_prototype.clone()
+            new_prototype[:, flip_indices] *= -1
+            
+            self.classify_weights[pred_id] = new_prototype.squeeze(0)
