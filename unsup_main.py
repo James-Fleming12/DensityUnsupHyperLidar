@@ -23,6 +23,7 @@ MAX_HDC_EPOCHS = 10
 HD_DIM = 5000
 
 HDC_SAVE_PATH = "logs/hdc.pth"
+HDC_SUB_PATH = "logs/hdc_sub.pth"
 
 def convert_dataset():
     converter = KittiConverter(
@@ -107,6 +108,10 @@ def test_init(ARCH, DATA):
     model: DensityModel = torch.load(HDC_SAVE_PATH, weights_only=False)
 
     model.init_subclusters(dataloader)
+    torch.save(model.state_dict(), HDC_SUB_PATH)
+
+def test_inference(ARCH, DATA):
+    pass
 
 def main():
     try:
