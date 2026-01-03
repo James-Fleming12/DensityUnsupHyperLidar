@@ -685,30 +685,33 @@ class DensityModel(nn.Module):
         return max_similarities, absolute_indices
 
     def update(self, x):
-        """x being a single datapoint"""
+        """x being a single image datapoint"""
         enc, _, _ = self.encode(x)
         num_hv = enc.size(0)
         for i, hv in enumerate(enc):
             print(f"Processing Hypervector {i} out of {num_hv}")
             hv = hv.unsqueeze(0)
+            self.update_hv(hv)
 
-            pred = self.get_predictions(hv)
-            pred_id = torch.argmax(pred)
-            current_prototype = self.classify_weights[pred_id:pred_id+1]
+    def update_hv(self, x):
+        """x being a single hypervector already processed by the model"""
+        pred = self.get_predictions(x)
+        pred_id = torch.argmax(pred)
+        current_prototype = self.classify_weights[pred_id:pred_id+1]
 
-            subcluster_sims, _ = self.get_max_subcluster_similarity(hv, pred_id)
+        subcluster_sims, _ = self.get_max_subcluster_similarity(x, pred_id)
 
-            disagreements = (current_prototype * enc) == -1
-            num_disagreements = disagreements.sum().item()
-            if num_disagreements == 0: continue
+        disagreements = (current_prototype * x) == -1
+        num_disagreements = disagreements.sum().item()
+        if num_disagreements == 0: return
 
-            num_bits_to_flip = int(subcluster_sims[0].item() * num_disagreements)
+        num_bits_to_flip = int(subcluster_sims[0].item() * num_disagreements)
 
-            disagree_indices = torch.nonzero(disagreements, as_tuple=True)[1]
+        disagree_indices = torch.nonzero(disagreements, as_tuple=True)[1]
 
-            flip_indices = disagree_indices[torch.randperm(len(disagree_indices), device=self.device)[:num_bits_to_flip]]
+        flip_indices = disagree_indices[torch.randperm(len(disagree_indices), device=self.device)[:num_bits_to_flip]]
 
-            new_prototype = current_prototype.clone()
-            new_prototype[:, flip_indices] *= -1
-            
-            self.classify_weights[pred_id] = new_prototype.squeeze(0)
+        new_prototype = current_prototype.clone()
+        new_prototype[:, flip_indices] *= -1
+        
+        self.classify_weights[pred_id] = new_prototype.squeeze(0)
