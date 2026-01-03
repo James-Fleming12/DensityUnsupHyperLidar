@@ -687,7 +687,9 @@ class DensityModel(nn.Module):
     def update(self, x):
         """x being a single datapoint"""
         enc, _, _ = self.encode(x)
-        for hv in enc:
+        num_hv = enc.size(0)
+        for i, hv in enumerate(enc):
+            print(f"Processing Hypervector {i} out of {num_hv}")
             hv = hv.unsqueeze(0)
 
             pred = self.get_predictions(hv)

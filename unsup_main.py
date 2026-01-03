@@ -110,8 +110,37 @@ def test_init(ARCH, DATA):
     model.init_subclusters(dataloader)
     torch.save(model.state_dict(), HDC_SUB_PATH)
 
+    print(f"Subcluster Initialized Model saved to {HDC_SUB_PATH}")
+
 def test_inference(ARCH, DATA):
-    pass
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    parser = Parser(root=DATA_DIR,
+                        train_sequences=DATA["split"]["train"], # self.DATA["split"]["valid"] + self.DATA["split"]["train"] if finetune with valid
+                        valid_sequences=DATA["split"]["valid"],
+                        test_sequences=None,
+                        labels=DATA["labels"],
+                        color_map=DATA["color_map"],
+                        learning_map=DATA["learning_map"],
+                        learning_map_inv=DATA["learning_map_inv"],
+                        sensor=ARCH["dataset"]["sensor"],
+                        max_points=ARCH["dataset"]["max_points"],
+                        batch_size=ARCH["train"]["batch_size"],
+                        workers=ARCH["train"]["workers"],
+                        gt=True,
+                        shuffle_train=True)
+    
+    dataloader = parser.get_train_set()
+
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
+    model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
+    model.to(device)
+
+    images, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = next(iter(dataloader))
+
+    image = images[0].to(device).unsqueeze(0)
+
+    model.update(image)
 
 def main():
     try:
@@ -130,7 +159,8 @@ def main():
     # convert_dataset()
     # train_extractor(ARCH, DATA)
     # hdc = train_hdc(ARCH, DATA)
-    test_init(ARCH, DATA)
+    # test_init(ARCH, DATA)
+    test_inference(ARCH, DATA)
 
 if __name__=="__main__":
     main()
