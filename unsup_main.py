@@ -1,11 +1,9 @@
-import os
 import torch
 import yaml
 
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import DensityModel
-from faster_mean_shift.mean_shift_cosine_gpu import get_binary_density_centroids
-from modules.trainer import Trainer, TrainingPipeline
+from modules.trainer import Trainer
 from modules.Basic_HD import DenseHDTrainer
 from modules.ioueval import iouEval
 
@@ -104,8 +102,8 @@ def test_init(ARCH, DATA):
     
     dataloader = parser.get_train_set()
 
-    model = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
-    model: DensityModel = torch.load(HDC_SAVE_PATH, weights_only=False)
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
+    model = torch.load(HDC_SAVE_PATH, weights_only=False)
 
     model.init_subclusters(dataloader)
     torch.save(model.state_dict(), HDC_SUB_PATH)
@@ -154,12 +152,13 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    DATA['split']['train'] = [61, 103, 553, 655]
+    # DATA['split']['train'] = [61, 103, 553, 655]
+    DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
 
-    # convert_dataset()
-    # train_extractor(ARCH, DATA)
-    # hdc = train_hdc(ARCH, DATA)
-    # test_init(ARCH, DATA)
+    convert_dataset()
+    train_extractor(ARCH, DATA)
+    hdc = train_hdc(ARCH, DATA)
+    test_init(ARCH, DATA)
     test_inference(ARCH, DATA)
 
 if __name__=="__main__":

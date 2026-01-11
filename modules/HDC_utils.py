@@ -616,7 +616,6 @@ class DensityModel(nn.Module):
         
         print("All subclusters loaded")
 
-
     def _clear_memory(self):
         """Aggressive memory clearing."""
         # import gc
@@ -688,8 +687,7 @@ class DensityModel(nn.Module):
         """x being a single image datapoint"""
         enc, _, _ = self.encode(x)
         num_hv = enc.size(0)
-        for i, hv in enumerate(enc):
-            print(f"Processing Hypervector {i} out of {num_hv}")
+        for _, hv in enumerate(enc):
             hv = hv.unsqueeze(0)
             self.update_hv(hv)
 
@@ -715,3 +713,30 @@ class DensityModel(nn.Module):
         new_prototype[:, flip_indices] *= -1
         
         self.classify_weights[pred_id] = new_prototype.squeeze(0)
+
+    def inference_update(self, x, beta=0.3):
+        """
+        Inference with updates based on distance.
+        """
+        enc, _, _ = self.encode(x)
+        enc_normalized = F.normalize(enc)
+        
+        logits = self.classify(enc_normalized)
+        predictions = torch.argmax(logits, dim=1)
+
+        enc_binary = torch.sign(enc) # distance calculation
+        prototypes = torch.sign(self.classify.weight)
+        selected_prototypes = prototypes[predictions]
+        hd_dim = enc_binary.shape[1]
+        similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
+        distances = (1 - similarities) / 2
+
+        mask = distances >= beta
+
+        if torch.any(mask): # need to figure out how to vectorize
+            distant_hvs_binary = enc_binary[mask]
+            
+            for hv_binary in distant_hvs_binary:
+                self.update_hv(hv_binary.unsqueeze(0))
+        
+        return predictions
