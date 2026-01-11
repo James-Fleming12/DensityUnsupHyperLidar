@@ -7,7 +7,7 @@ from modules.trainer import Trainer
 from modules.Basic_HD import DenseHDTrainer
 from modules.ioueval import iouEval
 
-from dataset.export_semantickitti import KittiConverter
+import numpy as np
 
 from unsup_main import train_extractor, train_hdc
 
@@ -47,9 +47,35 @@ def test_collapse(ARCH, DATA, inference_epochs=5):
     model: DensityModel = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
     model = torch.load(HDC_SUB_PATH, weights_only=False)
 
-    for i in range(inference_epochs):
+    for epoch in range(inference_epochs):
         for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
-            pass
+            for i in proj_in:
+                model.inference_update(i)
+
+    all_accuracies = []
+    all_class_accuracies = {}
+
+    # evaluate
+    model.eval()
+    with torch.no_grad():
+        for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
+            curr_acc, _, curr_class_accs = model.get_accuracy(proj_in, proj_labels)
+            all_accuracies.append(curr_acc)
+
+            for class_id, class_acc in curr_class_accs.items():
+                if class_id not in all_class_accuracies:
+                    all_class_accuracies[class_id] = []
+                all_class_accuracies[class_id].append(class_acc)
+
+        accuracy = np.mean(all_accuracies) if all_accuracies else 0.0
+
+        class_accuracy = {}
+        for class_id, acc_list in all_class_accuracies.items():
+            class_accuracy[class_id] = np.mean(acc_list)
+
+        print(f"Final Accuracy of {accuracy}")
+        for i in class_accuracy:
+            print(f"Accuracy for class {i} is {class_accuracy[i]}")
 
 def main():
     # A code snippet to test model collapse in the model after updating over the training set/test set
