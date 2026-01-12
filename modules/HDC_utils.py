@@ -760,6 +760,7 @@ class DensityModel(nn.Module):
     def inference_update(self, x, beta=0.3):
         """
         Inference with updates based on distance.
+        If beta=0, then the confidence updates are removed (ablation)
         """
         enc, _, _ = self.encode(x)
         enc_normalized = F.normalize(enc)
