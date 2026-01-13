@@ -605,7 +605,7 @@ class Trainer():
                 name = os.path.join(directory, str(i) + ".png")
                 cv2.imwrite(name, img)
 
-    def train(self):
+    def train(self, epochs=None):
 
         self.ignore_class = []
         for i, w in enumerate(self.loss_w):
@@ -625,7 +625,8 @@ class Trainer():
                                              save_scans=self.ARCH["train"]["save_scans"])
 
         # train for n epochs
-        for epoch in range(self.epoch, self.ARCH["train"]["max_epochs"]):
+        max_epochs = epochs if epochs is not None else self.ARCH["train"]["max_epochs"]
+        for epoch in range(self.epoch, max_epochs):
             # train for 1 epoch
 
             acc, iou, loss = self.train_epoch(train_loader=self.parser.get_train_set(),

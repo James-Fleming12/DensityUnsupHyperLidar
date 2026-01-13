@@ -309,6 +309,7 @@ class DensityModel(nn.Module):
             self.net.cuda()
 
         self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+        self.projection = self.projection.to(self.device)
 
         self.classify = nn.Linear(self.hd_dim, self.num_classes, bias=False, device=self.device)
         self.classify_sample_cnt = torch.zeros((self.num_classes, 1)).to(self.device)
@@ -362,7 +363,7 @@ class DensityModel(nn.Module):
         sample_hv[:, mask] = functional.hard_quantize(sample_hv[:, mask])
         return sample_hv, selected_indices, is_wrong
         
-    def encode_chunked(self, x, mask=None, chunk_size=1000, projection_chunk_size=5000):
+    def encode_chunked(self, x, mask=None, PERCENTAGE=None, is_wrong=None, chunk_size=1000, projection_chunk_size=5000):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
@@ -387,7 +388,29 @@ class DensityModel(nn.Module):
         
         x = torch.cat(all_embeddings, dim=0)
         del all_embeddings
+        x = x.to(self.device)
 
+        if PERCENTAGE is not None:
+            wrong_indices = torch.nonzero(is_wrong, as_tuple=False).squeeze()
+            num_samples = int(x.shape[0] * PERCENTAGE)
+
+            if wrong_indices.numel() >= num_samples:
+                selected_indices = wrong_indices[torch.randperm(wrong_indices.shape[0], device=x.device)[:num_samples]]
+                is_wrong[selected_indices] = False
+            else:
+                non_wrong_indices = torch.nonzero(~is_wrong, as_tuple=False).squeeze()
+                remaining = num_samples - wrong_indices.numel()
+                fill_indices = non_wrong_indices[torch.randperm(non_wrong_indices.shape[0], device=x.device)[:remaining]]
+
+                selected_indices = torch.cat([wrong_indices, fill_indices], dim=0)
+                is_wrong[selected_indices] = False
+
+            selected_indices, _ = selected_indices.sort()
+            x = x[selected_indices]
+            assert x.shape[0] == num_samples, f"Expected {num_samples} samples, got {x.shape[0]}"
+        else:
+            selected_indices = torch.arange(x.shape[0], device=x.device)
+        
         total_points = x.shape[0]
         sample_hv = torch.zeros((total_points, self.hd_dim), device=self.device, dtype=torch.float16)
 
@@ -414,7 +437,7 @@ class DensityModel(nn.Module):
         del x
         self._clear_memory()
         
-        return sample_hv, torch.arange(total_points, device=self.device), None
+        return sample_hv, selected_indices, is_wrong
 
     def _quantize_tiny_chunks(self, tensor, max_chunk_elements=100000):
         """Quantize in very small chunks to minimize memory."""
@@ -448,10 +471,24 @@ class DensityModel(nn.Module):
 
         return logits, F.normalize(enc), indices, is_wrong_left # enc is still hd_dim, but some elements are 0
 
-    def get_predictions(self, enc):
+    def get_predictions(self, enc, chunk_size=4096):
         if enc.dtype != self.classify.weight.dtype:
             self.classify = self.classify.to(enc.dtype)
-        logits = self.classify(F.normalize(enc))
+        
+        num_samples = enc.shape[0]
+        all_logits = []
+        
+        for i in range(0, num_samples, chunk_size):
+            end_i = min(i + chunk_size, num_samples)
+            enc_chunk = enc[i:end_i]
+            logits_chunk = self.classify(F.normalize(enc_chunk))
+            all_logits.append(logits_chunk)
+            
+            del enc_chunk, logits_chunk
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        
+        logits = torch.cat(all_logits, dim=0)
         return logits
     
     def get_accuracy(self, x, labels):
@@ -461,7 +498,7 @@ class DensityModel(nn.Module):
         self.eval()
         
         with torch.no_grad():
-            enc, _, _ = self.encode(x)
+            enc, _, _ = self.encode_chunked(x)
             
             logits = self.get_predictions(enc)
             predictions = torch.argmax(logits, dim=1)
@@ -757,30 +794,66 @@ class DensityModel(nn.Module):
         
         self.classify_weights[pred_id] = new_prototype.squeeze(0)
 
-    def inference_update(self, x, beta=0.3):
+    def inference_update(self, x, beta=0.5):
         """
         Inference with updates based on distance.
         If beta=0, then the confidence updates are removed (ablation)
         """
-        enc, _, _ = self.encode(x)
-        enc_normalized = F.normalize(enc)
-        
-        logits = self.classify(enc_normalized)
-        predictions = torch.argmax(logits, dim=1)
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            enc_normalized = F.normalize(enc)
 
-        enc_binary = torch.sign(enc) # distance calculation
-        prototypes = torch.sign(self.classify.weight)
-        selected_prototypes = prototypes[predictions]
-        hd_dim = enc_binary.shape[1]
-        similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
-        distances = (1 - similarities) / 2
-
-        mask = distances >= beta
-
-        if torch.any(mask): # need to figure out how to vectorize
-            distant_hvs_binary = enc_binary[mask]
+            if enc_normalized.dtype != self.classify.weight.dtype:
+                enc_normalized = enc_normalized.to(self.classify.weight.dtype)
             
-            for hv_binary in distant_hvs_binary:
-                self.update_hv(hv_binary.unsqueeze(0))
-        
-        return predictions
+            logits = self.classify(enc_normalized)
+            predictions = torch.argmax(logits, dim=1)
+
+            enc_binary = torch.sign(enc) # distance calculation
+            # prototypes = torch.sign(self.classify.weight)
+            # selected_prototypes = prototypes[predictions]
+            # hd_dim = enc_binary.shape[1]
+            # similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
+            # distances = (1 - similarities) / 2
+
+            confidence = torch.softmax(logits, dim=1).max(dim=1)[0] # confidence based mask
+            mask = confidence < (1 - beta)
+
+            # top2_logits = torch.topk(logits, 2, dim=1)[0] # relative distances
+            # margin = top2_logits[:, 0] - top2_logits[:, 1]
+            # mask = margin < beta  # Update when margin is small
+
+            print(f"Distances have mean {confidence.mean()} and variance {confidence.var()}")
+
+            if torch.any(mask):
+                distant_hvs = enc_binary[mask]
+                distant_predictions = predictions[mask]
+                
+                unique_classes = torch.unique(distant_predictions)
+                
+                for class_id in unique_classes:
+                    class_mask = distant_predictions == class_id
+                    class_hvs = distant_hvs[class_mask]
+
+                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_hvs, class_id)
+                    
+                    current_prototype = self.classify_weights[class_id:class_id+1]
+
+                    disagreements = (current_prototype * class_hvs) == -1
+
+                    # flip_prob[i, j] = (sum of similarities for samples that disagree at bit j) / N_class
+                    flip_weights = disagreements.float() * subcluster_sims.unsqueeze(1)
+                    flip_contribution = flip_weights.sum(dim=0)
+
+                    has_disagreement = disagreements.any(dim=0)
+
+                    # each bit gets weighted by how much it should flip
+                    update_direction = -2 * current_prototype[0] * has_disagreement.float()
+                    weighted_update = update_direction * flip_contribution / (class_hvs.shape[0] + 1e-8)
+                    
+                    # Apply threshold to actually flip bits (if weighted_update magnitude > 0.5)
+                    should_flip = torch.abs(weighted_update) > 0.5
+                    
+                    self.classify_weights[class_id, should_flip] *= -1
+            
+            return predictions

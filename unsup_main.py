@@ -15,8 +15,8 @@ DATA_DIR = "nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
-MAX_EPOCHS = 10
-MAX_HDC_EPOCHS = 10
+MAX_HDC_EPOCHS = 50
+FEATURE_EXTRACTOR_EPOCHS = 250
 
 HD_DIM = 5000
 
@@ -37,7 +37,7 @@ def convert_dataset():
 
 def train_extractor(ARCH, DATA):
     trainer = Trainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
-    trainer.train()
+    trainer.train(epochs=FEATURE_EXTRACTOR_EPOCHS)
 
 def train_hdc(ARCH, DATA) -> DensityModel:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -82,7 +82,7 @@ def train_hdc(ARCH, DATA) -> DensityModel:
 
     return model
 
-def test_init(ARCH, DATA):
+def init_sub(ARCH, DATA):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     parser = Parser(root=DATA_DIR,
@@ -142,7 +142,7 @@ def test_inference(ARCH, DATA):
 
 def main():
     try:
-        ARCH = yaml.safe_load(open("config/arch/senet-512.yml", 'r'))
+        ARCH = yaml.safe_load(open("config/arch/senet-1024p.yml", 'r'))
     except Exception as e:
         print(f"Error opening arch yaml file. {e}")
         quit()
@@ -155,11 +155,11 @@ def main():
     # DATA['split']['train'] = [61, 103, 553, 655]
     DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
 
-    convert_dataset()
-    train_extractor(ARCH, DATA)
+    # convert_dataset()
+    # train_extractor(ARCH, DATA)
     hdc = train_hdc(ARCH, DATA)
-    test_init(ARCH, DATA)
-    test_inference(ARCH, DATA)
+    init_sub(ARCH, DATA)
+    # test_inference(ARCH, DATA)
 
 if __name__=="__main__":
     main()

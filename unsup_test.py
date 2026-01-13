@@ -45,12 +45,43 @@ def test_collapse(ARCH, DATA, inference_epochs=5):
     trainloader = parser.get_train_set()
 
     model: DensityModel = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
-    model = torch.load(HDC_SUB_PATH, weights_only=False)
+    model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
 
+    model.to(device)
+
+    all_accuracies = []
+    all_class_accuracies = {}
+
+    model.eval()
+    with torch.no_grad():
+        for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
+            proj_in = proj_in.to(device)
+            proj_labels = proj_labels.to(device)
+
+            curr_acc, _, curr_class_accs = model.get_accuracy(proj_in, proj_labels)
+            all_accuracies.append(curr_acc)
+
+            for class_id, class_acc in curr_class_accs.items():
+                if class_id not in all_class_accuracies:
+                    all_class_accuracies[class_id] = []
+                all_class_accuracies[class_id].append(class_acc)
+
+        init_accuracy = np.mean(all_accuracies) if all_accuracies else 0.0
+
+        init_class_accuracy = {}
+        for class_id, acc_list in all_class_accuracies.items():
+            init_class_accuracy[class_id] = np.mean(acc_list)
+
+        print(f"Beginning Accuracy of {init_accuracy}")
+        for i in init_class_accuracy:
+            print(f"Accuracy for class {i} is {init_class_accuracy[i]}")
+
+    model.train()
     for epoch in range(inference_epochs):
         for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
+            proj_in = proj_in.to(device)
             for i in proj_in:
-                model.inference_update(i)
+                model.inference_update(i.unsqueeze(0))
 
     all_accuracies = []
     all_class_accuracies = {}
@@ -59,6 +90,9 @@ def test_collapse(ARCH, DATA, inference_epochs=5):
     model.eval()
     with torch.no_grad():
         for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
+            proj_in = proj_in.to(device)
+            proj_labels = proj_labels.to(device)
+
             curr_acc, _, curr_class_accs = model.get_accuracy(proj_in, proj_labels)
             all_accuracies.append(curr_acc)
 
@@ -73,9 +107,9 @@ def test_collapse(ARCH, DATA, inference_epochs=5):
         for class_id, acc_list in all_class_accuracies.items():
             class_accuracy[class_id] = np.mean(acc_list)
 
-        print(f"Final Accuracy of {accuracy}")
+        print(f"Final Accuracy of {accuracy} from {init_accuracy}")
         for i in class_accuracy:
-            print(f"Accuracy for class {i} is {class_accuracy[i]}")
+            print(f"Accuracy for class {i} is {class_accuracy[i]} from {init_class_accuracy[i]}")
 
 def main():
     # A code snippet to test model collapse in the model after updating over the training set/test set
