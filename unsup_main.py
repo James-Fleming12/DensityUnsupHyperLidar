@@ -15,7 +15,7 @@ DATA_DIR = "nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
-MAX_HDC_EPOCHS = 50
+MAX_HDC_EPOCHS = 10
 FEATURE_EXTRACTOR_EPOCHS = 250
 
 HD_DIM = 5000
@@ -157,7 +157,7 @@ def main():
 
     # convert_dataset()
     # train_extractor(ARCH, DATA)
-    hdc = train_hdc(ARCH, DATA)
+    # hdc = train_hdc(ARCH, DATA)
     init_sub(ARCH, DATA)
     # test_inference(ARCH, DATA)
 

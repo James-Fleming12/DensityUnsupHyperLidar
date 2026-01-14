@@ -92,10 +92,8 @@ class Model(nn.Module):
 
         # self.classify_weights is the sum of all hypervectors, so its scale
         # accounts the number of samples in this class/cluster
-        self.classify_weights = copy.deepcopy(self.classify.weight)
-        self.classify_weights.to(self.device)
+        self.classify_weights = nn.Parameter(self.classify.weight.data.clone()).to(device)
         # print(self.classify_weights.shape)  # size num_class x HD dim
-
 
     def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
         if mask is None:
@@ -329,8 +327,8 @@ class DensityModel(nn.Module):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
-        # with torch.amp.autocast(self.device, enabled=True):
-        x = self.net(x, True)
+        with torch.amp.autocast(self.device.type, enabled=True):
+            x = self.net(x, True)
 
         x = x.permute(0, 2, 3, 1)
         x = x.reshape(-1, 128)
@@ -467,9 +465,23 @@ class DensityModel(nn.Module):
         enc, indices, is_wrong_left = self.encode_chunked(x, mask, PERCENTAGE, is_wrong)
         if enc.dtype != self.classify.weight.dtype:
             self.classify = self.classify.to(enc.dtype)
-        logits = self.classify(F.normalize(enc))
 
-        return logits, F.normalize(enc), indices, is_wrong_left # enc is still hd_dim, but some elements are 0
+        enc_normalized = self._normalize_chunked(enc, chunk_size=4096)
+        logits = self.classify(enc_normalized)
+
+        return logits, enc_normalized, indices, is_wrong_left # enc is still hd_dim, but some elements are 0
+    
+    def _normalize_chunked(self, enc, chunk_size=4096):
+        num_samples = enc.shape[0]
+
+        for i in range(0, num_samples, chunk_size):
+            end_i = min(i + chunk_size, num_samples)
+            chunk = enc[i:end_i]
+            norm = torch.norm(chunk, dim=1, keepdim=True)
+            norm = torch.where(norm == 0, torch.ones_like(norm), norm)
+            enc[i:end_i] = chunk / norm
+        
+        return enc
 
     def get_predictions(self, enc, chunk_size=4096):
         if enc.dtype != self.classify.weight.dtype:
@@ -650,6 +662,7 @@ class DensityModel(nn.Module):
             X=class_emb_np,
             bandwidth=bandwidth,
         )
+        cluster_centers = np.sign(cluster_centers)
         
         num_clusters_found = len(cluster_centers)
         print(f"  Found {num_clusters_found} clusters")
@@ -682,11 +695,13 @@ class DensityModel(nn.Module):
                 end_idx = min(i + batch_size, total_centers)
 
                 batch = torch.stack([
-                    torch.sign(c.to(self.device)) if c.device.type == 'cpu' 
-                    else torch.sign(c) 
+                    self._make_bipolar(c.to(self.device)) if c.device.type == 'cpu' 
+                    else self._make_bipolar(c) 
                     for c in centers_list[i:end_idx]
                 ])
                 
+                assert torch.all(torch.abs(batch) == 1), f"Subclusters must be bipolar! Got values: {torch.unique(batch)}"
+
                 self.subclusters.data[i:end_idx] = batch
 
                 del batch
@@ -695,6 +710,13 @@ class DensityModel(nn.Module):
                     print(f"  Loaded {end_idx}/{total_centers} subclusters")
         
         print("All subclusters loaded")
+
+    def _make_bipolar(self, tensor):
+        """Convert tensor to bipolar {-1, +1}, mapping 0 -> 1."""
+        # Method 1: Map zeros to +1 (most common)
+        result = torch.sign(tensor)
+        result[result == 0] = -1
+        return result
 
     def _clear_memory(self):
         """Aggressive memory clearing."""
@@ -857,3 +879,45 @@ class DensityModel(nn.Module):
                     self.classify_weights[class_id, should_flip] *= -1
             
             return predictions
+        
+    def run_diagnostics(self):
+        print("=" * 50)
+        print("MODEL DIAGNOSTICS")
+        print("=" * 50)
+        
+        # 1. Backbone
+        print("\n1. Backbone Check:")
+        test_input = torch.randn(1, 5, 512, 512, device=self.device)
+        with torch.no_grad():
+            backbone_out = self.net(test_input, True)
+        print(f"   Output shape: {backbone_out.shape}")
+        print(f"   Has NaN: {torch.isnan(backbone_out).any()}")
+        
+        # 2. Projection
+        print("\n2. Projection Check:")
+        test_features = torch.randn(10, 128, device=self.device)
+        projected = self.projection(test_features)
+        print(f"   Input shape: {test_features.shape}")
+        print(f"   Output shape: {projected.shape}")
+        print(f"   Binary values: {torch.unique(torch.sign(projected))}")
+        
+        # 3. Classifier
+        print("\n3. Classifier Check:")
+        print(f"   Weight shape: {self.classify.weight.shape}")
+        print(f"   Weight norm: {self.classify.weight.norm():.3f}")
+        
+        # 4. Forward pass
+        print("\n4. Full Forward Pass:")
+        enc, _, _ = self.encode(test_input)
+        logits = self.get_predictions(enc[:1])  # Just first sample
+        print(f"   Logits: {logits}")
+        print(f"   Prediction: {torch.argmax(logits)}")
+        
+        # 5. Subclusters
+        print("\n5. Subclusters Check:")
+        print(f"   Shape: {self.subclusters.shape}")
+        print(f"   Non-zero: {(self.subclusters != 0).sum().item()}")
+        
+        print("\n" + "=" * 50)
+
+        print(f"Classify is {self.classify.weight}")

@@ -161,21 +161,25 @@ class DenseHDTrainer():
 
                 self.is_wrong_list[i] = is_wrong
 
-            model.classify.weight[:] = F.normalize(model.classify_weights)
+            # model.classify.weight[:] = F.normalize(model.classify_weights)
+            model.classify_weights.data = F.normalize(model.classify_weights.data)
+            model.classify.weight.data = model.classify_weights.data.clone()
+
             print("sum of is_wrong_list: ", sum([x.sum().item() for x in self.is_wrong_list if x is not None]))
             print("Mean HDC training time:{}\t std:{}".format(np.mean(train_time), np.std(train_time)))
             # print("Finish one batch, update classify weights")
     
-    def retrain(self, train_loader, model, epoch):  # task_list
+    def retrain(self, train_loader, model, epoch):
         """Training of one epoch on single-pass of data"""
-        # Set validation frequency
         batchs_per_class = np.floor(len(train_loader) / self.num_classes).astype('int')
         if self.gpu:
             torch.cuda.empty_cache()
+        
         with torch.no_grad():
             cur_class = -1
             total_miss = 0
             retrain_time = []
+            
             for i, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(tqdm(train_loader, desc="Retraining")):
                 path_seq = path_seq[0]
                 path_name = path_name[0]
@@ -185,9 +189,13 @@ class DenseHDTrainer():
                     proj_mask = proj_mask.cuda()
 
                 start = time.time()
-                model.classify.weight[:] = F.normalize(model.classify_weights)
+
+                model.classify_weights.data = F.normalize(model.classify_weights.data)
+                model.classify.weight.data = model.classify_weights.data.clone()
+                
                 predictions, samples_hv, indices, self.is_wrong_list[i] = model(proj_in, self.mask, None, self.is_wrong_list[i])
                 argmax = predictions.argmax(dim=1)
+                
                 proj_labels = proj_labels.view(-1)
                 proj_labels = proj_labels.to(self.device)
                 proj_labels = proj_labels[indices]
@@ -203,34 +211,30 @@ class DenseHDTrainer():
                 samples_hv = samples_hv[is_wrong]
                 samples_hv = samples_hv.to(model.classify_weights.dtype)
 
-                true_scores = predictions[is_wrong, proj_labels]  # shape: [wrong_size]
-                wrong_scores = predictions[is_wrong, argmax]  # shape: [wrong_size
-                losses = wrong_scores - true_scores  # shape: [wrong_size]
+                true_scores = predictions[is_wrong, proj_labels]
+                wrong_scores = predictions[is_wrong, argmax]
+                losses = wrong_scores - true_scores
+                
                 if losses.sum().item() < 0:
-                    print("Warning: negative losses detected, this is not expected")
-                    print("proj_labels: ", proj_labels)
-                    print("argmax: ", argmax)
-                    print("samples_hv: ", samples_hv)
-                    print("true_scores: ", true_scores)
-                    print("wrong_scores: ", wrong_scores)
-                    print("losses: ", losses)
+                    print("Warning: negative losses detected")
 
                 wrong_indices_within_selected = is_wrong.nonzero(as_tuple=False).squeeze()
                 actual_wrong_indices = indices[wrong_indices_within_selected]
-
                 self.is_wrong_list[i][actual_wrong_indices] = True
 
-                # retraining updates were happening twice???
                 model.classify_weights.index_add_(0, proj_labels, samples_hv)
-                # model.classify_weights.index_add_(0, proj_labels, samples_hv)
-                model.classify_weights.index_add_(0, argmax, -samples_hv)
-                # model.classify_weights.index_add_(0, argmax, -samples_hv)
 
+                samples_hv.neg_()  # In-place negation
+                model.classify_weights.index_add_(0, argmax, samples_hv)
+                samples_hv.neg_()
+
+                del predictions, samples_hv, is_wrong, true_scores, wrong_scores, losses
+                
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
+                
                 res = time.time() - start
                 retrain_time.append(res)
-                start = time.time()
 
             print("total_miss: ", total_miss)
             print("sum of is_wrong_list: ", sum([x.sum().item() for x in self.is_wrong_list if x is not None]))
