@@ -4,7 +4,6 @@ import yaml
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import DensityModel
 from modules.trainer import Trainer
-from modules.Basic_HD import DenseHDTrainer
 from modules.ioueval import iouEval
 
 import numpy as np
@@ -44,7 +43,7 @@ def test_collapse(ARCH, DATA, inference_epochs=5):
     
     trainloader = parser.get_train_set()
 
-    model: DensityModel = DensityModel(ARCH, MODEL_DIR, NUM_CLASSES, hd_dim=HD_DIM, device=device)
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
 
     model.to(device)

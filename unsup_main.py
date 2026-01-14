@@ -3,9 +3,9 @@ import torch
 import yaml
 
 from dataset.kitti.parser import Parser
-from modules.HDC_utils import DensityModel, Model, NewModel
+from modules.HDC_utils import Model, DensityModel
 from modules.trainer import Trainer
-from modules.Basic_HD import DenseHDTrainer, BasicHD, NewDenseTrain
+from modules.Basic_HD import BasicHD, DensityTrainer
 from modules.ioueval import iouEval
 
 from dataset.export_semantickitti import KittiConverter
@@ -69,14 +69,14 @@ def train_hdc(ARCH, DATA) -> DensityModel:
 
     evaluator = iouEval(NUM_CLASSES, device, ignore)
 
-    trainer = NewDenseTrain(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, None)
+    trainer = DensityTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, None)
 
     trainer.train(dataloader, trainer.model, None)
 
     for i in range(1):
         trainer.retrain(dataloader, trainer.model, i+1, None)
 
-    model: NewModel = trainer.model
+    model: DensityModel = trainer.model
     torch.save(model, HDC_SAVE_PATH)
 
     test_hdc_model(model, dataloader)
@@ -266,7 +266,7 @@ def init_sub(ARCH, DATA):
     
     dataloader = parser.get_train_set()
 
-    model: NewModel = NewModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model = torch.load(HDC_SAVE_PATH, weights_only=False)
 
     model.init_subclusters(dataloader)
@@ -294,7 +294,7 @@ def test_inference(ARCH, DATA):
     
     dataloader = parser.get_train_set()
 
-    model: NewModel = NewModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
     model.to(device)
 
