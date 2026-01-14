@@ -246,7 +246,6 @@ class Model(nn.Module):
             pair_simil[:self.num_classes, :self.num_classes] = torch.eye(self.num_classes)
         return pair_simil.detach().cpu().numpy(), class_hv.detach().cpu().numpy()
 
-
 def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
@@ -314,7 +313,7 @@ class DensityModel(nn.Module):
 
         self.classify.weight.data.fill_(0.0)
 
-        self.classify_weights = copy.deepcopy(self.classify.weight)
+        self.classify_weights = nn.Parameter(self.classify.weight.data.clone()).to(device)
 
         # density subcluster initialization
         self.num_subclusters = max_subclusters
@@ -463,11 +462,14 @@ class DensityModel(nn.Module):
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
         enc, indices, is_wrong_left = self.encode_chunked(x, mask, PERCENTAGE, is_wrong)
+        
         if enc.dtype != self.classify.weight.dtype:
             self.classify = self.classify.to(enc.dtype)
+        if enc.dtype != self.classify_weights.dtype:
+            self.classify_weights.data = self.classify_weights.data.to(enc.dtype)
 
         enc_normalized = self._normalize_chunked(enc, chunk_size=4096)
-        logits = self.classify(enc_normalized)
+        logits = F.linear(enc_normalized, self.classify.weight)
 
         return logits, enc_normalized, indices, is_wrong_left # enc is still hd_dim, but some elements are 0
     
@@ -486,6 +488,8 @@ class DensityModel(nn.Module):
     def get_predictions(self, enc, chunk_size=4096):
         if enc.dtype != self.classify.weight.dtype:
             self.classify = self.classify.to(enc.dtype)
+        if enc.dtype != self.classify_weights.dtype:
+            self.classify_weights.data = self.classify_weights.data.to(enc.dtype)
         
         num_samples = enc.shape[0]
         all_logits = []
@@ -545,6 +549,74 @@ class DensityModel(nn.Module):
                     class_accuracies[cls.item()] = cls_correct / cls_total if cls_total > 0 else 0.0
         
         return accuracy, confidence_map, class_accuracies
+    
+    def diagnose_hdc_layer(self, dataloader, samples=20000):
+        self.eval()
+        device = self.device
+        D = self.hd_dim
+        C = self.num_classes
+
+        bit_sum = torch.zeros(D, device=device)
+        count = 0
+
+        pre_sign_var = []
+        post_sign_var = []
+
+        proto_sum = torch.zeros(C, D, device=device)
+        proto_count = torch.zeros(C, device=device)
+
+        with torch.no_grad():
+            for x, _, labels, *_ in dataloader:
+                x = x.to(device)
+                labels = labels.flatten().to(device)
+
+                enc, _, _ = self.encode_chunked(x)
+                signed = torch.sign(enc)
+
+                take = min(enc.size(0), samples - count)
+
+                bit_sum += signed[:take].sum(dim=0)
+                count += take
+
+                pre_sign_var.append(enc[:take].var(dim=0).mean())
+                post_sign_var.append(signed[:take].var(dim=0).mean())
+
+                for i in range(take):
+                    c = labels[i].item()
+                    if c == 255:
+                        continue
+                    proto_sum[c] += signed[i]
+                    proto_count[c] += 1
+
+                if count >= samples:
+                    break
+
+        bit_imbalance = (bit_sum / count).abs().mean().item()
+
+        pre_var = torch.stack(pre_sign_var).mean().item()
+        post_var = torch.stack(post_sign_var).mean().item()
+        variance_ratio = post_var / (pre_var + 1e-8)
+
+        proto = torch.sign(proto_sum / proto_count.unsqueeze(1))
+        sim = proto @ proto.T / D
+        off_diag = sim[~torch.eye(C, dtype=bool, device=device)]
+        mean_proto_sim = off_diag.mean().item()
+
+        bit_usage = (proto.abs().mean(dim=0) > 0.1).float().mean().item()
+
+        print("\n===== HDC LAYER DIAGNOSIS =====")
+        print(f"Bit imbalance        : {bit_imbalance:.4f}")
+        print(f"Variance ratio       : {variance_ratio:.4f}")
+        print(f"Mean proto similarity: {mean_proto_sim:.4f}")
+        print(f"Effective dims used  : {bit_usage*100:.1f}%")
+
+        return {
+            "bit_imbalance": bit_imbalance,
+            "variance_ratio": variance_ratio,
+            "mean_proto_similarity": mean_proto_sim,
+            "effective_dim_fraction": bit_usage,
+        }
+
 
     def extract_class_hv(self, mask=None):
         if mask is None:
@@ -725,29 +797,6 @@ class DensityModel(nn.Module):
         if torch.cuda.is_available():
             torch.cuda.synchronize()
             torch.cuda.empty_cache()
-
-    def get_max_subcluster_similarity(self, enc, class_id):
-        """
-        Get maximum similarity [0,1] to subclusters using Hamming distance.
-        """
-        enc_binary = torch.sign(enc)
-        
-        mask = self.subcluster_to_class == class_id
-        relevant_subclusters = self.subclusters[mask]
-        
-        if len(relevant_subclusters) == 0:
-            return torch.zeros(enc.shape[0], device=enc.device), None
-
-        dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
-
-        hd_dim = enc_binary.shape[1]
-        similarities = (1.0 + dot_products / hd_dim) / 2.0
-
-        max_similarities, relative_indices = torch.max(similarities, dim=1)
-
-        absolute_indices = torch.nonzero(mask)[relative_indices, 0]
-        
-        return max_similarities, absolute_indices
     
     def get_max_subcluster_similarity(self, enc, class_id, distance_sensitivity=1.0):
         """
@@ -880,44 +929,435 @@ class DensityModel(nn.Module):
             
             return predictions
         
-    def run_diagnostics(self):
-        print("=" * 50)
-        print("MODEL DIAGNOSTICS")
-        print("=" * 50)
-        
-        # 1. Backbone
-        print("\n1. Backbone Check:")
-        test_input = torch.randn(1, 5, 512, 512, device=self.device)
-        with torch.no_grad():
-            backbone_out = self.net(test_input, True)
-        print(f"   Output shape: {backbone_out.shape}")
-        print(f"   Has NaN: {torch.isnan(backbone_out).any()}")
-        
-        # 2. Projection
-        print("\n2. Projection Check:")
-        test_features = torch.randn(10, 128, device=self.device)
-        projected = self.projection(test_features)
-        print(f"   Input shape: {test_features.shape}")
-        print(f"   Output shape: {projected.shape}")
-        print(f"   Binary values: {torch.unique(torch.sign(projected))}")
-        
-        # 3. Classifier
-        print("\n3. Classifier Check:")
-        print(f"   Weight shape: {self.classify.weight.shape}")
-        print(f"   Weight norm: {self.classify.weight.norm():.3f}")
-        
-        # 4. Forward pass
-        print("\n4. Full Forward Pass:")
-        enc, _, _ = self.encode(test_input)
-        logits = self.get_predictions(enc[:1])  # Just first sample
-        print(f"   Logits: {logits}")
-        print(f"   Prediction: {torch.argmax(logits)}")
-        
-        # 5. Subclusters
-        print("\n5. Subclusters Check:")
-        print(f"   Shape: {self.subclusters.shape}")
-        print(f"   Non-zero: {(self.subclusters != 0).sum().item()}")
-        
-        print("\n" + "=" * 50)
+class NewModel(nn.Module):
+    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5):
+        super(NewModel, self).__init__()
 
-        print(f"Classify is {self.classify.weight}")
+        self.device = device
+
+        self.num_classes = num_classes
+        self.hd_dim = 10000
+        self.temperature = 0.01
+
+        self.flatten = torch.nn.Flatten()
+
+        self.input_dim = 128
+        self.ARCH = ARCH
+
+        with torch.no_grad():
+            torch.nn.Module.dump_patches = True
+            if self.ARCH["train"]["pipeline"] == "hardnet":
+                from modules.network.HarDNet import HarDNet
+                self.net = HarDNet(self.num_classes, self.ARCH["train"]["aux_loss"])
+
+            if self.ARCH["train"]["pipeline"] == "res":
+                from modules.network.ResNet import ResNet_34
+                self.net = ResNet_34(self.num_classes, self.ARCH["train"]["aux_loss"])
+
+                def convert_relu_to_softplus(model, act):
+                    for child_name, child in model.named_children():
+                        if isinstance(child, nn.LeakyReLU):
+                            setattr(model, child_name, act)
+                        else:
+                            convert_relu_to_softplus(child, act)
+
+                if self.ARCH["train"]["act"] == "Hardswish":
+                    convert_relu_to_softplus(self.net, nn.Hardswish())
+                elif self.ARCH["train"]["act"] == "SiLU":
+                    convert_relu_to_softplus(self.net, nn.SiLU())
+
+            if self.ARCH["train"]["pipeline"] == "fid":
+                from modules.network.Fid import ResNet_34
+                self.net = ResNet_34(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
+
+                if self.ARCH["train"]["act"] == "Hardswish":
+                    convert_relu_to_softplus(self.net, nn.Hardswish())
+                elif self.ARCH["train"]["act"] == "SiLU":
+                    convert_relu_to_softplus(self.net, nn.SiLU())
+        w_dict = torch.load(modeldir + "/SENet_valid_best",
+                            map_location=lambda storage, loc: storage)
+        self.net.load_state_dict(w_dict['state_dict'], strict=True)
+        self.net.eval()
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            self.gpu = True
+            self.net.cuda()
+
+        self.hd_encoder = hd_encoder
+        if self.hd_encoder == 'rp':  # Random projection encoding
+            # Generate a random projection matrix
+            self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+
+        elif self.hd_encoder == 'idlevel':  # ID-level encoding
+            # Generate id-level value hv for each floating value
+            self.value = embeddings.Level(num_levels, self.hd_dim, 
+                                          randomness=randomness)
+            print("self.value", self.value.weight.shape)  # cifar10: [100, 10000] # num_levels * hd_dim
+            # Create a random hv for each position, for binding with the value hv
+            self.position = embeddings.Random(self.input_dim, self.hd_dim)
+            print("self.position", self.position.weight.shape)  # cifar10: [1280, 10000]  #bsz x num_features
+
+        elif self.hd_encoder == 'nonlinear':  # Nonlinear encoding
+            self.nonlinear_projection = embeddings.Sinusoid(self.input_dim, self.hd_dim)
+        else:
+            self.hd_dim = self.input_dim
+
+        self.classify = nn.Linear(self.hd_dim, self.num_classes, bias=False)
+        self.classify_sample_cnt = torch.zeros((self.num_classes, 1)).to(self.device)
+
+        self.classify.weight.data.fill_(0.0)
+
+        self.classify_weights = nn.Parameter(self.classify.weight.data.clone()).to(device)
+
+        self.num_subclusters = max_subclusters
+        self.subclusters = nn.Parameter(torch.zeros(self.num_classes * self.num_subclusters, self.hd_dim, device=self.device))
+        self.subclusters.data.fill_(0.0)
+
+        self.subcluster_to_class = torch.repeat_interleave(torch.arange(self.num_classes, device=self.device), self.num_subclusters)
+
+    def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
+        if mask is None:
+            mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
+
+        with torch.cuda.amp.autocast(enabled=True):
+            x = self.net(x, True)
+
+        x = x.permute(0, 2, 3, 1)
+        x = x.reshape(-1, 128)
+
+        if PERCENTAGE is not None:
+            wrong_indices = torch.nonzero(is_wrong, as_tuple=False).squeeze()
+            num_samples = int(x.shape[0] * PERCENTAGE)  # Calculate the number of samples to select
+
+            if wrong_indices.numel() >= num_samples:
+                selected_indices = wrong_indices[torch.randperm(wrong_indices.shape[0], device=x.device)[:num_samples]]
+                is_wrong[selected_indices] = False
+            else:
+                non_wrong_indices = torch.nonzero(~is_wrong, as_tuple=False).squeeze()
+                remaining = num_samples - wrong_indices.numel()
+                fill_indices = non_wrong_indices[torch.randperm(non_wrong_indices.shape[0], device=x.device)[:remaining]]
+
+                selected_indices = torch.cat([wrong_indices, fill_indices], dim=0)
+                is_wrong[selected_indices] = False
+
+            selected_indices, _ = selected_indices.sort()
+            x = x[selected_indices]
+            assert x.shape[0] == num_samples, f"Expected {num_samples} samples, got {x.shape[0]}"
+        else:
+            selected_indices = torch.arange(x.shape[0], device=x.device)  # use all data
+        sample_hv = torch.zeros((x.shape[0], self.hd_dim), device=self.device, dtype=x.dtype)
+
+        if self.hd_encoder == 'rp':
+            if x.dtype != self.projection.weight.dtype:
+                self.projection = self.projection.to(x.dtype).to(self.device)
+            sample_hv[:, mask] = self.projection(x)[:, mask]
+
+        elif self.hd_encoder == 'idlevel':
+            tmp_hv = functional.bind(self.position.weight[:, mask],
+                                     self.value(x)[:, :, mask])
+            sample_hv[:, mask] = functional.multiset(tmp_hv)
+
+        elif self.hd_encoder == 'nonlinear':
+            sample_hv[:, mask] = self.nonlinear_projection(x)[:, mask]
+        else:
+            return x
+
+        sample_hv[:, mask] = functional.hard_quantize(sample_hv[:, mask])
+        return sample_hv, selected_indices, is_wrong
+
+    def forward(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
+        if mask is None:
+            mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
+
+        enc, indices, is_wrong_left = self.encode(x, mask, PERCENTAGE, is_wrong)
+        if enc.dtype != self.classify.weight.dtype:
+            self.classify = self.classify.to(enc.dtype)
+        logits = self.classify(F.normalize(enc))
+
+        return logits, F.normalize(enc), indices, is_wrong_left
+
+    def get_predictions(self, enc):
+        if enc.dtype != self.classify.weight.dtype:
+            self.classify = self.classify.to(enc.dtype)
+        logits = self.classify(F.normalize(enc))
+        return logits
+
+    def extract_class_hv(self, mask=None):
+        if mask is None:
+            mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
+
+        if self.method == 'LifeHD':
+            class_hv = self.classify.weight[:self.cur_classes, mask]
+        else:
+            class_hv = self.classify.weight[:, mask]
+        return class_hv.detach().cpu().numpy()
+    
+    def extract_pair_simil(self, mask=None):
+        if mask is None:
+            mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
+
+        if self.method == 'LifeHD' or self.method == 'LifeHDsemi':
+            class_hv = self.classify.weight[:self.cur_classes, mask]
+        elif self.method == 'BasicHD':
+            class_hv = self.classify.weight[:, mask]
+        else:
+            raise ValueError('method not supported: {}'.format(self.method))
+        pair_simil = class_hv @ class_hv.T
+
+        if self.method == 'LifeHDsemi':
+            pair_simil[:self.num_classes, :self.num_classes] = torch.eye(self.num_classes)
+        return pair_simil.detach().cpu().numpy(), class_hv.detach().cpu().numpy()
+    
+    def init_subclusters(self, dataloader, bandwidth=None, max_samples_per_class=5000):
+        """
+        Initialize subclusters
+        """
+        self.eval()
+        num_sub_per_cluster = self.num_subclusters
+
+        print(f"Collecting embeddings for {self.num_classes} classes")
+
+        all_subcluster_centers = []
+        all_subcluster_classes = []
+        
+        for class_id in range(self.num_classes):
+            print(f"Processing class {class_id}...")
+
+            class_embeddings = []
+            total_samples = 0
+            
+            with torch.no_grad():
+                for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(dataloader):
+                    proj_in = proj_in.to(self.device)
+                    proj_labels = proj_labels.to(self.device).flatten()
+
+                    enc, _, _ = self.encode(proj_in)
+
+                    class_mask = proj_labels == class_id
+                    if torch.any(class_mask):
+                        class_enc = enc[class_mask].cpu().half()
+                        class_embeddings.append(class_enc)
+                        total_samples += class_enc.shape[0]
+
+                    del proj_in, proj_labels
+                    self._clear_memory()
+                    
+                    print(f"  Batch {batch_idx}: collected {total_samples} samples so far")
+                    
+                    if total_samples >= max_samples_per_class:
+                        break
+
+            if not class_embeddings:
+                print(f"  No data for class {class_id}, skipping")
+                continue
+
+            class_emb_cpu = torch.cat(class_embeddings, dim=0)
+
+            if len(class_emb_cpu) > max_samples_per_class:
+                indices = torch.randperm(len(class_emb_cpu))[:max_samples_per_class]
+                class_emb_cpu = class_emb_cpu[indices]
+            
+            class_emb_np = class_emb_cpu.numpy()
+
+            if bandwidth is None:
+                estimated_bandwidth = estimate_bandwidth_binary(
+                    class_emb_np, 
+                    quantile=0.2,
+                    n_samples=min(500, len(class_emb_np))
+                )
+                print(f"  Using Estimated bandwidth for class {class_id}: {estimated_bandwidth:.4f}")
+                class_bandwidth = estimated_bandwidth
+            else:
+                class_bandwidth = bandwidth
+            
+            print(f"  Using {len(class_emb_np)} samples for clustering")
+
+            del class_emb_cpu, class_embeddings
+            self._clear_memory()
+            
+            subclusters_for_class = self._process_single_class(
+                class_emb_np, class_id, num_sub_per_cluster, class_bandwidth
+            )
+            
+            all_subcluster_centers.extend(subclusters_for_class)
+            all_subcluster_classes.extend([class_id] * len(subclusters_for_class))
+
+            del class_emb_np
+            self._clear_memory()
+
+        self._load_subclusters(all_subcluster_centers, all_subcluster_classes)
+        print("Subcluster initialization complete")
+
+    def _process_single_class(self, class_emb_np, class_id, num_sub_per_cluster, bandwidth):
+        """Process a single class to generate its subclusters."""
+        if len(class_emb_np) == 0:
+            return []
+        
+        print(f"  Running mean shift on {len(class_emb_np)} samples...")
+        cluster_centers = mean_shift_binary(
+            X=class_emb_np,
+            bandwidth=bandwidth,
+        )
+        cluster_centers = np.sign(cluster_centers)
+        
+        num_clusters_found = len(cluster_centers)
+        print(f"  Found {num_clusters_found} clusters")
+
+        subclusters = []
+        if num_clusters_found <= num_sub_per_cluster:
+            for center in cluster_centers:
+                center_tensor = torch.tensor(center, device='cpu', dtype=torch.float16)
+                subclusters.append(center_tensor)
+        else:
+            indices = np.random.choice(num_clusters_found, num_sub_per_cluster, replace=False)
+            for idx in indices:
+                center = torch.tensor(cluster_centers[idx], device='cpu', dtype=torch.float16)
+                subclusters.append(center)
+
+        return subclusters
+
+    def _load_subclusters(self, centers_list, classes_list):
+        """Load subclusters into model parameters with memory efficiency."""
+        if not centers_list:
+            print("Warning: No subclusters to load")
+            return
+        
+        total_centers = len(centers_list)
+        print(f"Loading {total_centers} subclusters into model...")
+
+        with torch.no_grad():
+            batch_size = 100
+            for i in range(0, total_centers, batch_size):
+                end_idx = min(i + batch_size, total_centers)
+
+                batch = torch.stack([
+                    self._make_bipolar(c.to(self.device)) if c.device.type == 'cpu' 
+                    else self._make_bipolar(c) 
+                    for c in centers_list[i:end_idx]
+                ])
+                
+                assert torch.all(torch.abs(batch) == 1), f"Subclusters must be bipolar! Got values: {torch.unique(batch)}"
+
+                self.subclusters.data[i:end_idx] = batch
+
+                del batch
+                if i % 500 == 0:
+                    self._clear_memory()
+                    print(f"  Loaded {end_idx}/{total_centers} subclusters")
+        
+        print("All subclusters loaded")
+
+    def _make_bipolar(self, tensor):
+        """Convert tensor to bipolar {-1, +1}, mapping 0 -> 1."""
+        # Method 1: Map zeros to +1 (most common)
+        result = torch.sign(tensor)
+        result[result == 0] = -1
+        return result
+
+    def _clear_memory(self):
+        """Aggressive memory clearing."""
+        # import gc
+        # gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.synchronize()
+            torch.cuda.empty_cache()
+    
+    def get_max_subcluster_similarity(self, enc, class_id, distance_sensitivity=1.0):
+        """
+        Get maximum similarity [0,1] to subclusters using Hamming distance.
+        distance_sensitivity introduces a power law which scales with similarity = base_similarity ** (1 / distance_sensitivity)
+        """
+        enc_binary = torch.sign(enc).to(dtype=self.subclusters.dtype)
+        
+        mask = self.subcluster_to_class == class_id
+        relevant_subclusters = self.subclusters[mask]
+        
+        if len(relevant_subclusters) == 0:
+            return torch.zeros(enc.shape[0], device=enc.device), None
+
+        hd_dim = enc_binary.shape[1]
+
+        dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
+
+        base_similarity = (dot_products + hd_dim) / (2 * hd_dim)
+
+        if distance_sensitivity == 0.0:
+            scaled_similarity = torch.where(
+                base_similarity > 0.5,
+                torch.tensor(1.0, device=enc.device),
+                base_similarity * 2.0
+            )
+        elif distance_sensitivity == 1.0:
+            scaled_similarity = base_similarity
+        else:
+            exponent = 1.0 / max(distance_sensitivity, 0.001)
+            scaled_similarity = base_similarity ** exponent
+
+        max_similarities, relative_indices = torch.max(scaled_similarity, dim=1)
+        absolute_indices = torch.nonzero(mask)[relative_indices, 0]
+        
+        return max_similarities, absolute_indices
+
+    def inference_update(self, x, beta=0.5):
+        """
+        Inference with updates based on distance.
+        If beta=0, then the confidence updates are removed (ablation)
+        """
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            enc_normalized = F.normalize(enc)
+
+            if enc_normalized.dtype != self.classify.weight.dtype:
+                enc_normalized = enc_normalized.to(self.classify.weight.dtype)
+            
+            logits = self.classify(enc_normalized)
+            predictions = torch.argmax(logits, dim=1)
+
+            enc_binary = torch.sign(enc) # distance calculation
+            # prototypes = torch.sign(self.classify.weight)
+            # selected_prototypes = prototypes[predictions]
+            # hd_dim = enc_binary.shape[1]
+            # similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
+            # distances = (1 - similarities) / 2
+
+            confidence = torch.softmax(logits, dim=1).max(dim=1)[0] # confidence based mask
+            mask = confidence < (1 - beta)
+
+            # top2_logits = torch.topk(logits, 2, dim=1)[0] # relative distances
+            # margin = top2_logits[:, 0] - top2_logits[:, 1]
+            # mask = margin < beta  # Update when margin is small
+
+            if torch.any(mask):
+                distant_hvs = enc_binary[mask]
+                distant_predictions = predictions[mask]
+                
+                unique_classes = torch.unique(distant_predictions)
+                
+                for class_id in unique_classes:
+                    class_mask = distant_predictions == class_id
+                    class_hvs = distant_hvs[class_mask]
+
+                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_hvs, class_id)
+                    
+                    current_prototype = self.classify_weights[class_id:class_id+1]
+
+                    disagreements = (current_prototype * class_hvs) == -1
+
+                    # flip_prob[i, j] = (sum of similarities for samples that disagree at bit j) / N_class
+                    flip_weights = disagreements.float() * subcluster_sims.unsqueeze(1)
+                    flip_contribution = flip_weights.sum(dim=0)
+
+                    has_disagreement = disagreements.any(dim=0)
+
+                    # each bit gets weighted by how much it should flip
+                    update_direction = -2 * current_prototype[0] * has_disagreement.float()
+                    weighted_update = update_direction * flip_contribution / (class_hvs.shape[0] + 1e-8)
+                    
+                    # Apply threshold to actually flip bits (if weighted_update magnitude > 0.5)
+                    should_flip = torch.abs(weighted_update) > 0.5
+                    
+                    self.classify_weights[class_id, should_flip] *= -1
+            
+            return predictions
+
+def set_new_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
+    return NewModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
