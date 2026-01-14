@@ -10,7 +10,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from tqdm import tqdm
-from modules.HDC_utils import set_dense_model, set_model, set_new_model
+from modules.HDC_utils import set_model, set_new_model
 from modules.ioueval import *
 import torch.backends.cudnn as cudnn
 from postproc.KNN import KNN
