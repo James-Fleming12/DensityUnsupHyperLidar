@@ -617,10 +617,11 @@ class DensityModel(nn.Module):
         
         return max_similarities, absolute_indices
 
-    def inference_update(self, x, beta=0.5):
+    def inference_update(self, x, beta=0):
         """
         Inference with updates based on distance.
-        If beta=0, then the confidence updates are removed (ablation)
+        If beta=0, then the confidence masking is removed
+        If beta=1, then unsupervised updates are removed (ablation)
         """
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -633,14 +634,16 @@ class DensityModel(nn.Module):
             predictions = torch.argmax(logits, dim=1)
 
             enc_binary = torch.sign(enc) # distance calculation
-            # prototypes = torch.sign(self.classify.weight)
-            # selected_prototypes = prototypes[predictions]
-            # hd_dim = enc_binary.shape[1]
-            # similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
-            # distances = (1 - similarities) / 2
 
-            confidence = torch.softmax(logits, dim=1).max(dim=1)[0] # confidence based mask
-            mask = confidence < (1 - beta)
+            prototypes = torch.sign(self.classify.weight)
+            selected_prototypes = prototypes[predictions]
+            hd_dim = enc_binary.shape[1]
+            similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
+            distances = (1 - similarities) / 2
+            mask = distances > beta
+
+            # confidence = torch.softmax(logits, dim=1).max(dim=1)[0] # confidence based mask
+            # mask = confidence < (1 - beta)
 
             # top2_logits = torch.topk(logits, 2, dim=1)[0] # relative distances
             # margin = top2_logits[:, 0] - top2_logits[:, 1]
