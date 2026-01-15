@@ -53,7 +53,7 @@ def train_hdc(ARCH, DATA) -> DensityModel:
                         learning_map_inv=DATA["learning_map_inv"],
                         sensor=ARCH["dataset"]["sensor"],
                         max_points=ARCH["dataset"]["max_points"],
-                        batch_size=2,
+                        batch_size=ARCH["train"]["batch_size"],
                         workers=ARCH["train"]["workers"],
                         gt=True,
                         shuffle_train=True)

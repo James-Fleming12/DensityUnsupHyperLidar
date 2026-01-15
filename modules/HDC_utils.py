@@ -678,6 +678,45 @@ class DensityModel(nn.Module):
                     self.classify_weights[class_id, should_flip] *= -1
             
             return predictions
+        
+    def get_accuracy(self, x, labels):
+        self.eval()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+
+            logits = self.get_predictions(enc)
+            predictions = torch.argmax(logits, dim=1)
+        
+            confidences = torch.softmax(logits, dim=1)
+            max_confidences, _ = torch.max(confidences, dim=1)
+
+            batch_size = x.shape[0]
+            h, w = x.shape[-2:]
+            predictions_2d = predictions.reshape(batch_size, h, w)
+            confidence_map = max_confidences.reshape(batch_size, h, w)
+
+            if labels.dim() == 4:
+                labels = labels.squeeze(1)
+
+            pred_flat = predictions_2d.flatten()
+            label_flat = labels.flatten()
+
+            correct = (pred_flat == label_flat).sum().item()
+            total = len(pred_flat)
+            accuracy = correct / total
+            unique_classes = torch.unique(label_flat)
+            class_accuracies = {}
+
+            for cls in unique_classes:
+                if cls.item() == 255:
+                    continue
+                cls_mask = label_flat == cls
+                if torch.any(cls_mask):
+                    cls_correct = (pred_flat[cls_mask] == cls).sum().item()
+                    cls_total = cls_mask.sum().item()
+                    class_accuracies[cls.item()] = cls_correct / cls_total if cls_total > 0 else 0.0
+
+        return accuracy, confidence_map, class_accuracies
 
 def set_new_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
     return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)

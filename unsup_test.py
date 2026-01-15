@@ -124,6 +124,7 @@ def main():
         quit()
 
     DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
+    ARCH["train"]["batch_size"] = 2
 
     test_collapse(ARCH, DATA)
 
