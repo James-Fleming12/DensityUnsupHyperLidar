@@ -7,6 +7,7 @@ from modules.trainer import Trainer
 from modules.ioueval import iouEval
 
 import numpy as np
+import torch.functional as F
 
 from unsup_main import train_extractor, train_hdc
 
@@ -190,7 +191,7 @@ def test_subcluster_initialization(ARCH, trainloader):
     return model
 
 def test_inference_update_mechanics(ARCH, trainloader):
-    """Test inference updates for HARD BIPOLAR prototypes (±1 bit flips)"""
+    """Test inference updates for continuous unit-norm prototypes"""
     print("\n" + "="*80)
     print("TEST: Inference Update Mechanics (Bipolar)")
     print("="*80)
@@ -213,17 +214,15 @@ def test_inference_update_mechanics(ARCH, trainloader):
     print("\n[DIAGNOSTIC] Checking prototype validity...")
     proto = model.classify.weight
 
-    unique_vals = torch.unique(proto)
-    is_strict_bipolar = torch.all((unique_vals == -1) | (unique_vals == 1))
+    norms = torch.norm(proto, dim=1)
+    max_dev = torch.max(torch.abs(norms - 1.0)).item()
 
     print(f"  classify.weight shape: {proto.shape}")
-    print(f"  unique values: {unique_vals[:5]}{'...' if len(unique_vals) > 5 else ''}")
-    print(f"  Strict bipolar: {is_strict_bipolar}")
+    print(f"  Max deviation from unit norm: {max_dev:.6f}")
 
-    if not is_strict_bipolar:
+    if max_dev > 1e-3:
         raise AssertionError(
-            "❌ classify.weight contains non-bipolar values. "
-            "Hard bipolar prototypes must be ±1 only."
+            "❌ classify.weight is not unit-normalized after initialization."
         )
 
     for proj_in, _, proj_labels, *_ in trainloader:
@@ -234,16 +233,14 @@ def test_inference_update_mechanics(ARCH, trainloader):
     print("\n[DIAGNOSTIC] Prediction sanity check...")
     with torch.no_grad():
         enc, _, _ = model.encode(proj_in)
-        enc = torch.sign(enc)
+        enc_norm = F.normalize(enc)
 
-        assert torch.all((enc == -1) | (enc == 1)), "Encoded HVs are not bipolar"
-
-        logits = model.get_predictions(enc)
+        logits = model.classify(enc_norm)
         preds = logits.argmax(dim=1)
 
         print(f"  Unique predictions: {torch.unique(preds)}")
 
-    print("\n[Test 1] Bit-flip update check...")
+    print("\n[Test 1] Prototype update magnitude check...")
     original = model.classify.weight.clone()
 
     model.train()
@@ -256,34 +253,35 @@ def test_inference_update_mechanics(ARCH, trainloader):
 
     updated = model.classify.weight
 
-    flipped = (original != updated)
-    num_flipped = flipped.sum().item()
-    total_bits = original.numel()
+    delta = torch.norm(updated - original, dim=1)
+    mean_delta = delta.mean().item()
+    max_delta = delta.max().item()
 
-    print(f"  Flipped bits: {num_flipped}/{total_bits}")
+    print(f"  Mean prototype change (L2): {mean_delta:.6f}")
+    print(f"  Max prototype change (L2):  {max_delta:.6f}")
 
-    if num_flipped > 0:
-        print("  ✓ PASS: Prototype bits flipped")
+    if max_delta > 0:
+        print("  ✓ PASS: Prototypes updated")
     else:
-        print("  ✗ FAIL: No bit flips detected")
+        print("  ✗ FAIL: No prototype updates detected")
 
     print("\n[Test 2] Beta gating behavior...")
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
         model.chunked_inference_update(proj_in, beta=0.0)
-    flips_beta_0 = (model.classify.weight != original).sum().item()
+    delta_beta_0 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
         model.chunked_inference_update(proj_in, beta=0.5)
-    flips_beta_05 = (model.classify.weight != original).sum().item()
+    delta_beta_05 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
-    print(f"  beta=0.0 flips: {flips_beta_0}")
-    print(f"  beta=0.5 flips: {flips_beta_05}")
+    print(f"  beta=0.0 mean Δ: {delta_beta_0:.6f}")
+    print(f"  beta=0.5 mean Δ: {delta_beta_05:.6f}")
 
-    if flips_beta_0 >= flips_beta_05:
-        print("  ✓ PASS: Lower beta → more flips")
+    if delta_beta_0 >= delta_beta_05:
+        print("  ✓ PASS: Lower beta → stronger updates")
     else:
         print("  ⚠ WARNING: Beta gating inverted")
 
@@ -292,28 +290,28 @@ def test_inference_update_mechanics(ARCH, trainloader):
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
         model.chunked_inference_update(proj_in, beta=0.1, distance_sensitivity=0.0)
-    flips_ds_0 = (model.classify.weight != original).sum().item()
+    delta_ds_0 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
         model.chunked_inference_update(proj_in, beta=0.1, distance_sensitivity=2.0)
-    flips_ds_2 = (model.classify.weight != original).sum().item()
+    delta_ds_2 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
-    print(f"  ds=0.0 flips: {flips_ds_0}")
-    print(f"  ds=2.0 flips: {flips_ds_2}")
+    print(f"  ds=0.0 mean Δ: {delta_ds_0:.6f}")
+    print(f"  ds=2.0 mean Δ: {delta_ds_2:.6f}")
 
-    if flips_ds_2 >= flips_ds_0:
+    if delta_ds_2 >= delta_ds_0:
         print("  ✓ PASS: distance_sensitivity scales updates")
     else:
         print("  ⚠ WARNING: distance_sensitivity has no effect")
 
     print("\n[FINAL CHECK] Bipolar invariant...")
-    final_vals = torch.unique(model.classify.weight)
+    final_norms = torch.norm(model.classify.weight, dim=1)
+    max_dev = torch.max(torch.abs(final_norms - 1.0)).item()
 
-    assert torch.all((final_vals == -1) | (final_vals == 1)), \
-        "❌ Prototype lost bipolarity after updates"
+    assert max_dev < 1e-3, "❌ Prototype normalization invariant violated"
 
-    print("  ✓ All prototypes remain strictly bipolar")
+    print("  ✓ All prototypes remain unit-normalized")
 
 def test_similarity_calculation(ARCH, trainloader):
     """Test the get_max_subcluster_similarity function"""
@@ -392,7 +390,6 @@ def test_similarity_calculation(ARCH, trainloader):
             print(f"  Similarity with sensitivity=2.0: {sim_2:.4f}")
             print(f"  ✓ PASS: Distance sensitivity affects similarity values")
             break
-
 
 def test_encoding_consistency(ARCH, trainloader):
     """Test that encoding is consistent and correct"""
@@ -482,7 +479,6 @@ def test_accuracy_tracking(ARCH, trainloader):
     all_valid = all(0 <= acc <= 1 for acc in class_accs.values())
     print(f"  ✓ PASS: All class accuracies in [0, 1]" if all_valid else 
           f"  ✗ FAIL: Some class accuracies out of range")
-
 
 def main():
     # A code snippet to test model collapse in the model after updating over the training set/test set
