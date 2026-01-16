@@ -73,7 +73,7 @@ def train_hdc(ARCH, DATA) -> DensityModel:
 
     trainer.train(dataloader, trainer.model, None)
 
-    for i in range(1):
+    for i in range(5):
         trainer.retrain(dataloader, trainer.model, i+1, None)
 
     model: DensityModel = trainer.model
@@ -324,7 +324,7 @@ def main():
     # train_extractor(ARCH, DATA)
     hdc = train_hdc(ARCH, DATA)
     init_sub(ARCH, DATA)
-    test_inference(ARCH, DATA)
+    # test_inference(ARCH, DATA)
 
     # test_orig(ARCH, DATA)
 

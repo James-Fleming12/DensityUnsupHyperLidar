@@ -431,7 +431,7 @@ class BasicHD():
     
 class DensityTrainer():
     def __init__(self, ARCH, DATA, datadir, logdir, modeldir,
-                logger):
+                logger, bipolar_prototypes=True):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger = logger
@@ -486,6 +486,8 @@ class DensityTrainer():
             cudnn.fastest = True
             self.gpu = True
             self.model.cuda()
+
+        self.bipolar_prototypes = bipolar_prototypes
 
     def start(self):
         print("Starting training with the HDC online learning:")
@@ -563,7 +565,21 @@ class DensityTrainer():
 
                 self.is_wrong_list[i] = is_wrong
 
-            model.classify.weight[:] = F.normalize(model.classify_weights)
+            if self.bipolar_prototypes:
+                # making prototypes bipolar instead of continuous
+                with torch.no_grad():
+                    model.classify_weights.data = torch.sign(model.classify_weights.data)
+
+                    zero_mask = model.classify_weights.data == 0
+                    if torch.any(zero_mask):
+                        print(f"Warning: Found {zero_mask.sum().item()} zeros after sign(), replacing with -1")
+                        model.classify_weights.data[zero_mask] = -1.0
+                    
+                    model.classify.weight.data = model.classify_weights.data.clone()
+            else:
+                model.classify.weight[:] = F.normalize(model.classify_weights)
+
+    
             print("sum of is_wrong_list: ", sum([x.sum().item() for x in self.is_wrong_list if x is not None]))
             print("Mean HDC training time:{}\t std:{}".format(np.mean(train_time), np.std(train_time)))
             # print("Finish one batch, update classify weights")
@@ -588,7 +604,21 @@ class DensityTrainer():
                     proj_mask = proj_mask.cuda()
 
                 start = time.time()
-                model.classify.weight[:] = F.normalize(model.classify_weights)
+
+                if self.bipolar_prototypes:
+                    # making prototypes bipolar instead of 
+                    with torch.no_grad():
+                        model.classify_weights.data = torch.sign(model.classify_weights.data)
+
+                        zero_mask = model.classify_weights.data == 0
+                        if torch.any(zero_mask):
+                            print(f"Warning: Found {zero_mask.sum().item()} zeros after sign(), replacing with -1")
+                            model.classify_weights.data[zero_mask] = -1.0
+                        
+                        model.classify.weight.data = model.classify_weights.data.clone()
+                else:
+                    model.classify.weight[:] = F.normalize(model.classify_weights)
+
                 # print("Number of wrongs:", self.is_wrong_list[i].sum().item())
                 predictions, samples_hv, indices, self.is_wrong_list[i] = model(proj_in, self.mask, None, self.is_wrong_list[i])
                 argmax = predictions.argmax(dim=1) # (bsz*size, 1)

@@ -304,8 +304,8 @@ class DensityModel(nn.Module):
 
         self.hd_encoder = hd_encoder
         if self.hd_encoder == 'rp':  # Random projection encoding
-            # Generate a random projection matrix
             self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+            self.register_buffer("projection_weight", self.projection.weight)
 
         elif self.hd_encoder == 'idlevel':  # ID-level encoding
             # Generate id-level value hv for each floating value
@@ -332,7 +332,13 @@ class DensityModel(nn.Module):
         self.subclusters = nn.Parameter(torch.zeros(self.num_classes * self.num_subclusters, self.hd_dim, device=self.device))
         self.subclusters.data.fill_(0.0)
 
-        self.subcluster_to_class = torch.repeat_interleave(torch.arange(self.num_classes, device=self.device), self.num_subclusters)
+        self.register_buffer(
+            "subcluster_to_class",
+            torch.repeat_interleave(
+                torch.arange(self.num_classes),
+                self.num_subclusters
+            )
+        )
 
     def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
         if mask is None:
@@ -584,7 +590,7 @@ class DensityModel(nn.Module):
     def get_max_subcluster_similarity(self, enc, class_id, distance_sensitivity=1.0):
         """
         Get maximum similarity [0,1] to subclusters using Hamming distance.
-        distance_sensitivity introduces a power law which scales with similarity = base_similarity ** (1 / distance_sensitivity)
+        distance_sensitivity introduces a power law which scales with similarity = base_similarity ^ (1 / distance_sensitivity)
         """
         enc_binary = torch.sign(enc).to(dtype=self.subclusters.dtype)
         
@@ -617,11 +623,11 @@ class DensityModel(nn.Module):
         
         return max_similarities, absolute_indices
 
-    def inference_update(self, x, beta=0):
+    def inference_update(self, x, beta=0, distance_sensitivity=1.0):
         """
         Inference with updates based on distance.
         If beta=0, then the confidence masking is removed
-        If beta=1, then unsupervised updates are removed (ablation)
+        If distance_sensitivity=0, then updates are standard HDC retraining updates (ablation)
         """
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -659,9 +665,9 @@ class DensityModel(nn.Module):
                     class_mask = distant_predictions == class_id
                     class_hvs = distant_hvs[class_mask]
 
-                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_hvs, class_id)
-                    
-                    current_prototype = self.classify_weights[class_id:class_id+1]
+                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_hvs, class_id, distance_sensitivity=distance_sensitivity)
+
+                    current_prototype = self.classify.weight[class_id:class_id+1]
 
                     disagreements = (current_prototype * class_hvs) == -1
 
@@ -678,7 +684,88 @@ class DensityModel(nn.Module):
                     # Apply threshold to actually flip bits (if weighted_update magnitude > 0.5)
                     should_flip = torch.abs(weighted_update) > 0.5
                     
-                    self.classify_weights[class_id, should_flip] *= -1
+                    self.classify.weight[class_id, should_flip] *= -1
+            
+            return predictions
+        
+    def chunked_inference_update(self, x, beta=0, distance_sensitivity=1.0, flip_threshold=0.3):
+        """
+        a version of inference_update for low GPU memory testing
+        """
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            enc_normalized = F.normalize(enc)
+
+            if enc_normalized.dtype != self.classify.weight.dtype:
+                enc_normalized = enc_normalized.to(self.classify.weight.dtype)
+            
+            logits = self.classify(enc_normalized)
+            predictions = torch.argmax(logits, dim=1)
+
+            enc_binary = torch.sign(enc)
+
+            prototypes = torch.sign(self.classify.weight)
+            
+            # Handle zeros in prototypes
+            zero_mask = prototypes == 0
+            if torch.any(zero_mask):
+                print(f"Warning: Found {zero_mask.sum().item()} zeros in prototypes during inference_update")
+                # Convert zeros to -1
+                prototypes[zero_mask] = -1
+            
+            selected_prototypes = prototypes[predictions]
+            hd_dim = enc_binary.shape[1]
+            similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
+            distances = (1 - similarities) / 2
+            mask = distances > beta
+
+            if torch.any(mask):
+                distant_hvs = enc_binary[mask]
+                distant_predictions = predictions[mask]
+                
+                unique_classes = torch.unique(distant_predictions)
+                
+                for class_id in unique_classes:
+                    class_mask = distant_predictions == class_id
+                    class_hvs = distant_hvs[class_mask]
+
+                    subcluster_sims, _ = self.get_max_subcluster_similarity(
+                        class_hvs, class_id, distance_sensitivity=distance_sensitivity
+                    )
+                    
+                    current_prototype = self.classify.weight[class_id:class_id+1]
+
+                    chunk_size = 1000
+                    num_samples = class_hvs.shape[0]
+                    
+                    flip_contribution = torch.zeros(self.hd_dim, device=self.device)
+                    has_disagreement_total = torch.zeros(self.hd_dim, dtype=torch.bool, device=self.device)
+                    
+                    for chunk_start in range(0, num_samples, chunk_size):
+                        chunk_end = min(chunk_start + chunk_size, num_samples)
+                        
+                        hvs_chunk = class_hvs[chunk_start:chunk_end]
+                        sims_chunk = subcluster_sims[chunk_start:chunk_end]
+                        
+                        disagreements_chunk = (current_prototype * hvs_chunk) == -1
+                        flip_weights_chunk = disagreements_chunk.float() * sims_chunk.unsqueeze(1)
+                        
+                        flip_contribution += flip_weights_chunk.sum(dim=0)
+                        has_disagreement_total |= disagreements_chunk.any(dim=0)
+                        
+                        del hvs_chunk, sims_chunk, disagreements_chunk, flip_weights_chunk
+                    
+                    update_direction = -2 * current_prototype[0] * has_disagreement_total.float()
+                    weighted_update = update_direction * flip_contribution / (num_samples + 1e-8)
+                    
+                    # Use the flip_threshold parameter instead of hardcoded 0.5
+                    should_flip = torch.abs(weighted_update) > flip_threshold
+                    
+                    if torch.any(should_flip):
+                        self.classify.weight[class_id, should_flip] *= -1
+                    
+                    del class_hvs, subcluster_sims, flip_contribution, has_disagreement_total
+                    del update_direction, weighted_update, should_flip
             
             return predictions
         
