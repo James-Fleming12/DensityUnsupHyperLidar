@@ -430,7 +430,7 @@ class BasicHD():
         return iou.avg
     
 class DensityTrainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, modeldir, logger, bipolar_prototypes=True):
+    def __init__(self, ARCH, DATA, datadir, logdir, modeldir, logger, bipolar_prototypes=False):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger = logger
