@@ -79,8 +79,6 @@ def train_hdc(ARCH, DATA) -> DensityModel:
     model: DensityModel = trainer.model
     torch.save(model, HDC_SAVE_PATH)
 
-    test_hdc_model(model, dataloader)
-
     return model
 
 def test_hdc_model(model, dataloader) -> None:
@@ -144,6 +142,84 @@ def test_hdc_model(model, dataloader) -> None:
             print(f"  Class {class_id}: {acc:.4f} ({correct}/{total})")
         else:
             print(f"  Class {class_id}: No samples")
+
+def test_hdc_model_debug(model, dataloader):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    class_correct = torch.zeros(model.num_classes, device=device)
+    class_total = torch.zeros(model.num_classes, device=device)
+    class_sim_sum = torch.zeros(model.num_classes, device=device)
+    class_sim_sq = torch.zeros(model.num_classes, device=device)
+
+    pred_hist = torch.zeros(model.num_classes, device=device)
+
+    global_correct = 0
+    global_total = 0
+
+    model.eval()
+    with torch.no_grad():
+        for proj_in, _, proj_labels, *_ in dataloader:
+            proj_in = proj_in.to(device)
+            proj_labels = proj_labels.to(device).view(-1)
+
+            logits, sims, indices, _ = model(proj_in)
+            predictions = torch.argmax(logits, dim=1)
+
+            selected_labels = proj_labels[indices]
+
+            global_correct += (predictions == selected_labels).sum().item()
+            global_total += selected_labels.numel()
+
+            for c in range(model.num_classes):
+                mask = selected_labels == c
+                if mask.any():
+                    class_total[c] += mask.sum().item()
+                    class_correct[c] += (predictions[mask] == c).sum().item()
+
+                    s = sims[mask]
+                    class_sim_sum[c] += s.sum().item()
+                    class_sim_sq[c] += (s ** 2).sum().item()
+
+            for p in predictions:
+                pred_hist[p] += 1
+
+    print("\n[Accuracy + Similarity Diagnostics]")
+    for c in range(model.num_classes):
+        if class_total[c] > 0:
+            acc = class_correct[c] / class_total[c]
+            mean_sim = class_sim_sum[c] / class_total[c]
+            var_sim = (
+                class_sim_sq[c] / class_total[c] - mean_sim ** 2
+            ).clamp(min=0)
+            std_sim = torch.sqrt(var_sim)
+
+            collapse_flag = "⚠ COLLAPSE" if abs(mean_sim.item() - 0.5) < 1e-3 else ""
+
+            print(
+                f"  Class {c:2d}: acc={acc:.4f}, "
+                f"sim μ={mean_sim:.4f}, σ={std_sim:.4f} {collapse_flag}"
+            )
+        else:
+            print(f"  Class {c:2d}: no samples")
+
+    # Prediction entropy (global collapse detector)
+    pred_dist = pred_hist / pred_hist.sum().clamp(min=1)
+    entropy = -(pred_dist * torch.log2(pred_dist + 1e-8)).sum()
+
+    print("\n[Prediction Entropy]")
+    print(f"  Entropy: {entropy:.4f} (max = log2({model.num_classes}) ≈ {np.log2(model.num_classes):.2f})")
+
+    print("\n[Prediction Distribution]")
+    for c in range(model.num_classes):
+        print(
+            f"  Class {c:2d}: {int(pred_hist[c].item()):6d} "
+            f"({100 * pred_dist[c].item():5.2f}%)"
+        )
+
+    print(
+        f"\nGlobal Accuracy: {global_correct / max(global_total,1):.4f} "
+        f"({global_correct}/{global_total})"
+    )
 
 def test_orig(ARCH, DATA) -> Model:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -273,6 +349,8 @@ def init_sub(ARCH, DATA):
     torch.save(model.state_dict(), HDC_SUB_PATH)
 
     print(f"Subcluster Initialized Model saved to {HDC_SUB_PATH}")
+
+    test_hdc_model(model, dataloader)
 
 def test_inference(ARCH, DATA):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

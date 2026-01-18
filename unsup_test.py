@@ -7,9 +7,9 @@ from modules.trainer import Trainer
 from modules.ioueval import iouEval
 
 import numpy as np
-import torch.functional as F
+import torch.nn.functional as F
 
-from unsup_main import train_extractor, train_hdc
+from unsup_main import train_extractor, train_hdc, test_hdc_model, test_hdc_model_debug
 
 MODEL_DIR = "logs"
 NU_DATA_DIR = "v1.0-mini"
@@ -29,35 +29,14 @@ def test_collapse(ARCH, trainloader, inference_epochs=5):
 
     model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
-
     model.to(device)
 
-    all_accuracies = []
-    all_class_accuracies = {}
+    print("\n" + "="*80)
+    print(f"Initial Accuracy Stats")
+    print("="*80)
+    test_hdc_model(model, trainloader)
 
-    model.eval()
-    with torch.no_grad():
-        for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
-            proj_in = proj_in.to(device)
-            proj_labels = proj_labels.to(device)
-
-            curr_acc, _, curr_class_accs = model.get_accuracy(proj_in, proj_labels)
-            all_accuracies.append(curr_acc)
-
-            for class_id, class_acc in curr_class_accs.items():
-                if class_id not in all_class_accuracies:
-                    all_class_accuracies[class_id] = []
-                all_class_accuracies[class_id].append(class_acc)
-
-        init_accuracy = np.mean(all_accuracies) if all_accuracies else 0.0
-
-        init_class_accuracy = {}
-        for class_id, acc_list in all_class_accuracies.items():
-            init_class_accuracy[class_id] = np.mean(acc_list)
-
-        print(f"Beginning Accuracy of {init_accuracy}")
-        for i in init_class_accuracy:
-            print(f"Accuracy for class {i} is {init_class_accuracy[i]}")
+    model.to(device)
 
     model.train()
     for epoch in range(inference_epochs):
@@ -65,33 +44,90 @@ def test_collapse(ARCH, trainloader, inference_epochs=5):
             proj_in = proj_in.to(device)
             for i in proj_in:
                 model.inference_update(i.unsqueeze(0))
+        test_hdc_model(model, trainloader)
 
-    all_accuracies = []
-    all_class_accuracies = {}
+    print("\n" + "="*80)
+    print(f"After {inference_epochs} epochs of inference updating")
+    print("="*80)
+    test_hdc_model(model, trainloader)
 
-    model.eval()
-    with torch.no_grad():
-        for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
+def test_collapse_debug(ARCH, trainloader, inference_epochs=5):
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    model: DensityModel = DensityModel(
+        ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device
+    )
+    model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
+    model.to(device)
+
+    print("\n" + "=" * 80)
+    print("INITIAL MODEL DIAGNOSTICS")
+    print("=" * 80)
+
+    test_hdc_model_debug(model, trainloader)
+
+    proto_before = model.prototypes.detach().clone()
+    sub_before = model.subclusters.detach().clone()
+
+    for epoch in range(inference_epochs):
+        print("\n" + "-" * 80)
+        print(f"INFERENCE UPDATE EPOCH {epoch + 1}")
+        print("-" * 80)
+
+        model.train()
+
+        update_counts = torch.zeros(model.num_classes, device=device)
+        total_updates = 0
+
+        for batch_idx, (proj_in, _, proj_labels, *_) in enumerate(trainloader):
             proj_in = proj_in.to(device)
-            proj_labels = proj_labels.to(device)
 
-            curr_acc, _, curr_class_accs = model.get_accuracy(proj_in, proj_labels)
-            all_accuracies.append(curr_acc)
+            for x in proj_in:
+                logits, sims, indices, _ = model(x.unsqueeze(0))
+                pred = torch.argmax(logits, dim=1).item()
 
-            for class_id, class_acc in curr_class_accs.items():
-                if class_id not in all_class_accuracies:
-                    all_class_accuracies[class_id] = []
-                all_class_accuracies[class_id].append(class_acc)
+                update_counts[pred] += 1
+                total_updates += 1
 
-        accuracy = np.mean(all_accuracies) if all_accuracies else 0.0
+                model.inference_update(x.unsqueeze(0))
 
-        class_accuracy = {}
-        for class_id, acc_list in all_class_accuracies.items():
-            class_accuracy[class_id] = np.mean(acc_list)
+        # Normalize update distribution
+        update_dist = update_counts / (update_counts.sum() + 1e-8)
 
-        print(f"Final Accuracy of {accuracy} from {init_accuracy}")
-        for i in class_accuracy:
-            print(f"Accuracy for class {i} is {class_accuracy[i]} from {init_class_accuracy[i]}")
+        print("\n[Update Distribution]")
+        for c in range(model.num_classes):
+            print(
+                f"  Class {c:2d}: updates={int(update_counts[c].item()):6d} "
+                f"({100 * update_dist[c].item():5.2f}%)"
+            )
+
+        # Run diagnostics after epoch
+        test_hdc_model_debug(model, trainloader)
+
+    print("\n" + "=" * 80)
+    print("FINAL PROTOTYPE / SUBCLUSTER DRIFT ANALYSIS")
+    print("=" * 80)
+
+    proto_after = model.prototypes.detach()
+    sub_after = model.subclusters.detach()
+
+    proto_drift = torch.norm(proto_after - proto_before, dim=1)
+    sub_drift = torch.norm(sub_after - sub_before, dim=1)
+
+    print("\n[Prototype Drift]")
+    for c in range(model.num_classes):
+        print(
+            f"  Class {c:2d}: Δproto={proto_drift[c].item():.6f}"
+        )
+
+    print("\n[Subcluster Drift]")
+    per_class_sub = sub_drift.view(model.num_classes, -1)
+    for c in range(model.num_classes):
+        mean_drift = per_class_sub[c].mean().item()
+        max_drift = per_class_sub[c].max().item()
+        print(
+            f"  Class {c:2d}: mean Δsub={mean_drift:.6f}, max Δsub={max_drift:.6f}"
+        )
 
 def test_subcluster_initialization(ARCH, trainloader):
     """Test that subclusters are properly initialized and represent dense regions"""
@@ -235,7 +271,7 @@ def test_inference_update_mechanics(ARCH, trainloader):
         enc, _, _ = model.encode(proj_in)
         enc_norm = F.normalize(enc)
 
-        logits = model.classify(enc_norm)
+        logits = model.classify(enc_norm.to(torch.float))
         preds = logits.argmax(dim=1)
 
         print(f"  Unique predictions: {torch.unique(preds)}")
@@ -294,13 +330,13 @@ def test_inference_update_mechanics(ARCH, trainloader):
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
-        model.chunked_inference_update(proj_in, beta=0.1, distance_sensitivity=2.0)
-    delta_ds_2 = torch.norm(model.classify.weight - original, dim=1).mean().item()
+        model.chunked_inference_update(proj_in, beta=0.1, distance_sensitivity=50.0)
+    delta_ds_50 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
     print(f"  ds=0.0 mean Δ: {delta_ds_0:.6f}")
-    print(f"  ds=2.0 mean Δ: {delta_ds_2:.6f}")
+    print(f"  ds=50.0 mean Δ: {delta_ds_50:.6f}")
 
-    if delta_ds_2 >= delta_ds_0:
+    if delta_ds_0 >= delta_ds_50:
         print("  ✓ PASS: distance_sensitivity scales updates")
     else:
         print("  ⚠ WARNING: distance_sensitivity has no effect")
@@ -309,9 +345,284 @@ def test_inference_update_mechanics(ARCH, trainloader):
     final_norms = torch.norm(model.classify.weight, dim=1)
     max_dev = torch.max(torch.abs(final_norms - 1.0)).item()
 
-    assert max_dev < 1e-3, "❌ Prototype normalization invariant violated"
+    assert max_dev < 1e-3, "✗ Prototype normalization invariant violated"
 
     print("  ✓ All prototypes remain unit-normalized")
+
+def test_inference_update_verbose(ARCH, trainloader):
+    """Test inference update mechanics step-by-step"""
+    print("\n" + "="*80)
+    print("TEST: Inference Update Mechanics")
+    print("="*80)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    try:
+        model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+        model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
+        print("\n✓ Loaded pre-trained model")
+    except Exception as e:
+        print("\n⚠ Could not load pre-trained model, initializing new one...")
+        model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+        model.to(device)
+        model.init_subclusters(trainloader, bandwidth=None, max_samples_per_class=500)
+
+    model.to(device)
+    model.eval()
+
+    # Get a single batch and subsample it
+    for proj_in, _, proj_labels, *_ in trainloader:
+        proj_in = proj_in.to(device)
+        proj_labels = proj_labels.to(device)
+        break
+
+    # SUBSAMPLE to avoid OOM - take only 5000 pixels
+    with torch.no_grad():
+        enc_full, _, _ = model.encode(proj_in)
+        total_samples = enc_full.shape[0]
+        subsample_size = min(5000, total_samples)
+        
+        subsample_indices = torch.randperm(total_samples, device=device)[:subsample_size]
+        enc = enc_full[subsample_indices]
+        
+        # Reconstruct corresponding labels
+        batch_size = proj_in.shape[0]
+        h, w = proj_in.shape[-2:]
+        proj_labels_flat = proj_labels.view(-1)
+        proj_labels_sub = proj_labels_flat[subsample_indices]
+        
+        print(f"\n✓ Subsampled {subsample_size} pixels from {total_samples}")
+        del enc_full
+
+    print("\n[Step 1] Initial model state...")
+    with torch.no_grad():
+        enc_norm = F.normalize(enc)
+        logits_before = model.classify(enc_norm.to(torch.float))
+        preds_before = logits_before.argmax(dim=1)
+        
+        # Get accuracy before
+        acc_before = (preds_before == proj_labels_sub).float().mean().item()
+        
+        print(f"  Accuracy before update: {acc_before:.4f}")
+        print(f"  Unique predictions: {torch.unique(preds_before).tolist()}")
+        
+        # Check prototype norms
+        proto_norms = torch.norm(model.classify.weight, dim=1)
+        print(f"  Prototype norms - min: {proto_norms.min():.6f}, max: {proto_norms.max():.6f}")
+        
+        # Sample some predictions
+        sample_indices = torch.randperm(len(preds_before))[:10]
+        print(f"\n  Sample predictions vs labels:")
+        for idx in sample_indices:
+            print(f"    Pred: {preds_before[idx].item()}, Label: {proj_labels_sub[idx].item()}")
+
+    print("\n[Step 2] Testing subcluster similarity calculation...")
+    with torch.no_grad():
+        enc_binary = torch.sign(enc)
+        zero_mask = enc_binary == 0
+        if torch.any(zero_mask):
+            enc_binary[zero_mask] = -1.0
+        
+        # Test subcluster similarity for each class
+        for class_id in range(min(3, NUM_CLASSES)):  # Test first 3 classes
+            class_mask = preds_before == class_id
+            if not torch.any(class_mask):
+                continue
+                
+            class_enc = enc_binary[class_mask]
+            sims, indices = model.get_max_subcluster_similarity(
+                class_enc, class_id, distance_sensitivity=1.0
+            )
+            
+            print(f"  Class {class_id} ({class_mask.sum()} samples):")
+            print(f"    Subcluster similarities - min: {sims.min():.4f}, max: {sims.max():.4f}, mean: {sims.mean():.4f}")
+            print(f"    Number of subclusters for this class: {(model.subcluster_to_class == class_id).sum().item()}")
+
+    print("\n[Step 3] Testing distance calculation...")
+    with torch.no_grad():
+        prototypes_binary = torch.sign(model.classify.weight)
+        selected_prototypes = prototypes_binary[preds_before]
+        hd_dim = enc_binary.shape[1]
+        similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
+        distances = (1 - similarities) / 2
+        
+        print(f"  Hamming distances - min: {distances.min():.4f}, max: {distances.max():.4f}, mean: {distances.mean():.4f}")
+        print(f"  Samples with distance > 0.1: {(distances > 0.1).sum().item()}/{len(distances)}")
+        print(f"  Samples with distance > 0.2: {(distances > 0.2).sum().item()}/{len(distances)}")
+
+    print("\n[Step 4] Creating small test batch for update...")
+    # Create an even smaller batch for the actual update test
+    test_size = 1000
+    test_indices = torch.randperm(len(enc))[:test_size]
+    enc_test = enc[test_indices]
+    labels_test = proj_labels_sub[test_indices]
+    
+    # Reconstruct a fake input tensor (we'll pass enc directly to avoid re-encoding)
+    print(f"  Using {test_size} samples for update test")
+
+    print("\n[Step 5] Performing update with manual calculation...")
+    original_weight = model.classify.weight.clone()
+    original_weights = model.classify_weights.clone()
+    
+    with torch.no_grad():
+        # Manually simulate the update to debug
+        model.classify_weights.data.copy_(model.classify.weight.data)
+        
+        enc_test_binary = torch.sign(enc_test)
+        zero_mask = enc_test_binary == 0
+        if torch.any(zero_mask):
+            enc_test_binary[zero_mask] = -1.0
+        
+        enc_test_norm = F.normalize(enc_test)
+        
+        logits_test = model.classify(enc_test_norm.to(torch.float))
+        predictions_test = torch.argmax(logits_test, dim=1)
+        
+        # Calculate distances
+        prototypes_binary = torch.sign(model.classify.weight)
+        selected_prototypes = prototypes_binary[predictions_test]
+        hd_dim = enc_test_binary.shape[1]
+        similarities = torch.sum(enc_test_binary * selected_prototypes, dim=1) / hd_dim
+        distances = (1 - similarities) / 2
+        
+        beta = 0.1
+        mask = distances > beta
+        
+        print(f"  Samples needing update: {mask.sum().item()}/{len(mask)}")
+        
+        if torch.any(mask):
+            distant_enc_norm = enc_test_norm[mask]
+            distant_enc_binary = enc_test_binary[mask]
+            distant_predictions = predictions_test[mask]
+            
+            # Process one class as example
+            test_class = distant_predictions[0].item()
+            class_mask = distant_predictions == test_class
+            class_enc_norm = distant_enc_norm[class_mask]
+            class_enc_binary = distant_enc_binary[class_mask]
+            
+            print(f"\n  Example: Class {test_class} with {len(class_enc_norm)} samples")
+            
+            # Get subcluster similarities
+            subcluster_sims, sub_indices = model.get_max_subcluster_similarity(
+                class_enc_binary, test_class, distance_sensitivity=1.0
+            )
+            
+            print(f"    Subcluster sims - min: {subcluster_sims.min():.4f}, max: {subcluster_sims.max():.4f}, mean: {subcluster_sims.mean():.4f}")
+            
+            # Calculate update
+            scaled_samples = class_enc_norm * subcluster_sims.unsqueeze(1)
+            total_update = scaled_samples.sum(dim=0)
+            
+            print(f"    Update magnitude: {torch.norm(total_update):.4f}")
+            print(f"    Update/sample ratio: {torch.norm(total_update)/len(class_enc_norm):.4f}")
+            
+            # Apply update
+            model.classify_weights[test_class] += total_update
+            
+            # Normalize
+            old_weight = model.classify.weight[test_class].clone()
+            model.classify.weight[test_class] = F.normalize(
+                model.classify_weights[test_class:test_class+1], dim=1
+            )[0]
+            
+            weight_change = torch.norm(model.classify.weight[test_class] - old_weight).item()
+            print(f"    Weight change after normalization: {weight_change:.6f}")
+            
+            # Test prediction change
+            logits_after = model.classify(enc_test_norm.to(torch.float))
+            preds_after = logits_after.argmax(dim=1)
+            
+            acc_before_test = (predictions_test == labels_test).float().mean().item()
+            acc_after_test = (preds_after == labels_test).float().mean().item()
+            
+            print(f"\n    Accuracy before: {acc_before_test:.4f}")
+            print(f"    Accuracy after: {acc_after_test:.4f}")
+            print(f"    Change: {acc_after_test - acc_before_test:+.4f}")
+
+    print("\n" + "="*80)
+
+def test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES):
+    print("\n" + "="*80)
+    print("TEST: Subcluster Similarity Diagnostics")
+    print("="*80)
+
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    try:
+        model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+        model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
+        print("\n✓ Loaded pre-trained model")
+    except Exception as e:
+        print("\n⚠ Could not load pre-trained model, initializing new one...")
+        model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+        model.to(device)
+        model.init_subclusters(trainloader, bandwidth=None, max_samples_per_class=500)
+
+    model.to(device)
+    model.eval()
+
+    print("\n[Diag 1] Subcluster counts per class")
+    for c in range(NUM_CLASSES):
+        count = (model.subcluster_to_class == c).sum().item()
+        status = "OK" if count > 0 else "✗ MISSING"
+        print(f"  Class {c:2d}: {count} subclusters → {status}")
+
+    enc_cache = {}
+    with torch.no_grad():
+        for proj_in, _, proj_labels, *rest in trainloader:
+            proj_in = proj_in.to(device)
+            proj_labels = proj_labels.to(device).flatten()
+            enc, _, _ = model.encode(proj_in)
+
+            for c in range(NUM_CLASSES):
+                mask = proj_labels == c
+                if c not in enc_cache and torch.any(mask):
+                    enc_cache[c] = enc[mask][:8]  # small sample
+
+            if len(enc_cache) == NUM_CLASSES:
+                break
+
+    print("\n[Diag 2] Similarity failure mode analysis")
+    for c in sorted(enc_cache.keys()):
+        enc = enc_cache[c]
+
+        mask = model.subcluster_to_class == c
+        sub = model.subclusters[mask]
+
+        if sub.numel() == 0:
+            print(f"  Class {c:2d}: ✗ No subclusters — similarity forced to 0.5")
+            continue
+
+        sims_signed, _ = model.get_max_subcluster_similarity(enc, c)
+        sims_signed = sims_signed.cpu()
+
+        enc_n = torch.nn.functional.normalize(enc, dim=1).to(torch.float)
+        sub_n = torch.nn.functional.normalize(sub.float(), dim=1)
+        sims_cont = torch.max(enc_n @ sub_n.T, dim=1).values
+        sims_cont = ((sims_cont + 1) / 2).cpu()
+
+        enc_mag = enc.abs().mean().item()
+        enc_zero_frac = (torch.sign(enc) == 0).float().mean().item()
+
+        print(f"\n  Class {c:2d}")
+        print(f"    Signed sim:   mean={sims_signed.mean():.3f}, "
+              f"min={sims_signed.min():.3f}, max={sims_signed.max():.3f}")
+        print(f"    Cosine sim:   mean={sims_cont.mean():.3f}, "
+              f"min={sims_cont.min():.3f}, max={sims_cont.max():.3f}")
+        print(f"    Enc |x| mean: {enc_mag:.4f}")
+        print(f"    Zero sign %:  {enc_zero_frac*100:.2f}%")
+
+        if torch.allclose(sims_signed, torch.full_like(sims_signed, 0.5)):
+            print("    ✗ COLLAPSE: similarity = 0.5 → subclusters unused or orthogonal")
+        elif sims_cont.mean() > sims_signed.mean() + 0.15:
+            print("    ⚠  SIGN LOSS: binarization destroying similarity")
+        elif enc_zero_frac > 0.05:
+            print("    ⚠  ENCODER ISSUE: many near-zero dimensions before sign")
+        else:
+            print("    ✓ Similarity behaving as expected")
+
+    print("\n" + "="*80)
 
 def test_similarity_calculation(ARCH, trainloader):
     """Test the get_max_subcluster_similarity function"""
@@ -480,6 +791,21 @@ def test_accuracy_tracking(ARCH, trainloader):
     print(f"  ✓ PASS: All class accuracies in [0, 1]" if all_valid else 
           f"  ✗ FAIL: Some class accuracies out of range")
 
+def test_suite(ARCH, trainloader):
+    print("\n" + "="*80)
+    print("DENSITY MODEL SANITY TESTS")
+    print("="*80)
+
+    test_encoding_consistency(ARCH, trainloader)
+    test_subcluster_initialization(ARCH, trainloader)
+    test_similarity_calculation(ARCH, trainloader)
+    test_inference_update_mechanics(ARCH, trainloader)
+    test_accuracy_tracking(ARCH, trainloader)
+    
+    print("\n" + "="*80)
+    print("ALL TESTS COMPLETE")
+    print("="*80)
+
 def main():
     # A code snippet to test model collapse in the model after updating over the training set/test set
     try:
@@ -513,23 +839,10 @@ def main():
     
     trainloader = parser.get_train_set()
 
-    # test_collapse(ARCH, DATA)
-
-    print("\n" + "="*80)
-    print("DENSITY MODEL SANITY TESTS")
-    print("="*80)
-
-    test_encoding_consistency(ARCH, trainloader)
-    test_subcluster_initialization(ARCH, trainloader)
-    test_similarity_calculation(ARCH, trainloader)
-    test_inference_update_mechanics(ARCH, trainloader)
-    test_accuracy_tracking(ARCH, trainloader)
-    
-    print("\n" + "="*80)
-    print("ALL TESTS COMPLETE")
-    print("="*80)
-
+    # test_inference_update_verbose(ARCH, trainloader)
+    # test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES)
     test_collapse(ARCH, trainloader)
+    # test_collapse_debug(ARCH, trainloader)
 
 if __name__=="__main__":
     main()
