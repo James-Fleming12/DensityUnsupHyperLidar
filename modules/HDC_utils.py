@@ -337,7 +337,7 @@ class DensityModel(nn.Module):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
-        with torch.cuda.amp.autocast(enabled=True):
+        with torch.amp.autocast('cuda', enabled=True):
             x = self.net(x, True)
 
         x = x.permute(0, 2, 3, 1)
