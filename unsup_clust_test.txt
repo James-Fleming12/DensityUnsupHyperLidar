@@ -1,0 +1,778 @@
+Sequences folder exists! Using sequences from nuscenes_kitti/sequences
+sequences:  [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
+parsing seq 61
+Found 39 scans in sequence 61
+parsing seq 103
+Found 40 scans in sequence 103
+parsing seq 553
+Found 41 scans in sequence 553
+parsing seq 655
+Found 41 scans in sequence 655
+parsing seq 757
+Found 41 scans in sequence 757
+parsing seq 796
+Found 40 scans in sequence 796
+parsing seq 916
+Found 41 scans in sequence 916
+parsing seq 1077
+Found 41 scans in sequence 1077
+parsing seq 1094
+Found 40 scans in sequence 1094
+parsing seq 1100
+Found 40 scans in sequence 1100
+Using 404 scans from sequences [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
+Sequences folder exists! Using sequences from nuscenes_kitti/sequences
+sequences:  [1094, 1100]
+parsing seq 1094
+Found 40 scans in sequence 1094
+parsing seq 1100
+Found 40 scans in sequence 1100
+Using 80 scans from sequences [1094, 1100]
+
+===== Class 0 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7846
+  p05_sim       : 0.6476
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0092
+  separation    : 0.9077
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6758
+  p05_sim       : 0.4641
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.0100
+  separation    : 1.1226
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.4704
+  p05_sim       : 0.1211
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0084
+  separation    : 0.5309
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.5828
+  p05_sim       : 0.4752
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0071
+  separation    : 0.8452
+[binary_mean_shift]
+  num_centroids: 14
+  mean_max_sim  : 26.5435
+  p05_sim       : 7.3686
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.5013
+  separation    : 31.9144
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6304
+  p05_sim       : 0.3996
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0978
+
+===== Class 1 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.8420
+  p05_sim       : 0.7297
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0094
+  separation    : 0.6224
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.7658
+  p05_sim       : 0.6117
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.0100
+  separation    : 0.8512
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.6658
+  p05_sim       : 0.5411
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0078
+  separation    : 0.6081
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.6621
+  p05_sim       : 0.5867
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0078
+  separation    : 0.7587
+[binary_mean_shift]
+  num_centroids: 17
+  mean_max_sim  : 38.8706
+  p05_sim       : 30.2625
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.5044
+  separation    : 41.3118
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.7431
+  p05_sim       : 0.6030
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.0100
+  separation    : 0.8807
+
+===== Class 2 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.6804
+  p05_sim       : 0.5153
+  coverage@0.3  : 0.8998
+  bipolarity    : 0.0089
+  separation    : 0.9308
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.5540
+  p05_sim       : 0.3653
+  coverage@0.3  : 0.8998
+  bipolarity    : 0.0100
+  separation    : 1.1752
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.4132
+  p05_sim       : 0.2476
+  coverage@0.3  : 0.8998
+  bipolarity    : 0.0067
+  separation    : 0.7998
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.3934
+  p05_sim       : 0.3064
+  coverage@0.3  : 0.8998
+  bipolarity    : 0.0072
+  separation    : 0.9604
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 22.7119
+  p05_sim       : 11.2424
+  coverage@0.3  : 0.8998
+  bipolarity    : 0.4927
+  separation    : 57.4126
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.4879
+  p05_sim       : 0.3324
+  coverage@0.3  : 0.8998
+  bipolarity    : 0.0100
+  separation    : 1.1996
+
+===== Class 3 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7421
+  p05_sim       : 0.6100
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0091
+  separation    : 0.9136
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6333
+  p05_sim       : 0.4718
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.1174
+[hdbscan]
+  num_centroids: 1
+  mean_max_sim  : 0.3407
+  p05_sim       : 0.1734
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.0000
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.4951
+  p05_sim       : 0.3978
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0074
+  separation    : 0.9108
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 25.1330
+  p05_sim       : 8.1207
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.4991
+  separation    : 47.7472
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.5875
+  p05_sim       : 0.3942
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.1200
+
+===== Class 4 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7573
+  p05_sim       : 0.6029
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0091
+  separation    : 0.8838
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6572
+  p05_sim       : 0.4616
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0760
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.4729
+  p05_sim       : 0.3409
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0069
+  separation    : 0.7620
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.4819
+  p05_sim       : 0.3868
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0075
+  separation    : 0.9516
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 26.3250
+  p05_sim       : 10.2502
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.4984
+  separation    : 32.4339
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.5635
+  p05_sim       : 0.2832
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9735
+
+===== Class 5 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7941
+  p05_sim       : 0.6486
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0092
+  separation    : 0.7827
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.7025
+  p05_sim       : 0.4843
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9440
+[hdbscan]
+  num_centroids: 3
+  mean_max_sim  : 0.5903
+  p05_sim       : 0.3971
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0078
+  separation    : 0.6728
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.5720
+  p05_sim       : 0.4546
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0074
+  separation    : 0.8127
+[binary_mean_shift]
+  num_centroids: 9
+  mean_max_sim  : 31.4814
+  p05_sim       : 18.3034
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.5004
+  separation    : 37.5936
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6556
+  p05_sim       : 0.4515
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0442
+
+===== Class 6 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.6994
+  p05_sim       : 0.5011
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0090
+  separation    : 0.9469
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.5825
+  p05_sim       : 0.3608
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.0100
+  separation    : 1.1853
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.4379
+  p05_sim       : 0.2265
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0066
+  separation    : 0.8466
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.4393
+  p05_sim       : 0.3213
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0062
+  separation    : 0.7579
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 17.1198
+  p05_sim       : 4.8700
+  coverage@0.3  : 0.8990
+  bipolarity    : 0.5008
+  separation    : 38.1309
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.5115
+  p05_sim       : 0.2795
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.1866
+
+===== Class 7 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7593
+  p05_sim       : 0.6156
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0092
+  separation    : 0.7149
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6546
+  p05_sim       : 0.4882
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9999
+[hdbscan]
+  num_centroids: 1
+  mean_max_sim  : 0.4568
+  p05_sim       : 0.2593
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.0000
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.4744
+  p05_sim       : 0.3585
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0073
+  separation    : 0.9243
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 30.0520
+  p05_sim       : 17.0581
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.5011
+  separation    : 39.1791
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6096
+  p05_sim       : 0.4376
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0673
+
+===== Class 8 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7203
+  p05_sim       : 0.5539
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0091
+  separation    : 0.7751
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6035
+  p05_sim       : 0.4129
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0955
+[hdbscan]
+  num_centroids: 1
+  mean_max_sim  : 0.3619
+  p05_sim       : 0.1913
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.0000
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.4027
+  p05_sim       : 0.3105
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0072
+  separation    : 0.9636
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 25.8940
+  p05_sim       : 13.5119
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.4910
+  separation    : 44.3980
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.5341
+  p05_sim       : 0.3293
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0717
+
+===== Class 9 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.8694
+  p05_sim       : 0.7522
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0095
+  separation    : 0.6923
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.8124
+  p05_sim       : 0.6605
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.8816
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.6932
+  p05_sim       : 0.5282
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0084
+  separation    : 0.4751
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.6515
+  p05_sim       : 0.5717
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0080
+  separation    : 0.9528
+[binary_mean_shift]
+  num_centroids: 42
+  mean_max_sim  : 42.4357
+  p05_sim       : 32.2639
+  coverage@0.3  : 0.8990
+  bipolarity    : 0.4989
+  separation    : 35.9796
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.7619
+  p05_sim       : 0.6214
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.7669
+
+===== Class 10 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7794
+  p05_sim       : 0.5961
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0092
+  separation    : 0.8043
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6854
+  p05_sim       : 0.4234
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9915
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.5550
+  p05_sim       : 0.2704
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0080
+  separation    : 0.5347
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.5309
+  p05_sim       : 0.4050
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0079
+  separation    : 0.9252
+[binary_mean_shift]
+  num_centroids: 11
+  mean_max_sim  : 31.3505
+  p05_sim       : 15.8309
+  coverage@0.3  : 0.8985
+  bipolarity    : 0.5039
+  separation    : 38.3352
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6316
+  p05_sim       : 0.4410
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0761
+
+===== Class 11 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.8309
+  p05_sim       : 0.7242
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0093
+  separation    : 0.7435
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.7460
+  p05_sim       : 0.6010
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9700
+[hdbscan]
+  num_centroids: 3
+  mean_max_sim  : 0.6509
+  p05_sim       : 0.4671
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0081
+  separation    : 0.6049
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.6345
+  p05_sim       : 0.5494
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0079
+  separation    : 0.7981
+[binary_mean_shift]
+  num_centroids: 32
+  mean_max_sim  : 38.4459
+  p05_sim       : 25.2259
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.5040
+  separation    : 39.8239
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6898
+  p05_sim       : 0.4663
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9177
+
+===== Class 12 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7964
+  p05_sim       : 0.6787
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0092
+  separation    : 0.7660
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6968
+  p05_sim       : 0.5464
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0317
+[hdbscan]
+  num_centroids: 1
+  mean_max_sim  : 0.1616
+  p05_sim       : 0.0890
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.0000
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.5536
+  p05_sim       : 0.4730
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0070
+  separation    : 0.8339
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 31.2772
+  p05_sim       : 16.7356
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.4950
+  separation    : 40.6957
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6462
+  p05_sim       : 0.4333
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9818
+
+===== Class 13 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7973
+  p05_sim       : 0.6897
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0093
+  separation    : 0.6758
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6939
+  p05_sim       : 0.5628
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9232
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.5890
+  p05_sim       : 0.4490
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0075
+  separation    : 0.5640
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.5194
+  p05_sim       : 0.4512
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0084
+  separation    : 1.0003
+[binary_mean_shift]
+  num_centroids: 4
+  mean_max_sim  : 30.5571
+  p05_sim       : 22.2438
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.4970
+  separation    : 42.5475
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6745
+  p05_sim       : 0.5540
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9460
+
+===== Class 14 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7694
+  p05_sim       : 0.6038
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0092
+  separation    : 0.8823
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6653
+  p05_sim       : 0.4676
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0721
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.5056
+  p05_sim       : 0.3161
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0067
+  separation    : 0.6895
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.5016
+  p05_sim       : 0.3857
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0080
+  separation    : 0.9948
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 27.7966
+  p05_sim       : 13.8510
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.5012
+  separation    : 38.7476
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6082
+  p05_sim       : 0.3892
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 1.0388
+
+===== Class 15 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.7459
+  p05_sim       : 0.6119
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0091
+  separation    : 0.8141
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.6360
+  p05_sim       : 0.4854
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.0100
+  separation    : 1.0602
+[hdbscan]
+  num_centroids: 2
+  mean_max_sim  : 0.5036
+  p05_sim       : 0.3098
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0078
+  separation    : 0.6370
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.4986
+  p05_sim       : 0.4111
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0067
+  separation    : 0.6951
+[binary_mean_shift]
+  num_centroids: 5
+  mean_max_sim  : 24.5354
+  p05_sim       : 15.2403
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.5013
+  separation    : 38.6432
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.5734
+  p05_sim       : 0.3932
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.0100
+  separation    : 1.0982
+
+===== Class 16 =====
+[spherical_kmeans]
+  num_centroids: 8
+  mean_max_sim  : 0.8067
+  p05_sim       : 0.6771
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0093
+  separation    : 0.6811
+[kmedoids]
+  num_centroids: 8
+  mean_max_sim  : 0.7150
+  p05_sim       : 0.5464
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.9430
+[hdbscan]
+  num_centroids: 1
+  mean_max_sim  : 0.4351
+  p05_sim       : 0.2479
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0100
+  separation    : 0.0000
+[agglomerative]
+  num_centroids: 8
+  mean_max_sim  : 0.5625
+  p05_sim       : 0.4748
+  coverage@0.3  : 0.9000
+  bipolarity    : 0.0082
+  separation    : 0.9420
+[binary_mean_shift]
+  num_centroids: 4
+  mean_max_sim  : 31.8251
+  p05_sim       : 19.0111
+  coverage@0.3  : 0.8990
+  bipolarity    : 0.4996
+  separation    : 27.1614
+[random]
+  num_centroids: 8
+  mean_max_sim  : 0.6526
+  p05_sim       : 0.4588
+  coverage@0.3  : 0.8995
+  bipolarity    : 0.0100
+  separation    : 0.9302
