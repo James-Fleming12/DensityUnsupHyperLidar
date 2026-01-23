@@ -137,9 +137,9 @@ def meanshift_torch_binary(data, seed, bandwidth, max_iter=300, batch_size=1000)
 
     return S_filtered, p_num_filtered
 
-def mean_shift_binary(X, bandwidth=None, dedup_scale=0.1, seeds=None, cluster_all=True, GPU=True):
+def mean_shift_binary(X, bandwidth=None, dedup_scale=0.1, seeds=None, quantile=0.3, n_samples=500, bandwidth_multiplier=0.3):
     if bandwidth is None:
-        bandwidth = estimate_bandwidth_binary(X)
+        bandwidth = estimate_bandwidth_binary(X, quantile=quantile, n_samples=n_samples, bandwidth_multiplier=bandwidth_multiplier)
     if not (0 < bandwidth <= 1):
         raise ValueError("bandwidth must be in (0,1] for Hamming distance")
 

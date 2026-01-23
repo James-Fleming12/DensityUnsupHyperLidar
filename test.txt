@@ -1,0 +1,1441 @@
+Sequences folder exists! Using sequences from nuscenes_kitti/sequences
+sequences:  [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
+parsing seq 61
+Found 39 scans in sequence 61
+parsing seq 103
+Found 40 scans in sequence 103
+parsing seq 553
+Found 41 scans in sequence 553
+parsing seq 655
+Found 41 scans in sequence 655
+parsing seq 757
+Found 41 scans in sequence 757
+parsing seq 796
+Found 40 scans in sequence 796
+parsing seq 916
+Found 41 scans in sequence 916
+parsing seq 1077
+Found 41 scans in sequence 1077
+parsing seq 1094
+Found 40 scans in sequence 1094
+parsing seq 1100
+Found 40 scans in sequence 1100
+Using 404 scans from sequences [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
+Sequences folder exists! Using sequences from nuscenes_kitti/sequences
+sequences:  [1094, 1100]
+parsing seq 1094
+Found 40 scans in sequence 1094
+parsing seq 1100
+Found 40 scans in sequence 1100
+Using 80 scans from sequences [1094, 1100]
+
+===== Hyperparam sweep: Class 0 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 8 | sizes=[121, 763, 97, 190, 56, 58, 592, 123] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 8 | sizes=[121, 763, 97, 190, 56, 58, 592, 123] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 8 | sizes=[121, 763, 97, 190, 56, 58, 592, 123] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters=14 | sizes=[364, 134, 94, 99, 51, 69, 62, 46, 24, 53, 693, 59, 221, 31] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters=14 | sizes=[361, 115, 23, 93, 116, 53, 61, 46, 24, 56, 740, 58, 222, 32] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters=12 | sizes=[364, 111, 25, 102, 79, 55, 77, 118, 73, 701, 49, 246] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=11 | sizes=[109, 132, 44, 142, 51, 200, 136, 870, 106, 40, 170] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=11 | sizes=[183, 26, 90, 306, 50, 76, 557, 107, 32, 524, 49] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[184, 49, 438, 541, 52, 430, 69, 61, 176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters=11 | sizes=[124, 538, 65, 30, 77, 49, 52, 126, 53, 38, 848] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters=10 | sizes=[115, 590, 69, 32, 113, 49, 52, 131, 90, 759] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters=10 | sizes=[80, 518, 66, 104, 50, 46, 116, 46, 46, 928] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters=14 | sizes=[397, 136, 54, 104, 0, 59, 51, 51, 75, 43, 67, 709, 50, 204] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters=13 | sizes=[379, 135, 61, 104, 59, 52, 39, 76, 43, 69, 706, 48, 229] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[443, 137, 92, 111, 65, 194, 112, 125, 721] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=14 | sizes=[182, 120, 29, 417, 198, 130, 213, 86, 45, 144, 267, 40, 69, 60] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=12 | sizes=[179, 124, 39, 426, 485, 241, 141, 45, 136, 37, 67, 80] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=11 | sizes=[179, 123, 66, 426, 487, 240, 142, 45, 135, 68, 89] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters=11 | sizes=[676, 71, 31, 121, 49, 60, 45, 135, 11, 52, 749] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 9 | sizes=[750, 92, 138, 53, 60, 49, 132, 63, 663] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[629, 70, 36, 126, 49, 52, 131, 91, 816] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters=12 | sizes=[155, 127, 39, 110, 65, 160, 38, 67, 70, 998, 107, 64] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=10 | sizes=[154, 114, 46, 234, 53, 149, 932, 171, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters=10 | sizes=[153, 129, 45, 188, 54, 149, 908, 179, 45, 150] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=17 | sizes=[183, 104, 85, 421, 61, 58, 103, 212, 82, 45, 90, 98, 86, 211, 66, 39, 56] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=18 | sizes=[185, 68, 61, 116, 111, 417, 61, 55, 100, 193, 70, 45, 74, 84, 215, 27, 66, 52] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=15 | sizes=[186, 103, 110, 421, 61, 58, 103, 211, 82, 45, 91, 162, 86, 213, 68] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters=13 | sizes=[315, 56, 61, 39, 11, 42, 32, 85, 1223, 57, 9, 17, 53] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters=10 | sizes=[316, 56, 61, 50, 42, 40, 88, 1235, 97, 15] | coverage=0.899 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[316, 56, 61, 50, 49, 48, 88, 1235, 97] | coverage=0.899 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=15 | sizes=[398, 136, 54, 104, 4, 56, 56, 54, 39, 69, 0, 709, 49, 202, 70] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=11 | sizes=[400, 136, 89, 104, 58, 56, 110, 69, 726, 49, 203] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[435, 137, 90, 111, 63, 199, 112, 125, 728] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 1 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[98, 521, 485, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[604, 500, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[607, 762, 631] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[98, 521, 485, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[604, 500, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[607, 762, 631] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=21 | sizes=[291, 49, 50, 74, 62, 97, 32, 14, 23, 99, 158, 94, 101, 150, 79, 56, 59, 182, 97, 75, 158] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=20 | sizes=[241, 46, 126, 23, 70, 45, 85, 40, 26, 100, 222, 105, 144, 67, 52, 62, 81, 171, 137, 157] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=17 | sizes=[249, 60, 130, 72, 53, 95, 48, 185, 99, 225, 101, 159, 56, 80, 156, 123, 109] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[98, 521, 485, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[604, 500, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[607, 762, 631] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[542, 166, 600, 692] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[624, 608, 768] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[624, 767, 609] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=35 | sizes=[139, 48, 55, 33, 97, 22, 33, 65, 2, 32, 19, 80, 61, 83, 104, 68, 38, 76, 63, 86, 64, 47, 68, 32, 78, 47, 55, 39, 68, 36, 21, 112, 86, 30, 13] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=29 | sizes=[146, 48, 60, 58, 105, 67, 44, 24, 80, 61, 77, 107, 120, 49, 160, 106, 51, 62, 32, 28, 54, 63, 36, 59, 24, 61, 109, 69, 40] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=25 | sizes=[164, 48, 117, 55, 87, 49, 25, 80, 62, 100, 135, 111, 161, 119, 50, 70, 32, 73, 63, 93, 36, 28, 113, 73, 56] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[98, 521, 485, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[604, 500, 282, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[607, 762, 631] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[149, 402, 135, 95, 93, 259, 268, 599] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 7 | sizes=[400, 135, 153, 160, 271, 267, 614] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 6 | sizes=[400, 136, 155, 400, 270, 639] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=36 | sizes=[103, 133, 40, 41, 45, 62, 61, 53, 60, 27, 75, 85, 37, 54, 76, 38, 71, 44, 102, 54, 51, 97, 36, 15, 32, 24, 76, 71, 23, 35, 37, 45, 88, 67, 14, 28] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=28 | sizes=[154, 85, 39, 41, 56, 58, 35, 50, 64, 26, 87, 82, 128, 82, 81, 58, 203, 63, 48, 46, 32, 52, 119, 65, 75, 49, 32, 90] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=24 | sizes=[178, 76, 39, 40, 71, 60, 59, 79, 94, 84, 126, 80, 36, 136, 243, 63, 57, 32, 101, 85, 76, 59, 32, 94] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters=13 | sizes=[121, 265, 58, 95, 86, 53, 96, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters=11 | sizes=[353, 64, 122, 137, 98, 313, 78, 112, 373, 163, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters=10 | sizes=[357, 64, 125, 138, 106, 319, 78, 112, 514, 187] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=33 | sizes=[121, 76, 39, 24, 34, 60, 47, 48, 14, 55, 62, 24, 91, 82, 28, 72, 94, 35, 61, 40, 95, 201, 60, 56, 39, 36, 75, 65, 30, 55, 54, 34, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=24 | sizes=[153, 98, 74, 77, 57, 59, 63, 25, 91, 84, 129, 77, 168, 35, 220, 61, 76, 36, 81, 75, 59, 34, 75, 93] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters=21 | sizes=[243, 80, 80, 58, 61, 78, 96, 85, 131, 77, 207, 37, 220, 61, 76, 36, 91, 96, 59, 35, 93] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 2 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[77, 225, 144, 266, 196] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[77, 225, 144, 266, 196] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[77, 225, 144, 266, 196] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=16 | sizes=[50, 27, 42, 43, 19, 37, 30, 43, 41, 279, 80, 95, 35, 14, 63, 10] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=12 | sizes=[50, 27, 43, 50, 19, 39, 63, 41, 281, 80, 101, 114] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=11 | sizes=[60, 28, 43, 50, 20, 39, 63, 43, 347, 101, 114] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[76, 143, 124, 287, 278] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[78, 144, 123, 287, 276] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[68, 108, 167, 279, 286] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=13 | sizes=[49, 28, 34, 48, 20, 39, 71, 39, 277, 77, 102, 72, 52] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=13 | sizes=[46, 29, 54, 20, 37, 72, 39, 274, 77, 86, 76, 44, 54] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=13 | sizes=[47, 29, 51, 20, 37, 74, 38, 274, 77, 84, 73, 50, 54] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[202, 252, 118, 153, 183] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[202, 252, 118, 153, 183] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[202, 252, 118, 153, 183] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[185, 107, 305, 92, 219] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[75, 133, 137, 277, 286] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[186, 111, 389, 222] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=14 | sizes=[52, 47, 27, 62, 19, 32, 36, 215, 95, 64, 89, 74, 38, 58] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=13 | sizes=[52, 51, 27, 64, 19, 29, 36, 217, 94, 64, 112, 86, 57] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=13 | sizes=[51, 53, 25, 60, 19, 32, 36, 217, 94, 64, 114, 88, 55] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[191, 163, 236, 143, 175] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[109, 214, 117, 190, 278] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 3 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[398, 351, 139, 705, 407] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[429, 330, 376, 656, 209] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[398, 351, 139, 705, 407] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[291, 364, 629, 716] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[290, 363, 632, 715] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[290, 363, 632, 715] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=15 | sizes=[41, 110, 94, 107, 96, 232, 41, 115, 201, 40, 61, 495, 201, 82, 84] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=14 | sizes=[43, 106, 94, 106, 98, 235, 41, 119, 222, 94, 479, 196, 83, 84] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=15 | sizes=[38, 92, 116, 101, 70, 160, 121, 120, 37, 205, 83, 488, 203, 80, 86] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[275, 340, 136, 851, 398] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[275, 340, 136, 851, 398] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[275, 340, 136, 851, 398] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[230, 355, 626, 503, 286] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 6 | sizes=[170, 330, 831, 305, 195, 169] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 6 | sizes=[171, 332, 831, 302, 195, 169] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=21 | sizes=[101, 48, 150, 77, 59, 78, 54, 91, 41, 79, 137, 76, 241, 123, 214, 74, 124, 28, 23, 34, 148] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=20 | sizes=[127, 40, 76, 90, 61, 95, 103, 73, 71, 97, 131, 75, 218, 105, 210, 71, 124, 53, 34, 146] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=19 | sizes=[122, 48, 151, 85, 63, 76, 132, 83, 137, 76, 241, 123, 214, 75, 124, 66, 31, 120, 33] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[193, 352, 632, 540, 283] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[193, 352, 632, 540, 283] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 7 | sizes=[158, 340, 532, 300, 372, 158, 140] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 8 | sizes=[154, 339, 517, 306, 361, 51, 131, 141] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 8 | sizes=[154, 339, 517, 306, 361, 51, 131, 141] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=23 | sizes=[94, 177, 130, 80, 58, 42, 59, 78, 100, 76, 108, 173, 122, 140, 116, 78, 121, 36, 23, 30, 93, 34, 32] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=21 | sizes=[91, 169, 139, 85, 58, 88, 77, 102, 76, 112, 173, 122, 140, 117, 78, 121, 59, 31, 96, 34, 32] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=20 | sizes=[111, 189, 134, 95, 59, 92, 94, 98, 144, 174, 122, 140, 117, 78, 121, 41, 31, 92, 36, 32] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[194, 352, 635, 537, 282] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[238, 355, 612, 510, 285] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 4 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[319, 131, 340, 327, 883] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[319, 131, 340, 327, 883] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[319, 131, 340, 327, 883] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters=10 | sizes=[387, 222, 36, 31, 175, 191, 65, 93, 194, 606] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 6 | sizes=[412, 258, 604, 113, 163, 450] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[400, 281, 629, 324, 366] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=12 | sizes=[403, 374, 123, 168, 114, 28, 46, 160, 80, 240, 170, 94] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[399, 411, 191, 125, 78, 295, 91, 252, 158] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=10 | sizes=[355, 301, 107, 155, 121, 131, 111, 250, 174, 295] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[391, 108, 136, 643, 722] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[323, 125, 335, 339, 878] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[391, 107, 130, 645, 727] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters=13 | sizes=[375, 185, 37, 162, 33, 165, 46, 35, 91, 51, 138, 536, 146] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters=11 | sizes=[386, 207, 150, 66, 151, 73, 116, 117, 79, 535, 120] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[375, 239, 172, 175, 99, 103, 145, 92, 600] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=14 | sizes=[174, 239, 73, 59, 51, 44, 41, 88, 106, 218, 111, 368, 164, 264] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=10 | sizes=[168, 264, 133, 61, 68, 204, 75, 239, 519, 269] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=11 | sizes=[172, 302, 103, 59, 57, 48, 180, 221, 242, 349, 267] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[390, 196, 376, 681, 357] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[390, 293, 417, 339, 561] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[388, 315, 298, 437, 562] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters=14 | sizes=[386, 171, 108, 238, 41, 229, 24, 22, 44, 33, 48, 267, 68, 321] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=12 | sizes=[391, 155, 113, 288, 199, 59, 55, 40, 47, 263, 60, 330] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[389, 205, 173, 120, 305, 94, 77, 308, 329] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters= 8 | sizes=[177, 294, 60, 57, 157, 249, 590, 416] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters= 8 | sizes=[170, 308, 60, 561, 70, 162, 255, 414] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[170, 752, 60, 70, 227, 257, 464] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[363, 582, 404, 302, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[363, 871, 412, 354] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=13 | sizes=[375, 185, 68, 172, 26, 149, 35, 98, 45, 117, 78, 539, 113] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=11 | sizes=[375, 195, 172, 66, 158, 70, 107, 117, 79, 544, 117] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 8 | sizes=[382, 315, 209, 96, 124, 162, 92, 620] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 5 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters=15 | sizes=[292, 197, 393, 75, 57, 54, 39, 24, 173, 96, 75, 141, 81, 123, 180] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters=14 | sizes=[312, 558, 52, 59, 30, 56, 44, 97, 190, 71, 136, 88, 123, 184] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters=13 | sizes=[313, 547, 80, 57, 57, 47, 97, 188, 75, 147, 85, 125, 182] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=20 | sizes=[265, 58, 49, 46, 22, 14, 36, 255, 209, 31, 57, 107, 80, 67, 130, 68, 133, 130, 161, 82] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=17 | sizes=[265, 91, 61, 22, 50, 254, 227, 69, 103, 74, 67, 141, 66, 128, 160, 86, 136] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=15 | sizes=[266, 94, 59, 70, 254, 209, 128, 62, 167, 68, 134, 103, 144, 162, 80] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters=18 | sizes=[223, 93, 465, 115, 33, 75, 61, 16, 24, 16, 14, 85, 208, 80, 113, 76, 123, 180] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters=14 | sizes=[311, 556, 51, 62, 31, 45, 44, 196, 107, 71, 128, 89, 123, 186] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters=12 | sizes=[324, 549, 42, 83, 66, 31, 69, 266, 84, 160, 142, 184] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=20 | sizes=[268, 78, 28, 33, 37, 50, 222, 54, 257, 22, 49, 60, 23, 157, 72, 112, 127, 115, 173, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=14 | sizes=[268, 92, 46, 38, 50, 255, 226, 106, 117, 139, 220, 182, 73, 188] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=15 | sizes=[268, 99, 53, 70, 223, 56, 252, 74, 61, 174, 71, 130, 188, 203, 78] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[977, 144, 585, 294] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters=22 | sizes=[199, 57, 60, 297, 83, 175, 188, 32, 49, 60, 61, 41, 16, 19, 23, 71, 43, 50, 98, 81, 109, 188] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=19 | sizes=[238, 61, 468, 94, 189, 32, 49, 59, 64, 45, 17, 26, 23, 69, 76, 96, 93, 109, 192] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters=16 | sizes=[199, 59, 60, 541, 197, 44, 56, 70, 62, 54, 25, 91, 82, 103, 156, 201] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=19 | sizes=[78, 160, 44, 112, 34, 29, 45, 200, 105, 108, 86, 51, 53, 87, 224, 181, 215, 62, 126] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=16 | sizes=[262, 103, 35, 39, 46, 244, 109, 119, 87, 51, 92, 244, 148, 223, 75, 123] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=14 | sizes=[262, 113, 43, 28, 41, 252, 151, 169, 105, 244, 188, 214, 71, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 8 | sizes=[670, 74, 116, 39, 310, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[671, 74, 131, 333, 215, 315, 261] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=23 | sizes=[265, 60, 46, 29, 38, 13, 37, 256, 210, 56, 141, 77, 48, 65, 55, 137, 66, 32, 90, 18, 38, 74, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=20 | sizes=[265, 72, 62, 45, 44, 256, 210, 56, 141, 77, 48, 95, 55, 137, 66, 32, 90, 18, 82, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters=17 | sizes=[265, 125, 54, 44, 256, 247, 150, 83, 66, 98, 56, 137, 66, 32, 90, 82, 149] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 6 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[156, 47, 114, 127, 1556] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[957, 60, 75, 124, 784] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[957, 60, 75, 124, 784] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[129, 80, 27, 224, 1540] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[157, 228, 1615] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[129, 103, 228, 1540] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=12 | sizes=[80, 57, 184, 166, 154, 80, 159, 72, 131, 247, 399, 271] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=10 | sizes=[81, 76, 192, 218, 163, 156, 71, 155, 276, 612] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[131, 203, 233, 157, 161, 74, 155, 273, 613] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[127, 86, 83, 170, 1534] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[127, 86, 83, 170, 1534] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[126, 70, 216, 1588] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 6 | sizes=[106, 52, 22, 199, 437, 1184] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[106, 54, 181, 470, 1189] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[106, 62, 211, 444, 1177] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=15 | sizes=[178, 73, 57, 93, 184, 150, 135, 121, 66, 195, 173, 167, 154, 122, 132] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=13 | sizes=[178, 124, 98, 184, 152, 139, 122, 75, 199, 172, 163, 191, 203] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=12 | sizes=[184, 124, 196, 224, 139, 120, 77, 203, 171, 174, 182, 206] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[71, 65, 195, 1341, 328] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[125, 203, 1344, 328] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[119, 86, 187, 1608] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 9 | sizes=[90, 61, 182, 224, 172, 199, 168, 296, 608] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=10 | sizes=[89, 44, 153, 41, 226, 174, 196, 205, 286, 586] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[91, 62, 173, 228, 176, 196, 197, 290, 587] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=11 | sizes=[190, 154, 99, 100, 197, 190, 128, 249, 193, 175, 325] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[199, 201, 108, 231, 185, 131, 471, 226, 248] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[198, 197, 126, 228, 187, 131, 483, 228, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[150, 52, 92, 135, 1571] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[124, 79, 165, 1632] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[135, 225, 1640] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 7 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[538, 137, 458, 666, 201] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[538, 135, 464, 662, 201] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[621, 467, 702, 210] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=15 | sizes=[199, 480, 24, 241, 15, 144, 192, 203, 43, 22, 43, 45, 30, 45, 274] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=11 | sizes=[215, 459, 31, 243, 28, 155, 383, 53, 84, 60, 289] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 8 | sizes=[436, 328, 71, 174, 468, 111, 86, 326] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[587, 563, 622, 228] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[1027, 722, 251] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[1367, 303, 330] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=11 | sizes=[205, 189, 396, 279, 37, 173, 221, 101, 74, 48, 277] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters= 8 | sizes=[202, 217, 435, 280, 119, 193, 262, 292] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters= 6 | sizes=[223, 666, 111, 190, 321, 489] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[458, 541, 400, 508, 93] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[968, 148, 649, 235] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[1105, 650, 245] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[1109, 648, 243] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=11 | sizes=[111, 156, 245, 201, 264, 84, 49, 220, 30, 39, 601] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters= 6 | sizes=[103, 209, 924, 382, 129, 253] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters= 6 | sizes=[105, 209, 927, 384, 249, 126] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[649, 623, 103, 403, 222] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters= 8 | sizes=[866, 460, 232, 49, 78, 37, 227, 51] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters= 7 | sizes=[868, 461, 253, 85, 37, 227, 69] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 6 | sizes=[869, 468, 283, 87, 66, 227] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 8 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[212, 186, 1094, 200, 308] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[212, 186, 1094, 200, 308] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[209, 195, 1219, 281, 96] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 2 | sizes=[1375, 625] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=10 | sizes=[173, 205, 152, 472, 90, 149, 418, 66, 92, 183] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters= 6 | sizes=[191, 261, 207, 688, 551, 102] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[192, 275, 221, 752, 560] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[307, 1091, 223, 93, 286] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[307, 1091, 223, 93, 286] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[307, 1091, 223, 93, 286] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters= 7 | sizes=[205, 207, 107, 603, 178, 453, 247] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters= 7 | sizes=[192, 205, 97, 620, 207, 543, 136] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[193, 204, 596, 293, 714] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[311, 1069, 225, 95, 300] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[309, 1073, 220, 101, 297] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[308, 1049, 220, 100, 323] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 2 | sizes=[340, 1660] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[293, 476, 1231] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 2 | sizes=[370, 1630] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[260, 317, 659, 764] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[257, 336, 656, 751] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[263, 955, 782] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 5 | sizes=[374, 887, 292, 98, 349] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters= 2 | sizes=[886, 1114] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 1 | sizes=[2000] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 9 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters=23 | sizes=[57, 65, 117, 169, 209, 128, 92, 68, 133, 206, 22, 82, 76, 31, 60, 39, 40, 18, 33, 63, 138, 43, 111] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters=20 | sizes=[57, 65, 273, 209, 128, 92, 78, 133, 206, 23, 76, 38, 60, 76, 42, 33, 65, 152, 107, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters=18 | sizes=[62, 65, 273, 209, 128, 93, 79, 154, 206, 95, 76, 38, 60, 77, 43, 74, 152, 116] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters=23 | sizes=[57, 65, 117, 169, 209, 128, 92, 68, 133, 206, 22, 82, 76, 31, 60, 39, 40, 18, 33, 63, 138, 43, 111] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters=20 | sizes=[57, 65, 273, 209, 128, 92, 78, 133, 206, 23, 76, 38, 60, 76, 42, 33, 65, 152, 107, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters=18 | sizes=[62, 65, 273, 209, 128, 93, 79, 154, 206, 95, 76, 38, 60, 77, 43, 74, 152, 116] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=27 | sizes=[59, 46, 143, 221, 131, 74, 61, 97, 208, 122, 94, 62, 21, 46, 6, 42, 11, 46, 20, 89, 19, 32, 116, 47, 80, 68, 39] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=23 | sizes=[61, 47, 150, 207, 127, 72, 61, 99, 210, 114, 94, 70, 35, 46, 75, 43, 22, 48, 113, 48, 83, 68, 107] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=19 | sizes=[57, 46, 147, 218, 129, 113, 129, 226, 119, 98, 74, 85, 71, 109, 118, 63, 83, 28, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters=23 | sizes=[57, 65, 117, 169, 209, 128, 92, 68, 133, 206, 22, 82, 76, 31, 60, 39, 40, 18, 33, 63, 138, 43, 111] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters=20 | sizes=[57, 65, 273, 209, 128, 92, 78, 133, 206, 23, 76, 38, 60, 76, 42, 33, 65, 152, 107, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters=18 | sizes=[62, 65, 273, 209, 128, 93, 79, 154, 206, 95, 76, 38, 60, 77, 43, 74, 152, 116] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters=23 | sizes=[57, 65, 117, 169, 209, 128, 92, 68, 133, 206, 22, 82, 76, 31, 60, 39, 40, 18, 33, 63, 138, 43, 111] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters=20 | sizes=[57, 65, 273, 209, 128, 92, 78, 133, 206, 23, 76, 38, 60, 76, 42, 33, 65, 152, 107, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters=18 | sizes=[62, 65, 273, 209, 128, 93, 79, 154, 206, 95, 76, 38, 60, 77, 43, 74, 152, 116] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=28 | sizes=[62, 50, 139, 111, 136, 75, 21, 111, 119, 74, 94, 64, 22, 20, 76, 138, 47, 27, 47, 99, 118, 42, 57, 117, 81, 18, 11, 24] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=25 | sizes=[62, 51, 140, 111, 136, 102, 54, 119, 120, 74, 94, 69, 25, 146, 47, 28, 44, 117, 99, 122, 47, 57, 81, 35, 20] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=21 | sizes=[60, 46, 142, 242, 138, 114, 62, 120, 130, 95, 73, 132, 77, 50, 58, 104, 125, 35, 69, 82, 46] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters=23 | sizes=[57, 65, 117, 169, 209, 128, 92, 68, 133, 206, 22, 82, 76, 31, 60, 39, 40, 18, 33, 63, 138, 43, 111] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters=20 | sizes=[57, 65, 273, 209, 128, 92, 78, 133, 206, 23, 76, 38, 60, 76, 42, 33, 65, 152, 107, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters=18 | sizes=[62, 65, 273, 209, 128, 93, 79, 154, 206, 95, 76, 38, 60, 77, 43, 74, 152, 116] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters=23 | sizes=[57, 65, 117, 169, 209, 128, 92, 68, 133, 206, 22, 82, 76, 31, 60, 39, 40, 18, 33, 63, 138, 43, 111] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=20 | sizes=[57, 65, 273, 209, 128, 92, 78, 133, 206, 23, 76, 38, 60, 76, 42, 33, 65, 152, 107, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters=18 | sizes=[62, 65, 273, 209, 128, 93, 79, 154, 206, 95, 76, 38, 60, 77, 43, 74, 152, 116] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=21 | sizes=[91, 273, 61, 63, 165, 114, 34, 154, 152, 115, 159, 157, 44, 46, 80, 50, 55, 69, 61, 44, 13] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=17 | sizes=[88, 250, 63, 67, 168, 397, 135, 115, 179, 57, 55, 72, 67, 104, 65, 70, 48] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=16 | sizes=[92, 270, 64, 63, 162, 203, 147, 119, 187, 80, 86, 230, 106, 69, 73, 49] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters=28 | sizes=[62, 53, 139, 111, 131, 65, 16, 114, 119, 74, 98, 65, 21, 18, 86, 147, 45, 27, 44, 45, 60, 117, 34, 55, 118, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters=26 | sizes=[62, 53, 140, 111, 131, 100, 54, 121, 117, 74, 98, 67, 24, 146, 48, 28, 44, 119, 45, 60, 120, 47, 55, 81, 39, 16] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters=20 | sizes=[59, 53, 144, 111, 140, 151, 143, 121, 75, 95, 73, 149, 70, 62, 101, 118, 64, 141, 83, 47] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=14 | sizes=[270, 106, 241, 55, 58, 390, 133, 108, 106, 68, 117, 107, 141, 100] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=10 | sizes=[270, 107, 296, 145, 193, 397, 137, 108, 202, 145] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[270, 107, 296, 217, 195, 455, 109, 202, 149] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 10 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters=13 | sizes=[208, 175, 175, 117, 131, 317, 265, 247, 41, 118, 27, 135, 44] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters=13 | sizes=[198, 115, 157, 157, 49, 390, 85, 256, 250, 41, 122, 72, 108] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters=12 | sizes=[192, 115, 162, 175, 45, 399, 87, 261, 249, 43, 128, 144] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=20 | sizes=[89, 109, 125, 351, 89, 156, 52, 57, 47, 35, 113, 69, 92, 167, 62, 85, 60, 77, 57, 108] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=17 | sizes=[132, 123, 386, 88, 141, 47, 93, 44, 188, 95, 167, 63, 89, 100, 102, 33, 109] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=18 | sizes=[80, 112, 113, 368, 89, 154, 53, 59, 48, 110, 128, 66, 167, 65, 102, 95, 85, 106] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters=20 | sizes=[190, 111, 119, 113, 76, 28, 95, 389, 67, 54, 67, 34, 52, 20, 179, 94, 41, 118, 79, 74] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters=18 | sizes=[186, 110, 110, 124, 105, 28, 376, 92, 116, 57, 59, 39, 91, 115, 96, 41, 122, 133] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters=15 | sizes=[192, 113, 160, 153, 107, 407, 118, 59, 93, 98, 117, 95, 40, 121, 127] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=19 | sizes=[177, 120, 57, 322, 77, 166, 38, 26, 42, 66, 172, 20, 91, 169, 40, 101, 134, 77, 105] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=17 | sizes=[184, 133, 50, 306, 76, 152, 38, 26, 54, 80, 175, 97, 170, 96, 105, 152, 106] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=13 | sizes=[270, 211, 170, 78, 179, 95, 138, 223, 173, 102, 106, 149, 106] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[558, 266, 1176] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters=27 | sizes=[559, 87, 47, 35, 33, 19, 11, 25, 29, 95, 229, 37, 32, 47, 27, 36, 47, 35, 46, 44, 36, 101, 66, 34, 108, 68, 67] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=20 | sizes=[562, 87, 47, 47, 35, 49, 25, 95, 234, 40, 45, 46, 74, 54, 95, 95, 101, 34, 109, 126] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters=19 | sizes=[570, 87, 47, 63, 57, 37, 227, 88, 64, 53, 81, 50, 95, 57, 46, 102, 34, 108, 134] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=13 | sizes=[221, 88, 159, 254, 85, 213, 161, 51, 166, 99, 149, 117, 237] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=11 | sizes=[219, 142, 114, 246, 89, 355, 140, 189, 173, 117, 216] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=10 | sizes=[227, 233, 259, 87, 349, 145, 193, 177, 224, 106] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 9 | sizes=[225, 204, 204, 379, 399, 45, 177, 111, 256] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[227, 201, 204, 377, 394, 45, 175, 104, 273] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[247, 220, 213, 751, 49, 187, 333] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=22 | sizes=[168, 467, 87, 47, 69, 52, 29, 171, 17, 14, 76, 156, 71, 23, 49, 75, 84, 29, 38, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=18 | sizes=[168, 467, 88, 47, 69, 52, 29, 172, 27, 80, 156, 72, 98, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters=17 | sizes=[168, 469, 88, 47, 69, 52, 36, 178, 91, 156, 72, 99, 101, 96, 35, 109, 134] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 11 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters=14 | sizes=[125, 386, 208, 60, 50, 458, 41, 33, 27, 11, 128, 326, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters=13 | sizes=[125, 386, 208, 62, 50, 458, 66, 33, 11, 128, 326, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters=12 | sizes=[128, 408, 208, 62, 92, 463, 67, 33, 50, 342, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters=22 | sizes=[66, 261, 93, 63, 117, 65, 13, 57, 61, 101, 121, 91, 459, 80, 32, 34, 31, 9, 86, 49, 21, 90] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters=18 | sizes=[127, 261, 65, 116, 95, 66, 58, 65, 100, 121, 92, 459, 84, 40, 91, 50, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters=14 | sizes=[129, 377, 141, 63, 67, 53, 212, 322, 132, 41, 124, 218, 30, 91] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=31 | sizes=[93, 124, 57, 127, 47, 66, 164, 23, 60, 52, 64, 60, 108, 29, 101, 37, 83, 40, 144, 45, 42, 32, 69, 36, 74, 51, 30, 31, 6, 18, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=29 | sizes=[209, 64, 135, 63, 59, 156, 59, 50, 38, 109, 31, 101, 35, 84, 68, 43, 144, 47, 43, 61, 68, 35, 74, 52, 30, 31, 6, 18, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=26 | sizes=[209, 64, 135, 158, 169, 60, 52, 38, 109, 30, 101, 35, 84, 70, 52, 145, 45, 41, 69, 36, 74, 52, 30, 33, 22, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters=14 | sizes=[125, 386, 208, 60, 50, 458, 41, 33, 27, 11, 128, 326, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters=13 | sizes=[125, 386, 208, 62, 50, 458, 66, 33, 11, 128, 326, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters=12 | sizes=[128, 408, 208, 62, 92, 463, 67, 33, 50, 342, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters=25 | sizes=[93, 154, 187, 144, 251, 133, 42, 43, 131, 83, 44, 7, 31, 9, 63, 114, 90, 29, 82, 29, 36, 41, 53, 22, 89] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters=18 | sizes=[157, 169, 187, 123, 247, 135, 48, 53, 175, 84, 89, 63, 121, 91, 95, 53, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters=17 | sizes=[162, 173, 188, 171, 249, 166, 124, 86, 86, 73, 126, 90, 52, 91, 53, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=43 | sizes=[136, 49, 31, 24, 51, 112, 29, 87, 49, 77, 29, 55, 52, 13, 42, 78, 91, 84, 104, 16, 40, 35, 55, 29, 52, 19, 40, 49, 38, 59, 14, 23, 49, 17, 57, 28, 17, 9, 22, 32, 7, 35, 65] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=37 | sizes=[144, 49, 31, 61, 58, 79, 60, 36, 104, 43, 28, 99, 27, 54, 33, 60, 80, 84, 101, 49, 45, 37, 52, 54, 55, 15, 53, 51, 32, 49, 62, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 52, 115, 54, 36, 102, 61, 122, 28, 53, 31, 57, 94, 86, 102, 54, 48, 36, 53, 58, 65, 54, 29, 49, 61, 27, 23, 26, 56, 84] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters=14 | sizes=[125, 386, 208, 60, 50, 458, 41, 33, 27, 11, 128, 326, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters=13 | sizes=[125, 386, 208, 62, 50, 458, 66, 33, 11, 128, 326, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters=12 | sizes=[128, 408, 208, 62, 92, 463, 67, 33, 50, 342, 44, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters=29 | sizes=[91, 105, 22, 95, 50, 150, 56, 59, 110, 75, 155, 60, 84, 185, 105, 46, 26, 58, 43, 43, 67, 51, 21, 42, 38, 51, 8, 17, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=23 | sizes=[114, 96, 132, 114, 91, 49, 111, 152, 113, 295, 84, 109, 71, 83, 43, 43, 71, 23, 41, 54, 8, 16, 87] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters=18 | sizes=[117, 163, 193, 207, 111, 299, 118, 177, 76, 84, 60, 91, 72, 21, 45, 56, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=38 | sizes=[112, 39, 36, 27, 14, 40, 41, 48, 37, 90, 239, 58, 32, 60, 118, 29, 48, 10, 78, 50, 75, 71, 27, 48, 70, 26, 26, 19, 12, 31, 50, 56, 61, 31, 27, 45, 33, 86] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=31 | sizes=[108, 36, 68, 30, 47, 49, 38, 118, 246, 56, 56, 60, 117, 32, 19, 78, 66, 79, 72, 48, 70, 68, 53, 33, 31, 50, 56, 62, 34, 28, 92] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=26 | sizes=[135, 69, 33, 65, 76, 162, 266, 59, 59, 117, 70, 44, 64, 39, 79, 71, 73, 70, 75, 57, 56, 59, 30, 28, 56, 88] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters=24 | sizes=[50, 152, 190, 246, 127, 49, 112, 188, 127, 42, 34, 10, 63, 113, 90, 45, 85, 31, 37, 41, 40, 18, 21, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters=21 | sizes=[50, 152, 188, 246, 130, 56, 123, 221, 127, 42, 34, 64, 113, 90, 85, 31, 38, 42, 56, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters=18 | sizes=[143, 152, 193, 253, 135, 56, 123, 221, 72, 49, 64, 116, 90, 103, 58, 60, 23, 89] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=41 | sizes=[137, 49, 31, 21, 52, 49, 95, 28, 36, 102, 43, 24, 78, 29, 27, 54, 32, 57, 83, 83, 100, 46, 46, 37, 52, 32, 55, 54, 38, 53, 18, 37, 49, 61, 28, 23, 8, 19, 32, 25, 77] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=36 | sizes=[144, 49, 31, 60, 51, 95, 54, 36, 102, 43, 31, 93, 27, 54, 32, 57, 87, 86, 101, 48, 47, 37, 52, 48, 66, 54, 53, 37, 49, 61, 28, 23, 26, 37, 25, 76] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters=33 | sizes=[144, 49, 31, 60, 51, 115, 54, 36, 102, 63, 121, 27, 54, 32, 58, 94, 86, 101, 48, 47, 37, 52, 56, 66, 54, 37, 49, 61, 28, 23, 26, 54, 84] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 12 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[807, 461, 168, 263, 301] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[915, 443, 199, 275, 168] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[915, 443, 199, 275, 168] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=14 | sizes=[349, 259, 107, 284, 54, 138, 122, 89, 122, 153, 52, 84, 62, 125] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[405, 295, 308, 137, 302, 161, 151, 77, 164] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[383, 282, 347, 133, 300, 161, 140, 73, 181] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[438, 551, 307, 241, 463] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[438, 551, 310, 243, 458] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[442, 632, 398, 528] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=17 | sizes=[321, 250, 50, 176, 25, 36, 117, 140, 210, 149, 49, 76, 77, 65, 59, 94, 106] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=17 | sizes=[330, 145, 217, 64, 131, 71, 54, 99, 122, 63, 152, 144, 78, 83, 46, 86, 115] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=17 | sizes=[301, 157, 218, 109, 69, 62, 101, 120, 61, 115, 80, 142, 79, 86, 46, 84, 170] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[904, 421, 244, 284, 147] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[468, 308, 477, 289, 458] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[763, 827, 410] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[853, 837, 310] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=28 | sizes=[295, 114, 154, 98, 59, 40, 17, 77, 21, 49, 64, 79, 25, 43, 147, 99, 77, 97, 40, 43, 61, 28, 59, 44, 70, 40, 23, 37] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=28 | sizes=[297, 116, 147, 45, 40, 37, 41, 44, 22, 68, 51, 49, 64, 77, 57, 42, 115, 110, 99, 59, 60, 41, 31, 58, 44, 68, 36, 82] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=25 | sizes=[297, 117, 153, 100, 42, 65, 71, 54, 37, 49, 64, 82, 58, 42, 122, 107, 102, 62, 60, 42, 30, 60, 45, 82, 57] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[393, 682, 397, 528] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=14 | sizes=[353, 262, 109, 273, 54, 138, 123, 90, 123, 155, 57, 80, 64, 119] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=12 | sizes=[353, 263, 145, 287, 139, 123, 212, 155, 57, 82, 64, 120] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters=11 | sizes=[353, 263, 145, 287, 148, 123, 234, 157, 101, 64, 125] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 13 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[772, 532, 621, 75] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[772, 532, 621, 75] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[772, 532, 621, 75] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=10 | sizes=[704, 170, 71, 107, 51, 130, 103, 231, 383, 50] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=10 | sizes=[704, 170, 71, 108, 51, 130, 103, 231, 382, 50] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[740, 169, 77, 108, 131, 106, 233, 382, 54] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[1058, 239, 51, 652] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[1181, 191, 561, 67] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[1058, 239, 51, 652] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=21 | sizes=[306, 115, 132, 62, 134, 79, 28, 46, 135, 66, 83, 96, 30, 98, 136, 58, 52, 44, 119, 98, 83] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=22 | sizes=[296, 140, 243, 69, 88, 80, 18, 46, 52, 89, 100, 101, 30, 97, 125, 49, 43, 45, 83, 53, 80, 73] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=22 | sizes=[317, 132, 266, 115, 116, 52, 78, 46, 51, 57, 102, 31, 66, 34, 127, 45, 43, 42, 73, 52, 80, 75] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[1080, 313, 544, 63] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 3 | sizes=[508, 721, 771] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[540, 691, 769] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[585, 663, 752] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=29 | sizes=[58, 194, 101, 99, 72, 81, 51, 59, 33, 51, 46, 95, 96, 133, 55, 41, 39, 99, 40, 29, 132, 42, 35, 45, 64, 55, 38, 43, 74] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=25 | sizes=[64, 280, 120, 233, 100, 50, 87, 59, 66, 99, 54, 38, 37, 100, 41, 29, 139, 41, 26, 38, 45, 59, 49, 73, 73] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=25 | sizes=[61, 279, 120, 231, 100, 52, 91, 59, 66, 99, 54, 38, 37, 100, 41, 29, 139, 41, 26, 37, 45, 59, 48, 75, 73] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[772, 532, 622, 74] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=10 | sizes=[740, 163, 72, 107, 131, 108, 232, 113, 54, 280] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[740, 179, 73, 117, 132, 108, 234, 363, 54] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 14 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[518, 402, 277, 803] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[518, 402, 277, 803] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[518, 402, 277, 803] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 8 | sizes=[437, 147, 65, 509, 51, 63, 649, 79] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 6 | sizes=[241, 126, 779, 89, 686, 79] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 6 | sizes=[581, 72, 493, 97, 678, 79] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=19 | sizes=[437, 68, 86, 99, 123, 128, 145, 258, 43, 152, 51, 46, 35, 56, 83, 42, 87, 34, 27] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=16 | sizes=[436, 195, 73, 92, 136, 148, 267, 38, 35, 69, 44, 99, 170, 124, 44, 30] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters=17 | sizes=[434, 81, 87, 123, 190, 145, 307, 34, 36, 48, 101, 105, 86, 56, 47, 34, 86] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[378, 189, 527, 125, 781] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[594, 388, 912, 106] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[616, 452, 813, 119] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters=12 | sizes=[195, 187, 59, 151, 87, 136, 52, 504, 226, 217, 49, 137] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters=12 | sizes=[413, 83, 145, 59, 135, 91, 49, 485, 140, 183, 92, 125] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters=12 | sizes=[528, 149, 78, 117, 80, 50, 41, 469, 126, 169, 91, 102] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=16 | sizes=[151, 296, 138, 111, 87, 112, 56, 256, 43, 55, 230, 63, 107, 35, 198, 62] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=11 | sizes=[137, 311, 366, 149, 179, 260, 102, 84, 309, 64, 39] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=11 | sizes=[151, 294, 338, 181, 121, 75, 261, 96, 61, 338, 84] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[1171, 126, 703] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[1171, 126, 703] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[1171, 126, 703] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters=23 | sizes=[438, 75, 22, 46, 50, 21, 26, 289, 59, 306, 47, 26, 11, 30, 76, 133, 74, 41, 29, 19, 55, 44, 83] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters=21 | sizes=[438, 70, 48, 70, 35, 289, 65, 306, 38, 26, 21, 30, 75, 100, 78, 64, 42, 28, 55, 45, 77] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters=15 | sizes=[441, 86, 73, 89, 289, 68, 306, 35, 32, 41, 152, 138, 85, 82, 83] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=11 | sizes=[65, 182, 66, 126, 668, 101, 202, 73, 232, 98, 187] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=11 | sizes=[67, 183, 65, 124, 667, 76, 92, 117, 205, 231, 173] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[65, 183, 66, 126, 668, 103, 392, 163, 234] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[1165, 132, 703] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=11 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 217, 49, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters=10 | sizes=[185, 199, 70, 218, 143, 54, 507, 228, 266, 130] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 15 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[643, 497, 289, 384, 187] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[643, 497, 289, 384, 187] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[643, 497, 289, 384, 187] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[908, 343, 329, 420] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[907, 345, 329, 419] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[907, 345, 329, 419] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=12 | sizes=[60, 83, 36, 81, 296, 369, 224, 81, 185, 37, 249, 299] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters=13 | sizes=[60, 82, 35, 80, 291, 309, 217, 76, 154, 130, 39, 245, 282] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[79, 122, 301, 404, 241, 112, 185, 256, 300] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[639, 515, 294, 372, 180] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 5 | sizes=[647, 502, 305, 359, 187] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 5 | sizes=[639, 515, 294, 372, 180] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 6 | sizes=[377, 626, 321, 302, 245, 129] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[503, 669, 363, 465] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=17 | sizes=[75, 79, 30, 384, 31, 55, 226, 188, 221, 171, 29, 114, 56, 31, 80, 120, 110] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters=15 | sizes=[385, 76, 106, 33, 37, 222, 217, 223, 165, 29, 115, 65, 96, 121, 110] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters=13 | sizes=[392, 68, 112, 36, 234, 211, 244, 188, 126, 106, 79, 96, 108] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[661, 495, 374, 251, 219] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[675, 500, 391, 434] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[682, 503, 381, 434] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 5 | sizes=[378, 635, 316, 324, 347] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 5 | sizes=[378, 635, 316, 324, 347] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 5 | sizes=[377, 631, 322, 330, 340] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=18 | sizes=[161, 71, 70, 40, 98, 155, 182, 224, 232, 148, 26, 52, 147, 81, 34, 64, 135, 80] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=18 | sizes=[77, 161, 150, 46, 123, 99, 104, 195, 198, 175, 159, 127, 53, 95, 38, 61, 65, 74] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=16 | sizes=[74, 225, 127, 148, 42, 111, 211, 126, 127, 171, 148, 180, 51, 95, 93, 71] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[744, 594, 662] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 4 | sizes=[488, 679, 366, 467] | coverage=0.900 | bipolarity=1.000
+
+===== Hyperparam sweep: Class 16 =====
+  bw=None, q=0.2, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[627, 310, 360, 182, 521] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[637, 315, 374, 674] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[637, 315, 374, 674] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[801, 216, 331, 652] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.5 | clusters= 4 | sizes=[800, 229, 317, 654] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.3, dedup=0.7 | clusters= 4 | sizes=[801, 210, 337, 652] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.3 | clusters=11 | sizes=[115, 280, 139, 140, 62, 265, 265, 245, 148, 168, 173] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[418, 245, 218, 69, 263, 236, 190, 207, 154] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.2, mult=0.4, dedup=0.7 | clusters= 7 | sizes=[402, 110, 326, 429, 349, 191, 193] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[627, 310, 360, 182, 521] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[637, 315, 374, 674] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[637, 315, 374, 674] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[771, 195, 328, 706] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[797, 454, 749] | coverage=0.899 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[862, 379, 759] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.3 | clusters=11 | sizes=[103, 205, 250, 72, 78, 174, 278, 183, 321, 121, 215] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.5 | clusters= 9 | sizes=[321, 215, 92, 213, 146, 143, 225, 323, 322] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.3, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[320, 229, 106, 219, 275, 177, 336, 69, 269] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.3 | clusters= 5 | sizes=[627, 310, 360, 182, 521] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.5 | clusters= 4 | sizes=[637, 315, 374, 674] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.2, dedup=0.7 | clusters= 4 | sizes=[637, 315, 374, 674] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[519, 447, 676, 358] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.5 | clusters= 6 | sizes=[241, 334, 569, 116, 194, 546] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[529, 728, 743] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.3 | clusters=14 | sizes=[147, 90, 78, 211, 91, 210, 132, 58, 117, 104, 123, 245, 291, 103] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.5 | clusters=10 | sizes=[394, 232, 151, 145, 113, 57, 146, 327, 303, 132] | coverage=0.900 | bipolarity=1.000
+  bw=None, q=0.4, mult=0.4, dedup=0.7 | clusters=10 | sizes=[350, 275, 240, 63, 128, 90, 46, 212, 285, 311] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.2, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.3, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.2, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.3, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.3 | clusters= 4 | sizes=[818, 155, 303, 724] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.5 | clusters= 3 | sizes=[830, 405, 765] | coverage=0.900 | bipolarity=1.000
+  bw=0.06, q=0.4, mult=0.4, dedup=0.7 | clusters= 3 | sizes=[886, 388, 726] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.2, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.3, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.2, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.3, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.3 | clusters=13 | sizes=[98, 174, 246, 68, 178, 66, 141, 102, 61, 198, 248, 105, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.5 | clusters=10 | sizes=[310, 212, 95, 199, 141, 102, 61, 207, 358, 315] | coverage=0.900 | bipolarity=1.000
+  bw=0.08, q=0.4, mult=0.4, dedup=0.7 | clusters= 9 | sizes=[368, 234, 174, 145, 128, 61, 213, 361, 316] | coverage=0.900 | bipolarity=1.000
