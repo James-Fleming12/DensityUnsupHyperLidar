@@ -250,7 +250,7 @@ def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, d
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5):
+    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="continuous"):
         super(DensityModel, self).__init__()
 
         self.device = device
@@ -328,10 +328,15 @@ class DensityModel(nn.Module):
         self.classify_weights = nn.Parameter(self.classify.weight.data.clone()).to(device)
 
         self.num_subclusters = max_subclusters
+        self.subcluster_type = subcluster_type
         self.subclusters = nn.Parameter(torch.zeros(self.num_classes * self.num_subclusters, self.hd_dim, device=self.device))
         self.subclusters.data.fill_(0.0)
 
         self.subcluster_to_class = torch.repeat_interleave(torch.arange(self.num_classes, device=self.device), self.num_subclusters)
+
+        self.quantile = 0.4
+        self.mult = 0.2
+        self.dedup = 0.7
 
     def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
         if mask is None:
@@ -426,85 +431,143 @@ class DensityModel(nn.Module):
             pair_simil[:self.num_classes, :self.num_classes] = torch.eye(self.num_classes)
         return pair_simil.detach().cpu().numpy(), class_hv.detach().cpu().numpy()
     
-    def init_subclusters(self, dataloader, bandwidth=None, max_samples_per_class=5000):
+    def init_subclusters(self, dataloader, bandwidth=None, max_samples_per_class=5000, sampling_strategy='diverse'):
         """
-        Initialize subclusters
+        sampling_strategy: 'random' (simple random sampling), 'diverse' (stratified, temporal diversity), or 'fps' (farthest point sampling)
         """
         self.eval()
         num_sub_per_cluster = self.num_subclusters
-
-        print(f"Collecting embeddings for {self.num_classes} classes")
-
+        print(f"Collecting embeddings for {self.num_classes} classes using '{sampling_strategy}' sampling")
         all_subcluster_centers = []
         all_subcluster_classes = []
+
+        MAX_SAMPLES = max_samples_per_class * 2
         
         for class_id in range(self.num_classes):
             print(f"Processing class {class_id}...")
-
             class_embeddings = []
+            batch_indices = []
             total_samples = 0
             
             with torch.no_grad():
                 for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(dataloader):
                     proj_in = proj_in.to(self.device)
                     proj_labels = proj_labels.to(self.device).flatten()
-
                     enc, _, _ = self.encode(proj_in)
-
                     class_mask = proj_labels == class_id
+                    
                     if torch.any(class_mask):
                         class_enc = enc[class_mask].cpu().half()
                         class_embeddings.append(class_enc)
+                        batch_indices.extend([batch_idx] * class_enc.shape[0])
                         total_samples += class_enc.shape[0]
-
+                    
                     del proj_in, proj_labels
                     self._clear_memory()
                     
                     print(f"  Batch {batch_idx}: collected {total_samples} samples so far")
-                    
-                    if total_samples >= max_samples_per_class:
-                        break
 
+                    if total_samples >= MAX_SAMPLES: # collect extra for better sampling
+                        break
+            
             if not class_embeddings:
                 print(f"  No data for class {class_id}, skipping")
                 continue
-
+            
             class_emb_cpu = torch.cat(class_embeddings, dim=0)
 
-            if len(class_emb_cpu) > max_samples_per_class:
-                indices = torch.randperm(len(class_emb_cpu))[:max_samples_per_class]
+            if len(class_emb_cpu) > MAX_SAMPLES:
+                indices = torch.randperm(len(class_emb_cpu))[:MAX_SAMPLES]
                 class_emb_cpu = class_emb_cpu[indices]
             
-            class_emb_np = class_emb_cpu.numpy()
+            batch_indices = torch.tensor(batch_indices[:len(class_emb_cpu)])
+            
+            class_emb_cpu = torch.cat(class_embeddings, dim=0)
+            batch_indices = torch.tensor(batch_indices)
 
+            if len(class_emb_cpu) > max_samples_per_class:
+                if sampling_strategy == 'random':
+                    indices = torch.randperm(len(class_emb_cpu))[:max_samples_per_class]
+                elif sampling_strategy == 'diverse':
+                    indices = self._stratified_sample(batch_indices, max_samples_per_class)
+                elif sampling_strategy == 'fps':
+                    indices = self._farthest_point_sample(class_emb_cpu, max_samples_per_class)
+                else:
+                    raise ValueError(f"Unknown sampling strategy: {sampling_strategy}")
+                
+                class_emb_cpu = class_emb_cpu[indices]
+                print(f"  Sampled {len(class_emb_cpu)} from {len(batch_indices)} total samples using '{sampling_strategy}'")
+            
+            class_emb_np = class_emb_cpu.numpy()
+            
             if bandwidth is None:
                 estimated_bandwidth = estimate_bandwidth_binary(
                     class_emb_np, 
-                    quantile=0.2,
-                    n_samples=min(500, len(class_emb_np))
+                    quantile=self.quantile,
+                    n_samples=min(500, len(class_emb_np)), # just making it quicker (hopefully not an issue)
+                    bandwidth_multiplier=self.mult
                 )
-                print(f"  Using Estimated bandwidth for class {class_id}: {estimated_bandwidth:.4f}")
+                print(f"  Estimated bandwidth for class {class_id}: {estimated_bandwidth:.4f}")
                 class_bandwidth = estimated_bandwidth
             else:
                 class_bandwidth = bandwidth
             
             print(f"  Using {len(class_emb_np)} samples for clustering")
-
+            
             del class_emb_cpu, class_embeddings
             self._clear_memory()
-            
+
             subclusters_for_class = self._process_single_class(
                 class_emb_np, class_id, num_sub_per_cluster, class_bandwidth
             )
             
             all_subcluster_centers.extend(subclusters_for_class)
             all_subcluster_classes.extend([class_id] * len(subclusters_for_class))
-
+            
             del class_emb_np
             self._clear_memory()
-
+        
         self._load_subclusters(all_subcluster_centers, all_subcluster_classes)
         print("Subcluster initialization complete")
+
+    def _stratified_sample(self, batch_indices, n_samples):
+        unique_batches = torch.unique(batch_indices)
+        samples_per_batch = n_samples // len(unique_batches)
+        remainder = n_samples % len(unique_batches)
+        
+        selected_indices = []
+        for i, batch_id in enumerate(unique_batches):
+            batch_mask = batch_indices == batch_id
+            batch_positions = torch.where(batch_mask)[0]
+
+            n_from_batch = samples_per_batch + (1 if i < remainder else 0)
+            n_from_batch = min(n_from_batch, len(batch_positions))
+
+            perm = torch.randperm(len(batch_positions))[:n_from_batch]
+            selected_indices.append(batch_positions[perm])
+        
+        return torch.cat(selected_indices)
+
+    def _farthest_point_sample(self, embeddings, n_samples):
+        n_points = len(embeddings)
+        if n_points <= n_samples:
+            return torch.arange(n_points)
+        
+        selected = [torch.randint(0, n_points, (1,)).item()]
+        distances = torch.full((n_points,), float('inf'))
+        
+        for _ in range(n_samples - 1):
+            last_selected = embeddings[selected[-1]]
+            new_distances = torch.sum((embeddings - last_selected) ** 2, dim=1)
+
+            distances = torch.minimum(distances, new_distances)
+
+            farthest_idx = torch.argmax(distances).item()
+            selected.append(farthest_idx)
+
+            distances[farthest_idx] = 0
+        
+        return torch.tensor(selected)
 
     def _process_single_class(self, class_emb_np, class_id, num_sub_per_cluster, bandwidth):
         """Process a single class to generate its subclusters."""
@@ -515,6 +578,9 @@ class DensityModel(nn.Module):
         cluster_centers = mean_shift_binary(
             X=class_emb_np,
             bandwidth=bandwidth,
+            quantile=self.quantile,
+            bandwidth_multiplier=self.mult,
+            dedup_scale=self.dedup
         )
         cluster_centers = np.sign(cluster_centers)
         
@@ -541,20 +607,32 @@ class DensityModel(nn.Module):
             return
         
         total_centers = len(centers_list)
-        print(f"Loading {total_centers} subclusters into model...")
+        print(f"Loading {total_centers} subclusters into model (type: {self.subcluster_type})...")
 
         with torch.no_grad():
             batch_size = 100
             for i in range(0, total_centers, batch_size):
                 end_idx = min(i + batch_size, total_centers)
 
-                batch = torch.stack([
-                    self._make_bipolar(c.to(self.device)) if c.device.type == 'cpu' 
-                    else self._make_bipolar(c) 
-                    for c in centers_list[i:end_idx]
-                ])
-                
-                assert torch.all(torch.abs(batch) == 1), f"Subclusters must be bipolar! Got values: {torch.unique(batch)}"
+                if self.subcluster_type == 'bipolar':
+                    batch = torch.stack([
+                        self._make_bipolar(c.to(self.device)) if c.device.type == 'cpu' 
+                        else self._make_bipolar(c) 
+                        for c in centers_list[i:end_idx]
+                    ])
+                    assert torch.all(torch.abs(batch) == 1), f"Subclusters must be bipolar! Got values: {torch.unique(batch)}"
+                elif self.subcluster_type == 'continuous':
+                    batch = torch.stack([
+                        c.to(self.device) if c.device.type == 'cpu' else c 
+                        for c in centers_list[i:end_idx]
+                    ])
+                    batch = F.normalize(batch, dim=1)
+
+                    norms = torch.norm(batch, dim=1)
+                    expected_norms = torch.ones(len(batch), device=self.device, dtype=batch.dtype)
+                    assert torch.allclose(norms, expected_norms, atol=1e-3), f"Continuous subclusters must be unit norm! Got norms: {norms}"                
+                else:
+                    raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
 
                 self.subclusters.data[i:end_idx] = batch
 
@@ -562,7 +640,7 @@ class DensityModel(nn.Module):
                 if i % 500 == 0:
                     self._clear_memory()
                     print(f"  Loaded {end_idx}/{total_centers} subclusters")
-        
+
         print("All subclusters loaded")
 
     def _make_bipolar(self, tensor):
@@ -585,26 +663,27 @@ class DensityModel(nn.Module):
         Get maximum similarity [0,1] to subclusters using Hamming distance.
         distance_sensitivity introduces a power law which scales with similarity = base_similarity ^ (1 / distance_sensitivity)
         """
-        enc_binary = torch.sign(enc).to(dtype=self.subclusters.dtype)
-        
         mask = self.subcluster_to_class == class_id
         relevant_subclusters = self.subclusters[mask]
         
         if len(relevant_subclusters) == 0:
             return torch.zeros(enc.shape[0], device=enc.device), None
 
-        hd_dim = enc_binary.shape[1]
-
-        dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
-
-        base_similarity = (dot_products + hd_dim) / (2 * hd_dim)
+        if self.subcluster_type == 'bipolar':
+            enc_binary = torch.sign(enc).to(dtype=self.subclusters.dtype)
+            hd_dim = enc_binary.shape[1]
+            
+            dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
+            base_similarity = (dot_products + hd_dim) / (2 * hd_dim)
+        elif self.subcluster_type == 'continuous':
+            enc_norm = F.normalize(enc)
+            base_similarity = torch.matmul(enc_norm, relevant_subclusters.T)
+            base_similarity = (base_similarity + 1) / 2        
+        else:
+            raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
 
         if distance_sensitivity == 0.0:
-            scaled_similarity = torch.where(
-                base_similarity > 0.5,
-                torch.tensor(1.0, device=enc.device),
-                base_similarity * 2.0
-            )
+            scaled_similarity = torch.where(base_similarity > 0.5, torch.tensor(1.0, device=enc.device), base_similarity * 2.0)
         elif distance_sensitivity == 1.0:
             scaled_similarity = base_similarity
         else:
@@ -618,7 +697,7 @@ class DensityModel(nn.Module):
     def inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0):
         """
         Inference-only update with distance-aware gating.
-        Continuous prototypes, bipolar subclusters.
+        Works with both bipolar and continuous subclusters.
         """
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -630,13 +709,18 @@ class DensityModel(nn.Module):
             logits = self.classify(enc_norm)
             predictions = torch.argmax(logits, dim=1)
 
-            enc_binary = torch.sign(enc)
-            proto_binary = torch.sign(self.classify.weight)
+            if self.subcluster_type == 'bipolar':
+                enc_binary = torch.sign(enc)
+                proto_binary = torch.sign(self.classify.weight)
+                selected_proto = proto_binary[predictions]
+                hd_dim = enc_binary.shape[1]
+                similarities = torch.sum(enc_binary * selected_proto, dim=1) / hd_dim
+            elif self.subcluster_type == 'continuous':
+                selected_proto = F.normalize(self.classify.weight[predictions])
+                similarities = torch.sum(enc_norm * selected_proto, dim=1)
+            else:
+                raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
 
-            selected_proto = proto_binary[predictions]
-            hd_dim = enc_binary.shape[1]
-
-            similarities = torch.sum(enc_binary * selected_proto, dim=1) / hd_dim
             distances = (1.0 - similarities) / 2.0
             update_mask = distances > beta
 
@@ -654,11 +738,7 @@ class DensityModel(nn.Module):
                 class_enc_norm = enc_norm[class_mask]
                 class_enc_binary = enc_binary[class_mask]
 
-                subcluster_sims, _ = self.get_max_subcluster_similarity(
-                    class_enc_binary,
-                    class_id,
-                    distance_sensitivity=distance_sensitivity,
-                )
+                subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_binary, class_id, distance_sensitivity=distance_sensitivity)
 
                 scaled = class_enc_norm * subcluster_sims.unsqueeze(1) * learning_rate
 
@@ -847,5 +927,5 @@ class DensityModel(nn.Module):
 
         return accuracy, confidence_map, class_accuracies
 
-def set_new_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device):
-    return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
+def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type='continuous'):
+    return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type=subcluster_type)

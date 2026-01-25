@@ -154,7 +154,7 @@ def run_clustering_benchmark(
         # except Exception as e:
             # print(f"[{name}] FAILED: {e}")
 
-def test_init_subclusters_hyperparams(X, bandwidths=(None, 0.06, 0.08), quantiles=(0.2, 0.3, 0.4), dedup_scales=(0.3, 0.5, 0.7), bandwidth_multipliers=(0.2, 0.3, 0.4), max_samples=2000, device="cuda",):
+def test_init_subclusters_hyperparams(X, bandwidths=(0.10, 0.12, 0.15), quantiles=(0.4,), dedup_scales=(0.7, 1.0), bandwidth_multipliers=(0.2,), max_samples=5000, device="cuda",):
     if X.shape[0] > max_samples:
         idx = torch.randperm(X.shape[0])[:max_samples]
         X = X[idx]

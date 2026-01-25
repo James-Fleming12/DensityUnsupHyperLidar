@@ -6,3 +6,4 @@ logs/*
 common/*
 *.pyc
 /logs/*
+*.txt

@@ -73,7 +73,7 @@ def train_hdc(ARCH, DATA) -> DensityModel:
 
     trainer.train(dataloader, trainer.model, None)
 
-    for i in range(5):
+    for i in range(MAX_HDC_EPOCHS):
         trainer.retrain(dataloader, trainer.model, i+1, None)
 
     model: DensityModel = trainer.model
@@ -366,7 +366,7 @@ def main():
 
     # convert_dataset()
     # train_extractor(ARCH, DATA)
-    hdc = train_hdc(ARCH, DATA)
+    # hdc = train_hdc(ARCH, DATA)
     init_sub(ARCH, DATA)
     # test_inference(ARCH, DATA)
 
