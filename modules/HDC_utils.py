@@ -304,7 +304,23 @@ class DensityModel(nn.Module):
 
         self.hd_encoder = hd_encoder
         if self.hd_encoder == 'rp':  # Random projection encoding
+            torch_rng_state = torch.get_rng_state()
+            numpy_rng_state = np.random.get_state()
+            if torch.cuda.is_available():
+                cuda_rng_state = torch.cuda.get_rng_state()
+
+            torch.manual_seed(42) # setting fixed seed for projection initialization (removes saved model randomness)
+            np.random.seed(42)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed(42)
+                torch.cuda.manual_seed_all(42)
+
             self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+
+            torch.set_rng_state(torch_rng_state) # set back to random
+            np.random.set_state(numpy_rng_state)
+            if torch.cuda.is_available():
+                torch.cuda.set_rng_state(cuda_rng_state)
 
         elif self.hd_encoder == 'idlevel':  # ID-level encoding
             # Generate id-level value hv for each floating value
@@ -726,31 +742,32 @@ class DensityModel(nn.Module):
 
             if not torch.any(update_mask):
                 return predictions
-
-            enc_norm = enc_norm[update_mask]
-            enc_binary = enc_binary[update_mask]
+            enc_norm = enc_norm[update_mask].float()
             predictions = predictions[update_mask]
+
+            if self.subcluster_type == 'bipolar':
+                enc_binary = torch.sign(enc)[update_mask].float()
 
             unique_classes = torch.unique(predictions)
 
             for class_id in unique_classes:
                 class_mask = predictions == class_id
                 class_enc_norm = enc_norm[class_mask]
-                class_enc_binary = enc_binary[class_mask]
 
-                subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_binary, class_id, distance_sensitivity=distance_sensitivity)
+                if self.subcluster_type == 'bipolar':
+                    class_enc_binary = enc_binary[class_mask]
+                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_binary, class_id, distance_sensitivity=distance_sensitivity)
+                elif self.subcluster_type == 'continuous':
+                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_norm, class_id, distance_sensitivity=distance_sensitivity)
 
                 scaled = class_enc_norm * subcluster_sims.unsqueeze(1) * learning_rate
 
                 update = scaled.sum(dim=0)
 
                 self.classify.weight[class_id] += update
-                self.classify.weight[class_id] = F.normalize(
-                    self.classify.weight[class_id:class_id+1], dim=1
-                )[0]
+                self.classify.weight[class_id] = F.normalize(self.classify.weight[class_id:class_id+1], dim=1)[0]
 
             return predictions
-
 
     def chunked_inference_update(self, x, beta=0, distance_sensitivity=5.0, learning_rate=1.0, chunk_size=1000, verbose=False):
         """

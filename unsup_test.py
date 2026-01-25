@@ -31,9 +31,6 @@ def test_collapse(ARCH, trainloader, inference_epochs=5):
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
     model.to(device)
 
-    print("\n" + "="*80)
-    print(f"Initial Accuracy Stats")
-    print("="*80)
     test_hdc_model(model, trainloader)
 
     model.to(device)
@@ -819,7 +816,7 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077, 1094, 1100]
+    DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077]
     ARCH["train"]["batch_size"] = 2
 
     parser = Parser(root=DATA_DIR,
