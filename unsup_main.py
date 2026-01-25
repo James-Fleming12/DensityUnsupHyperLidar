@@ -311,11 +311,11 @@ def init_sub(ARCH, DATA):
     model = torch.load(HDC_SAVE_PATH, weights_only=False)
 
     model.init_subclusters(dataloader)
+    test_hdc_model(model, dataloader)
+
     torch.save(model.state_dict(), HDC_SUB_PATH)
 
     print(f"Subcluster Initialized Model saved to {HDC_SUB_PATH}")
-
-    test_hdc_model(model, dataloader)
 
 def test_inference(ARCH, DATA):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

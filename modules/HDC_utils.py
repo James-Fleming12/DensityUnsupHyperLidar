@@ -250,7 +250,7 @@ def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, d
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="continuous"):
+    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="bipolar"):
         super(DensityModel, self).__init__()
 
         self.device = device
@@ -447,7 +447,7 @@ class DensityModel(nn.Module):
             pair_simil[:self.num_classes, :self.num_classes] = torch.eye(self.num_classes)
         return pair_simil.detach().cpu().numpy(), class_hv.detach().cpu().numpy()
     
-    def init_subclusters(self, dataloader, bandwidth=None, max_samples_per_class=5000, sampling_strategy='diverse'):
+    def init_subclusters(self, dataloader, bandwidth=None, max_samples_per_class=8000, sampling_strategy='diverse'):
         """
         sampling_strategy: 'random' (simple random sampling), 'diverse' (stratified, temporal diversity), or 'fps' (farthest point sampling)
         """
@@ -944,5 +944,5 @@ class DensityModel(nn.Module):
 
         return accuracy, confidence_map, class_accuracies
 
-def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type='continuous'):
+def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type='bipolar'):
     return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type=subcluster_type)

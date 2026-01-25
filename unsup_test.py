@@ -806,7 +806,7 @@ def test_suite(ARCH, trainloader):
 def main():
     # A code snippet to test model collapse in the model after updating over the training set/test set
     try:
-        ARCH = yaml.safe_load(open("config/arch/senet-512.yml", 'r'))
+        ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
     except Exception as e:
         print(f"Error opening arch yaml file. {e}")
         quit()
@@ -817,7 +817,7 @@ def main():
         quit()
 
     DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077]
-    ARCH["train"]["batch_size"] = 2
+    ARCH["train"]["batch_size"] = 1
 
     parser = Parser(root=DATA_DIR,
                     train_sequences=DATA["split"]["train"],
@@ -832,7 +832,7 @@ def main():
                     batch_size=ARCH["train"]["batch_size"],
                     workers=ARCH["train"]["workers"],
                     gt=True,
-                    shuffle_train=False)
+                    shuffle_train=True)
     
     trainloader = parser.get_train_set()
 
