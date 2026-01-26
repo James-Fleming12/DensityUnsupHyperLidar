@@ -36,11 +36,11 @@ def test_collapse(ARCH, trainloader, inference_epochs=5):
     model.to(device)
 
     model.train()
-    for epoch in range(inference_epochs):
-        for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
+    for _ in range(inference_epochs):
+        for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
             proj_in = proj_in.to(device)
             for i in proj_in:
-                model.inference_update(i.unsqueeze(0))
+                model.chunked_inference_update(i.unsqueeze(0))
         test_hdc_model(model, trainloader)
 
     print("\n" + "="*80)

@@ -710,10 +710,9 @@ class DensityModel(nn.Module):
         
         return max_similarities, absolute_indices
 
-    def inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0):
+    def inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0, chunk_size=None):
         """
-        Inference-only update with distance-aware gating.
-        Works with both bipolar and continuous subclusters.
+        chunk_size: If None, processes all at once. If int, processes in chunks.
         """
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -742,169 +741,66 @@ class DensityModel(nn.Module):
 
             if not torch.any(update_mask):
                 return predictions
-            enc_norm = enc_norm[update_mask].float()
-            predictions = predictions[update_mask]
+
+            distant_indices = torch.nonzero(update_mask, as_tuple=False).squeeze(1)
+            num_distant = len(distant_indices)
 
             if self.subcluster_type == 'bipolar':
-                enc_binary = torch.sign(enc)[update_mask].float()
-
-            unique_classes = torch.unique(predictions)
-
-            for class_id in unique_classes:
-                class_mask = predictions == class_id
-                class_enc_norm = enc_norm[class_mask]
-
-                if self.subcluster_type == 'bipolar':
-                    class_enc_binary = enc_binary[class_mask]
-                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_binary, class_id, distance_sensitivity=distance_sensitivity)
-                elif self.subcluster_type == 'continuous':
-                    subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_norm, class_id, distance_sensitivity=distance_sensitivity)
-
-                scaled = class_enc_norm * subcluster_sims.unsqueeze(1) * learning_rate
-
-                update = scaled.sum(dim=0)
-
-                self.classify.weight[class_id] += update
-                self.classify.weight[class_id] = F.normalize(self.classify.weight[class_id:class_id+1], dim=1)[0]
-
-            return predictions
-
-    def chunked_inference_update(self, x, beta=0, distance_sensitivity=5.0, learning_rate=1.0, chunk_size=1000, verbose=False):
-        """
-        Inference with updates scaled by subcluster distance.
-        Not updated as frequently as inference_update, may be wrong.
-        """
-        with torch.no_grad():
-            self.classify_weights.data.copy_(self.classify.weight.data)
+                enc_binary = torch.sign(enc)
+    
+            class_updates = {}
+    
+            if chunk_size is None:
+                chunk_size = num_distant
             
-            if verbose:
-                print(f"\n[DIAGNOSTIC] Before update:")
-                print(f"  classify.weight norms: min={torch.norm(self.classify.weight, dim=1).min():.6f}, max={torch.norm(self.classify.weight, dim=1).max():.6f}")
-                print(f"  classify_weights norms: min={torch.norm(self.classify_weights, dim=1).min():.6f}, max={torch.norm(self.classify_weights, dim=1).max():.6f}")
-            
-            enc, _, _ = self.encode(x)
-
-            enc_binary = torch.sign(enc)
-            zero_mask = enc_binary == 0
-            if torch.any(zero_mask):
-                enc_binary[zero_mask] = -1.0
-
-            enc_normalized = F.normalize(enc)
-
-            if enc_normalized.dtype != self.classify.weight.dtype:
-                enc_normalized = enc_normalized.to(self.classify.weight.dtype)
-
-            logits = self.classify(enc_normalized)
-            predictions = torch.argmax(logits, dim=1)
-
-            prototypes_binary = torch.sign(self.classify.weight)
-            selected_prototypes = prototypes_binary[predictions]
-            hd_dim = enc_binary.shape[1]
-            similarities = torch.sum(enc_binary * selected_prototypes, dim=1) / hd_dim
-            distances = (1 - similarities) / 2
-            mask = distances > beta
-
-            if verbose:
-                print(f"  Samples needing update: {mask.sum().item()}/{len(mask)} ({100*mask.float().mean():.1f}%)")
-                print(f"  Distance stats: min={distances.min():.4f}, max={distances.max():.4f}, mean={distances.mean():.4f}")
-
-            if not torch.any(mask):
-                return predictions
-
-            distant_indices = torch.nonzero(mask, as_tuple=False).squeeze(1)
-            num_distant = len(distant_indices)
-            
-            update_magnitudes = []
-            subcluster_sim_stats = []
-
             for chunk_start in range(0, num_distant, chunk_size):
                 chunk_end = min(chunk_start + chunk_size, num_distant)
                 chunk_indices = distant_indices[chunk_start:chunk_end]
 
-                chunk_enc_norm = enc_normalized[chunk_indices]
-                chunk_enc_binary = enc_binary[chunk_indices]
+                chunk_enc_norm = enc_norm[chunk_indices]
                 chunk_predictions = predictions[chunk_indices]
+                
+                if self.subcluster_type == 'bipolar':
+                    chunk_enc_binary = enc_binary[chunk_indices]
                 
                 unique_classes = torch.unique(chunk_predictions)
                 
                 for class_id in unique_classes:
+                    class_id = class_id.item()
                     class_mask = chunk_predictions == class_id
                     class_enc_norm = chunk_enc_norm[class_mask]
-                    class_enc_binary = chunk_enc_binary[class_mask]
 
-                    # Get subcluster similarity weights using bipolar vectors
-                    subcluster_sims, _ = self.get_max_subcluster_similarity(
-                        class_enc_binary, class_id, distance_sensitivity=distance_sensitivity
-                    )
-                    
-                    if verbose:
-                        subcluster_sim_stats.append({
-                            'class': class_id.item(),
-                            'min': subcluster_sims.min().item(),
-                            'max': subcluster_sims.max().item(),
-                            'mean': subcluster_sims.mean().item()
-                        })
+                    if self.subcluster_type == 'bipolar':
+                        class_enc_binary = chunk_enc_binary[class_mask]
+                        subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_binary, class_id, distance_sensitivity=distance_sensitivity)
+                    elif self.subcluster_type == 'continuous':
+                        subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_norm, class_id, distance_sensitivity=distance_sensitivity)
 
-                    # Scale the NORMALIZED updates by subcluster similarity
-                    # This matches retrain() where we add normalized hypervectors
-                    scaled_samples = class_enc_norm * subcluster_sims.unsqueeze(1) * learning_rate
-                    
-                    total_update = scaled_samples.sum(dim=0)
-                    
-                    if verbose:
-                        update_magnitudes.append({
-                            'class': class_id.item(),
-                            'magnitude': torch.norm(total_update).item(),
-                            'num_samples': len(class_enc_norm)
-                        })
+                    scaled = class_enc_norm * subcluster_sims.unsqueeze(1) * learning_rate
+                    chunk_update = scaled.sum(dim=0)
 
-                    self.classify_weights[class_id] += total_update
+                    if class_id not in class_updates:
+                        class_updates[class_id] = chunk_update
+                    else:
+                        class_updates[class_id] += chunk_update
 
-                    del class_enc_norm, class_enc_binary, subcluster_sims, scaled_samples, total_update
-
-                del chunk_enc_norm, chunk_enc_binary, chunk_predictions
+                del chunk_enc_norm, chunk_predictions
+                if self.subcluster_type == 'bipolar':
+                    del chunk_enc_binary
                 
-                if torch.cuda.is_available():
+                if torch.cuda.is_available() and chunk_size < num_distant:
                     torch.cuda.empty_cache()
 
-            if verbose:
-                print(f"\n  Subcluster similarity stats:")
-                for stat in subcluster_sim_stats[:5]:
-                    print(f"    Class {stat['class']}: min={stat['min']:.4f}, max={stat['max']:.4f}, mean={stat['mean']:.4f}")
-                
-                print(f"\n  Update magnitudes:")
-                for stat in update_magnitudes[:5]:
-                    print(f"    Class {stat['class']}: magnitude={stat['magnitude']:.4f}, samples={stat['num_samples']}")
-
-            unique_updated_classes = torch.unique(predictions[distant_indices])
-
-            for class_id in unique_updated_classes:
-                if verbose and class_id == unique_updated_classes[0]:
-                    old_weight = self.classify.weight[class_id].clone()
-                
-                self.classify.weight[class_id] = F.normalize(
-                    self.classify_weights[class_id:class_id+1], dim=1
-                )[0]
-                
-                if verbose and class_id == unique_updated_classes[0]:
-                    change = torch.norm(self.classify.weight[class_id] - old_weight).item()
-                    print(f"\n  Example class {class_id.item()} weight change: {change:.6f}")
-
-            if verbose:
-                print(f"\n[DIAGNOSTIC] After update:")
-                print(f"  classify.weight norms: min={torch.norm(self.classify.weight, dim=1).min():.6f}, max={torch.norm(self.classify.weight, dim=1).max():.6f}")
-                final_norms = torch.norm(self.classify.weight, dim=1)
-                max_dev = torch.abs(final_norms - 1.0).max().item()
-                print(f"  Max deviation from unit norm: {max_dev:.6f}")
-
-            del enc_normalized, enc_binary, prototypes_binary, selected_prototypes
-            del similarities, distances, mask, distant_indices
-            
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
+            for class_id, update in class_updates.items():
+                self.classify.weight[class_id] += update
+                self.classify.weight[class_id] = F.normalize(self.classify.weight[class_id:class_id+1], dim=1)[0]
             
             return predictions
-            
+
+    def chunked_inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0, chunk_size=1000, verbose=False):
+        """Alias for memory-efficient inference_update"""
+        return self.inference_update(x, beta, distance_sensitivity, learning_rate, chunk_size=chunk_size)
+                
     def get_accuracy(self, x, labels):
         self.eval()
         with torch.no_grad():
