@@ -40,7 +40,7 @@ def test_collapse(ARCH, trainloader, inference_epochs=5):
         for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
             proj_in = proj_in.to(device)
             for i in proj_in:
-                model.chunked_inference_update(i.unsqueeze(0))
+                model.chunked_inference_update(i.unsqueeze(0), learning_rate=0.001, distance_sensitivity=3.0, max_updates_per_class=10000)
         test_hdc_model(model, trainloader)
 
     print("\n" + "="*80)
@@ -51,9 +51,7 @@ def test_collapse(ARCH, trainloader, inference_epochs=5):
 def test_collapse_debug(ARCH, trainloader, inference_epochs=5):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    model: DensityModel = DensityModel(
-        ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device
-    )
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
     model.to(device)
 
@@ -61,70 +59,239 @@ def test_collapse_debug(ARCH, trainloader, inference_epochs=5):
     print("INITIAL MODEL DIAGNOSTICS")
     print("=" * 80)
 
+    initial_prototypes = model.classify.weight.data.clone().cpu()
+    initial_subclusters = model.subclusters.data.clone().cpu()
+
+    print("\n[Initial Model Health Check]")
+    proto_norms = torch.norm(model.classify.weight, dim=1)
+    print(f"  Prototype norms: min={proto_norms.min():.6f}, max={proto_norms.max():.6f}, mean={proto_norms.mean():.6f}")
+    print(f"  All prototypes unit norm? {torch.allclose(proto_norms, torch.ones_like(proto_norms), atol=1e-3)}")
+    
+    sub_norms = torch.norm(model.subclusters, dim=1)
+    print(f"  Subcluster norms: min={sub_norms.min():.6f}, max={sub_norms.max():.6f}, mean={sub_norms.mean():.6f}")
+
+    print(f"  Subcluster type: {model.subcluster_type}")
+    print(f"  Prototype dtype: {model.classify.weight.dtype}")
+    print(f"  Subcluster dtype: {model.subclusters.dtype}")
+
+    torch.cuda.empty_cache()
+
+    model.eval()
     test_hdc_model_debug(model, trainloader)
 
-    proto_before = model.prototypes.detach().clone()
-    sub_before = model.subclusters.detach().clone()
+    print("\n[Getting sample batch...]")
+    sample_batch = next(iter(trainloader))
+    sample_input = sample_batch[0][:1].to(device)
+    sample_label = sample_batch[2][:1].to(device)
+    
+    print("\n[Sample Batch Analysis]")
+    with torch.no_grad():
+        print(f"  Sample input shape: {sample_input.shape}")
 
+        B, C, H, W = sample_input.shape
+        total_pixels = H * W
+        max_pixels = 2000
+        
+        if total_pixels > max_pixels:
+            # Randomly subsample pixels
+            indices = torch.randperm(total_pixels, device=device)[:max_pixels]
+            sample_flat = sample_input.view(B, C, -1)[:, :, indices]
+            print(f"  Subsampled to {max_pixels} pixels for analysis")
+        else:
+            sample_flat = sample_input.view(B, C, -1)
+        
+        enc, _, _ = model.encode(sample_input)
+        enc_sample = enc[:max_pixels] if enc.shape[0] > max_pixels else enc
+        
+        enc_norm = F.normalize(enc_sample)
+        logits = model.classify(enc_norm.to(model.classify.weight.dtype))
+        preds = logits.argmax(dim=1)
+        
+        print(f"  Encoding shape: {enc.shape}")
+        print(f"  Unique predictions: {torch.unique(preds).tolist()}")
+        print(f"  Prediction distribution: {torch.bincount(preds, minlength=NUM_CLASSES).tolist()}")
+
+        enc_norms = torch.norm(enc_sample, dim=1)
+        print(f"  Encoding norms: min={enc_norms.min():.6f}, max={enc_norms.max():.6f}, mean={enc_norms.mean():.6f}")
+
+        unique_enc_vals = torch.unique(enc_sample)
+        is_bipolar = torch.all((unique_enc_vals == -1) | (unique_enc_vals == 1))
+        print(f"  Encodings are bipolar? {is_bipolar}")
+        if not is_bipolar:
+            print(f"  WARNING: Encoding has non-bipolar values: {unique_enc_vals[:10].tolist()}")
+        
+        del enc, enc_sample, enc_norm, logits, preds
+        torch.cuda.empty_cache()
+
+    epoch_metrics = []
+    
     for epoch in range(inference_epochs):
-        print("\n" + "-" * 80)
-        print(f"INFERENCE UPDATE EPOCH {epoch + 1}")
-        print("-" * 80)
+        print("\n" + "=" * 80)
+        print(f"INFERENCE UPDATE EPOCH {epoch + 1}/{inference_epochs}")
+        print("=" * 80)
 
         model.train()
 
         update_counts = torch.zeros(model.num_classes, device=device)
         total_updates = 0
+        update_magnitudes = {i: [] for i in range(model.num_classes)}
+        distance_stats = {i: [] for i in range(model.num_classes)}
+        similarity_stats = {i: [] for i in range(model.num_classes)}
 
+        proto_before_epoch = model.classify.weight.data.clone().cpu()
+        
+        batch_count = 0
         for batch_idx, (proj_in, _, proj_labels, *_) in enumerate(trainloader):
             proj_in = proj_in.to(device)
+            proj_labels = proj_labels.to(device).flatten()
 
-            for x in proj_in:
-                logits, sims, indices, _ = model(x.unsqueeze(0))
-                pred = torch.argmax(logits, dim=1).item()
+            if batch_idx >= 10:
+                print(f"  Stopping at batch {batch_idx} to save memory")
+                break
 
-                update_counts[pred] += 1
-                total_updates += 1
+            x = proj_in[0].unsqueeze(0)
 
-                model.inference_update(x.unsqueeze(0))
+            with torch.no_grad():
+                try:
+                    enc, _, _ = model.encode(x)
+                except torch.cuda.OutOfMemoryError:
+                    print(f"  OOM during encoding at batch {batch_idx}, skipping...")
+                    torch.cuda.empty_cache()
+                    continue
 
-        # Normalize update distribution
-        update_dist = update_counts / (update_counts.sum() + 1e-8)
+                if enc.shape[0] > 20000:
+                    enc_indices = torch.randperm(enc.shape[0], device=device)[:20000]
+                    enc = enc[enc_indices]
+                
+                enc_norm = F.normalize(enc)
+                logits = model.classify(enc_norm.to(model.classify.weight.dtype))
+                preds_before = logits.argmax(dim=1)
 
-        print("\n[Update Distribution]")
+                sample_size = min(5000, enc.shape[0])
+                sample_idx = torch.randperm(enc.shape[0], device=device)[:sample_size]
+                
+                enc_sample = enc[sample_idx]
+                preds_sample = preds_before[sample_idx]
+                enc_norm_sample = enc_norm[sample_idx]
+                
+                if model.subcluster_type == 'bipolar':
+                    enc_binary = torch.sign(enc_sample)
+                    proto_binary = torch.sign(model.classify.weight)
+                    selected_proto = proto_binary[preds_sample]
+                    hd_dim = enc_binary.shape[1]
+                    similarities = torch.sum(enc_binary * selected_proto, dim=1) / hd_dim
+                else:
+                    selected_proto = F.normalize(model.classify.weight[preds_sample])
+                    similarities = torch.sum(enc_norm_sample * selected_proto, dim=1)
+                
+                distances = (1.0 - similarities) / 2.0
+
+                for cls in torch.unique(preds_sample):
+                    cls_idx = cls.item()
+                    cls_mask = preds_sample == cls
+                    if cls_mask.sum() > 0:
+                        distance_stats[cls_idx].extend(distances[cls_mask].cpu().tolist())
+                        similarity_stats[cls_idx].extend(similarities[cls_mask].cpu().tolist())
+                
+                del enc, enc_norm, logits, enc_sample, preds_sample, enc_norm_sample, similarities, distances
+                torch.cuda.empty_cache()
+
+            proto_before_update = model.classify.weight.data.clone().cpu()
+            
+            try:
+                returned_preds = model.inference_update(
+                    x,
+                    beta=0.05,
+                    distance_sensitivity=1.0,
+                    learning_rate=1.0,
+                    chunk_size=5000
+                )
+            except torch.cuda.OutOfMemoryError:
+                print(f"\n  OOM during inference_update at batch {batch_idx}, skipping...")
+                torch.cuda.empty_cache()
+                continue
+            except Exception as e:
+                print(f"\n  ERROR during inference_update: {e}")
+                import traceback
+                traceback.print_exc()
+                continue
+
+            proto_after_update = model.classify.weight.data.cpu()
+            proto_changes = torch.norm(proto_after_update - proto_before_update, dim=1)
+            
+            classes_updated = torch.where(proto_changes > 1e-6)[0]
+            for cls_idx in classes_updated:
+                cls_idx = cls_idx.item()
+                update_counts[cls_idx] += 1
+                update_magnitudes[cls_idx].append(proto_changes[cls_idx].item())
+            
+            total_updates += len(classes_updated)
+
+            if torch.any(torch.isnan(model.classify.weight)) or torch.any(torch.isinf(model.classify.weight)):
+                print(f"\n  CRITICAL: NaN or Inf detected in prototypes after update!")
+                print(f"  Batch {batch_idx}")
+                print(f"  Classes with NaN: {torch.where(torch.any(torch.isnan(model.classify.weight), dim=1))[0].tolist()}")
+                print(f"  Classes with Inf: {torch.where(torch.any(torch.isinf(model.classify.weight), dim=1))[0].tolist()}")
+                return
+            
+            del proto_before_update, proto_after_update, proto_changes, x
+            torch.cuda.empty_cache()
+            
+            batch_count += 1
+            if batch_count % 5 == 0:
+                print(f"  Processed {batch_count} batches, {total_updates} total class updates")
+
+        print("\n[Epoch Update Summary]")
+        print(f"  Total class updates: {total_updates}")
+        
         for c in range(model.num_classes):
-            print(
-                f"  Class {c:2d}: updates={int(update_counts[c].item()):6d} "
-                f"({100 * update_dist[c].item():5.2f}%)"
-            )
+            if update_counts[c] > 0:
+                avg_mag = np.mean(update_magnitudes[c]) if update_magnitudes[c] else 0
+                avg_dist = np.mean(distance_stats[c]) if distance_stats[c] else 0
+                avg_sim = np.mean(similarity_stats[c]) if similarity_stats[c] else 0
+                print(f"  Class {c:2d}: updates={int(update_counts[c].item()):6d}, "
+                      f"avg_magnitude={avg_mag:.6f}, avg_distance={avg_dist:.4f}, avg_similarity={avg_sim:.4f}")
 
-        # Run diagnostics after epoch
+        proto_after_epoch = model.classify.weight.data.cpu()
+        proto_norms = torch.norm(proto_after_epoch, dim=1)
+        proto_drift = torch.norm(proto_after_epoch - proto_before_epoch, dim=1)
+        
+        print("\n[Prototype Health After Epoch]")
+        print(f"  Norms: min={proto_norms.min():.6f}, max={proto_norms.max():.6f}, mean={proto_norms.mean():.6f}")
+        print(f"  Max deviation from unit norm: {torch.abs(proto_norms - 1.0).max():.6f}")
+        print(f"  Drift: min={proto_drift.min():.6f}, max={proto_drift.max():.6f}, mean={proto_drift.mean():.6f}")
+        
+        if torch.any(torch.abs(proto_norms - 1.0) > 0.01):
+            print(f"  WARNING: Some prototypes are not unit norm!")
+            bad_classes = torch.where(torch.abs(proto_norms - 1.0) > 0.01)[0]
+            print(f"  Bad classes: {bad_classes.tolist()}")
+
+        epoch_metrics.append({
+            'epoch': epoch + 1,
+            'total_updates': total_updates,
+            'proto_drift_mean': proto_drift.mean().item(),
+            'proto_drift_max': proto_drift.max().item(),
+            'proto_norm_deviation': torch.abs(proto_norms - 1.0).max().item()
+        })
+        
+        del proto_before_epoch, proto_after_epoch, proto_norms, proto_drift
+        torch.cuda.empty_cache()
+
+        print("\n[Full Evaluation After Epoch]")
+        model.eval()
         test_hdc_model_debug(model, trainloader)
 
     print("\n" + "=" * 80)
-    print("FINAL PROTOTYPE / SUBCLUSTER DRIFT ANALYSIS")
+    print("FINAL ANALYSIS")
     print("=" * 80)
 
-    proto_after = model.prototypes.detach()
-    sub_after = model.subclusters.detach()
-
-    proto_drift = torch.norm(proto_after - proto_before, dim=1)
-    sub_drift = torch.norm(sub_after - sub_before, dim=1)
-
-    print("\n[Prototype Drift]")
-    for c in range(model.num_classes):
-        print(
-            f"  Class {c:2d}: Δproto={proto_drift[c].item():.6f}"
-        )
-
-    print("\n[Subcluster Drift]")
-    per_class_sub = sub_drift.view(model.num_classes, -1)
-    for c in range(model.num_classes):
-        mean_drift = per_class_sub[c].mean().item()
-        max_drift = per_class_sub[c].max().item()
-        print(
-            f"  Class {c:2d}: mean Δsub={mean_drift:.6f}, max Δsub={max_drift:.6f}"
-        )
+    print("\n[Epoch-by-Epoch Metrics]")
+    for metrics in epoch_metrics:
+        print(f"  Epoch {metrics['epoch']}: "
+              f"updates={metrics['total_updates']}, "
+              f"drift_mean={metrics['proto_drift_mean']:.6f}, "
+              f"drift_max={metrics['proto_drift_max']:.6f}, "
+              f"norm_dev={metrics['proto_norm_deviation']:.6f}")
 
 def test_subcluster_initialization(ARCH, trainloader):
     """Test that subclusters are properly initialized and represent dense regions"""

@@ -636,7 +636,10 @@ class DensityModel(nn.Module):
                         else self._make_bipolar(c) 
                         for c in centers_list[i:end_idx]
                     ])
-                    assert torch.all(torch.abs(batch) == 1), f"Subclusters must be bipolar! Got values: {torch.unique(batch)}"
+
+                    batch = F.normalize(batch.float(), dim=1) # normalize (temp change to check)
+                    
+                    assert torch.all(torch.abs(batch) <= 1.0), f"Subclusters must be normalized!"
                 elif self.subcluster_type == 'continuous':
                     batch = torch.stack([
                         c.to(self.device) if c.device.type == 'cpu' else c 
@@ -676,25 +679,25 @@ class DensityModel(nn.Module):
     
     def get_max_subcluster_similarity(self, enc, class_id, distance_sensitivity=1.0):
         """
-        Get maximum similarity [0,1] to subclusters using Hamming distance.
-        distance_sensitivity introduces a power law which scales with similarity = base_similarity ^ (1 / distance_sensitivity)
+        Get maximum similarity [0,1] to subclusters.
+        Handles both bipolar and continuous subclusters.
         """
         mask = self.subcluster_to_class == class_id
         relevant_subclusters = self.subclusters[mask]
         
-        if len(relevant_subclusters) == 0:
-            return torch.zeros(enc.shape[0], device=enc.device), None
-
         if self.subcluster_type == 'bipolar':
             enc_binary = torch.sign(enc).to(dtype=self.subclusters.dtype)
             hd_dim = enc_binary.shape[1]
             
             dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
+
             base_similarity = (dot_products + hd_dim) / (2 * hd_dim)
         elif self.subcluster_type == 'continuous':
-            enc_norm = F.normalize(enc)
-            base_similarity = torch.matmul(enc_norm, relevant_subclusters.T)
-            base_similarity = (base_similarity + 1) / 2        
+            enc_norm = F.normalize(enc, dim=1)
+            sub_norm = F.normalize(relevant_subclusters, dim=1)
+            cosine_sim = torch.matmul(enc_norm, sub_norm.T)
+
+            base_similarity = (cosine_sim + 1) / 2
         else:
             raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
 
@@ -710,96 +713,85 @@ class DensityModel(nn.Module):
         
         return max_similarities, absolute_indices
 
-    def inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0, chunk_size=None):
+    def inference_update(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=5000, max_updates_per_class=50):
         """
-        chunk_size: If None, processes all at once. If int, processes in chunks.
+        EMA updates
+        Args:
+            beta: Distance threshold (samples closer than this are ignored).
+            learning_rate: The 'pull' strength (momentum factor).
+            chunk_size: Number of pixels to process at once to avoid OOM.
+            max_updates_per_class: Caps the influence of any single class per batch to prevent collapse.
         """
+        self.train()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             enc_norm = F.normalize(enc)
-
+            
             if enc_norm.dtype != self.classify.weight.dtype:
                 enc_norm = enc_norm.to(self.classify.weight.dtype)
 
-            logits = self.classify(enc_norm)
-            predictions = torch.argmax(logits, dim=1)
+            num_samples = enc_norm.shape[0]
+            all_predictions = []
+            all_update_masks = []
 
-            if self.subcluster_type == 'bipolar':
-                enc_binary = torch.sign(enc)
-                proto_binary = torch.sign(self.classify.weight)
-                selected_proto = proto_binary[predictions]
-                hd_dim = enc_binary.shape[1]
-                similarities = torch.sum(enc_binary * selected_proto, dim=1) / hd_dim
-            elif self.subcluster_type == 'continuous':
-                selected_proto = F.normalize(self.classify.weight[predictions])
-                similarities = torch.sum(enc_norm * selected_proto, dim=1)
-            else:
-                raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
+            for i in range(0, num_samples, chunk_size):
+                chunk_enc = enc_norm[i : i + chunk_size]
+                chunk_logits = self.classify(chunk_enc)
+                chunk_preds = torch.argmax(chunk_logits, dim=1)
+                all_predictions.append(chunk_preds)
 
-            distances = (1.0 - similarities) / 2.0
-            update_mask = distances > beta
+                if self.subcluster_type == 'bipolar':
+                    chunk_enc_orig = enc[i : i + chunk_size]
+                    enc_binary = torch.sign(chunk_enc_orig)
+                    proto_binary = torch.sign(self.classify.weight)
+                    selected_proto = proto_binary[chunk_preds]
+                    sims = torch.sum(enc_binary * selected_proto, dim=1) / self.hd_dim
+                else:
+                    selected_proto = F.normalize(self.classify.weight[chunk_preds])
+                    sims = torch.sum(chunk_enc * selected_proto, dim=1)
+
+                distances = (1.0 - sims) / 2.0
+                all_update_masks.append(distances > beta)
+
+            predictions = torch.cat(all_predictions)
+            update_mask = torch.cat(all_update_masks)
 
             if not torch.any(update_mask):
                 return predictions
 
-            distant_indices = torch.nonzero(update_mask, as_tuple=False).squeeze(1)
-            num_distant = len(distant_indices)
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(predictions[valid_indices])
 
-            if self.subcluster_type == 'bipolar':
-                enc_binary = torch.sign(enc)
-    
-            class_updates = {}
-    
-            if chunk_size is None:
-                chunk_size = num_distant
-            
-            for chunk_start in range(0, num_distant, chunk_size):
-                chunk_end = min(chunk_start + chunk_size, num_distant)
-                chunk_indices = distant_indices[chunk_start:chunk_end]
+            for class_id in unique_classes:
+                class_id = class_id.item()
+                class_mask = (predictions == class_id) & update_mask
+                class_indices = torch.nonzero(class_mask).squeeze(1)
 
-                chunk_enc_norm = enc_norm[chunk_indices]
-                chunk_predictions = predictions[chunk_indices]
+                if len(class_indices) > max_updates_per_class:
+                    perm = torch.randperm(len(class_indices), device=self.device)[:max_updates_per_class]
+                    class_indices = class_indices[perm]
+
+                sample_encs = enc_norm[class_indices]
                 
                 if self.subcluster_type == 'bipolar':
-                    chunk_enc_binary = enc_binary[chunk_indices]
-                
-                unique_classes = torch.unique(chunk_predictions)
-                
-                for class_id in unique_classes:
-                    class_id = class_id.item()
-                    class_mask = chunk_predictions == class_id
-                    class_enc_norm = chunk_enc_norm[class_mask]
+                    target_encs = torch.sign(enc[class_indices])
+                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, class_id, distance_sensitivity)
+                else:
+                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, class_id, distance_sensitivity)
 
-                    if self.subcluster_type == 'bipolar':
-                        class_enc_binary = chunk_enc_binary[class_mask]
-                        subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_binary, class_id, distance_sensitivity=distance_sensitivity)
-                    elif self.subcluster_type == 'continuous':
-                        subcluster_sims, _ = self.get_max_subcluster_similarity(class_enc_norm, class_id, distance_sensitivity=distance_sensitivity)
+                weighted_samples = sample_encs * sub_sims.unsqueeze(1)
+                mean_pull_vector = weighted_samples.mean(dim=0)
 
-                    scaled = class_enc_norm * subcluster_sims.unsqueeze(1) * learning_rate
-                    chunk_update = scaled.sum(dim=0)
+                current_weight = self.classify.weight[class_id]
+                updated_weight = (1.0 - learning_rate) * current_weight + (learning_rate * mean_pull_vector)
 
-                    if class_id not in class_updates:
-                        class_updates[class_id] = chunk_update
-                    else:
-                        class_updates[class_id] += chunk_update
+                self.classify.weight[class_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
 
-                del chunk_enc_norm, chunk_predictions
-                if self.subcluster_type == 'bipolar':
-                    del chunk_enc_binary
-                
-                if torch.cuda.is_available() and chunk_size < num_distant:
-                    torch.cuda.empty_cache()
-
-            for class_id, update in class_updates.items():
-                self.classify.weight[class_id] += update
-                self.classify.weight[class_id] = F.normalize(self.classify.weight[class_id:class_id+1], dim=1)[0]
-            
             return predictions
 
-    def chunked_inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0, chunk_size=1000, verbose=False):
+    def chunked_inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0, chunk_size=1000, max_updates_per_class=50):
         """Alias for memory-efficient inference_update"""
-        return self.inference_update(x, beta, distance_sensitivity, learning_rate, chunk_size=chunk_size)
+        return self.inference_update(x, beta, distance_sensitivity, learning_rate, chunk_size=chunk_size, max_updates_per_class=max_updates_per_class)
                 
     def get_accuracy(self, x, labels):
         self.eval()
