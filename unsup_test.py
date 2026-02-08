@@ -8,6 +8,7 @@ from modules.ioueval import iouEval
 
 import numpy as np
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
 
 from unsup_main import train_extractor, train_hdc, test_hdc_model, test_hdc_model_debug
 
@@ -24,29 +25,64 @@ HD_DIM = 5000
 
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
-def test_collapse(ARCH, trainloader, inference_epochs=5):
+def test_collapse(ARCH, trainloader, inference_epochs=10, ablation=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+    accs = []
+    mious = []
 
     model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
     model.to(device)
 
-    test_hdc_model(model, trainloader)
+    acc, miou = test_hdc_model(model, trainloader)
+    accs.append(acc)
+    mious.append(miou)
 
     model.to(device)
-
     model.train()
+
+    distance_sensitivity = 0 if ablation else 3
+
     for _ in range(inference_epochs):
         for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
             proj_in = proj_in.to(device)
             for i in proj_in:
-                model.chunked_inference_update(i.unsqueeze(0), learning_rate=0.001, distance_sensitivity=3.0, max_updates_per_class=10000)
-        test_hdc_model(model, trainloader)
+                model.chunked_inference_update(i.unsqueeze(0), learning_rate=0.001, distance_sensitivity=distance_sensitivity, max_updates_per_class=10000)
+        acc, miou = test_hdc_model(model, trainloader)
+        accs.append(acc)
+        mious.append(miou)
 
     print("\n" + "="*80)
     print(f"After {inference_epochs} epochs of inference updating")
     print("="*80)
-    test_hdc_model(model, trainloader)
+    acc, miou = test_hdc_model(model, trainloader)
+    accs.append(acc)
+    mious.append(miou)
+
+    fig, ax1 = plt.subplots(figsize=(10, 6))
+
+    epochs_range = range(len(accs))
+    color_acc = 'tab:blue'
+    ax1.set_xlabel('Evaluation Step')
+    ax1.set_ylabel('Accuracy', color=color_acc)
+    ax1.plot(epochs_range, accs, color=color_acc, marker='o', label='Accuracy')
+    ax1.tick_params(axis='y', labelcolor=color_acc)
+
+    ax2 = ax1.twinx()  
+    color_miou = 'tab:red'
+    ax2.set_ylabel('mIoU', color=color_miou)
+    ax2.plot(epochs_range, mious, color=color_miou, marker='s', label='mIoU')
+    ax2.tick_params(axis='y', labelcolor=color_miou)
+
+    plt.title(f'Ablation Model Performance During Inference Updating' if ablation else f'Model Performance During Inference Updating')
+    fig.tight_layout() 
+    plt.grid(True, linestyle='--', alpha=0.6)
+
+    plt.savefig('ablation_metrics.png' if ablation else 'collapse_metrics.png', dpi=300)
+    print(f"Plot saved as collapse_metrics.png")
+
+    plt.close()
 
 def test_collapse_debug(ARCH, trainloader, inference_epochs=5):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

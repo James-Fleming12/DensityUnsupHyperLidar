@@ -99,6 +99,16 @@ def test_hdc_model(model, dataloader) -> None:
             proj_in = proj_in.to(device)
             proj_labels = proj_labels.to(device)
             logits, _, indices, _ = model(proj_in, PERCENTAGE=None, is_wrong=None)
+
+            # top_two = torch.topk(logits, k=2, dim=1).values
+            # margin = top_two[:, 0] - top_two[:, 1]
+            # print(f"Mean Confidence Margin: {margin.mean().item()}")
+
+            # mask = torch.ones_like(logits, dtype=torch.bool)
+            # mask.scatter_(1, logits.argmax(1, keepdim=True), False)
+            # rcv = logits[mask].view(logits.size(0), -1).var(dim=1)
+            # print(f"Residual Class Variance: {rcv.mean().item()}")
+            
             predictions = torch.argmax(logits, dim=1)
             proj_labels_flat = proj_labels.view(-1)
             selected_labels = proj_labels_flat[indices]
@@ -164,6 +174,8 @@ def test_hdc_model(model, dataloader) -> None:
             print(f"  Class {class_id}: Acc={acc:.4f} ({correct}/{total}), IoU={iou:.4f}")
         else:
             print(f"  Class {class_id}: No samples")
+
+    return global_accuracy, miou
 
 def test_hdc_model_debug(model, dataloader):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
