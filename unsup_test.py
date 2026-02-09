@@ -1041,8 +1041,10 @@ def main():
 
     # test_inference_update_verbose(ARCH, trainloader)
     # test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES)
-    test_collapse(ARCH, trainloader)
     # test_collapse_debug(ARCH, trainloader)
+
+    test_collapse(ARCH, trainloader, inference_epochs=50, ablation=True)
+    test_collapse(ARCH, trainloader, inference_epochs=50, ablation=False)
 
 if __name__=="__main__":
     main()
