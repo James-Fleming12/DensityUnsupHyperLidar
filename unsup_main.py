@@ -19,7 +19,7 @@ NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes t
 MAX_HDC_EPOCHS = 50
 FEATURE_EXTRACTOR_EPOCHS = 250
 
-HD_DIM = 5000
+HD_DIM = 10000
 
 HDC_SAVE_PATH = "logs/hdc.pth"
 HDC_SUB_PATH = "logs/hdc_sub.pth"

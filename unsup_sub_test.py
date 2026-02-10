@@ -21,7 +21,7 @@ NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes t
 MAX_EPOCHS = 10
 MAX_HDC_EPOCHS = 10
 
-HD_DIM = 5000
+HD_DIM = 10000
 
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 

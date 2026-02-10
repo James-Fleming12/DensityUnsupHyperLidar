@@ -21,7 +21,7 @@ NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes t
 MAX_EPOCHS = 10
 MAX_HDC_EPOCHS = 10
 
-HD_DIM = 5000
+HD_DIM = 10000
 
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
@@ -42,7 +42,7 @@ def test_collapse(ARCH, trainloader, inference_epochs=10, ablation=False):
     model.to(device)
     model.train()
 
-    distance_sensitivity = 0 if ablation else 3
+    distance_sensitivity = 0 if ablation else 5
 
     for _ in range(inference_epochs):
         for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
@@ -1043,7 +1043,7 @@ def main():
     # test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES)
     # test_collapse_debug(ARCH, trainloader)
 
-    test_collapse(ARCH, trainloader, inference_epochs=50, ablation=True)
+    # test_collapse(ARCH, trainloader, inference_epochs=50, ablation=True)
     test_collapse(ARCH, trainloader, inference_epochs=50, ablation=False)
 
 if __name__=="__main__":
