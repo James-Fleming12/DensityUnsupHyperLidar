@@ -11,8 +11,8 @@ from modules.ioueval import iouEval
 from dataset.export_semantickitti import KittiConverter
 
 MODEL_DIR = "logs"
-NU_DATA_DIR = "v1.0-mini"
-DATA_DIR = "nuscenes_kitti"
+NU_DATA_DIR = "/mnt/alpha/ziw140/nuscenes_all"
+DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 

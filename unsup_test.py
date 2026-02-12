@@ -13,8 +13,8 @@ import matplotlib.pyplot as plt
 from unsup_main import train_extractor, train_hdc, test_hdc_model, test_hdc_model_debug
 
 MODEL_DIR = "logs"
-NU_DATA_DIR = "v1.0-mini"
-DATA_DIR = "nuscenes_kitti"
+NU_DATA_DIR = "/mnt/alpha/ziw140/nuscenes_all"
+DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
