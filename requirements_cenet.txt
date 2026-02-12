@@ -88,3 +88,8 @@ texttable>=1.7.0
 threadpoolctl>=3.2.0
 
 opencv-python>=4.13.0.92
+torchvision>=0.25.0
+torch-hd>=5.8.4
+fire>=0.7.1
+pyquaternion>=0.9.9
+nuscenes-devkit
