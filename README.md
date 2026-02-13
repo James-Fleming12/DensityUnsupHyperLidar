@@ -1,5 +1,5 @@
 ## Setup:
-All of the required packages and versions should be contained in requirements_cenet.txt, if something doesn't match up let me know and I can update them to match everything I have specifically. Don't want to mess up anything there if I don't have to.
+All of the required packages and versions should be contained in requirements_cenet.txt, if something doesn't match up let me know and I can update them to match everything I have specifically. Had to mass update all of the versions, but many of them aren't necessary for the main training and testing pipeline.
 
 ## Running:
 
@@ -10,6 +10,7 @@ unsup_test.py contains the inference update testing code, mostly in the test_col
 Also important, for each of the main functions I had to hard code the sequences because I didn't want to touch the original config files, so edit DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077] to match the sequence that are in the dataset you are using.
 
 The current code is setup for testing the model's performance in inference on the pretraining dataset, but it can be very quickly extended to test domain shift performance by changing the datasets in unsup_main.py and unsup_test.py. It is currently restricted to only working on NuScenes and KITTI, as those are the ones with interfaces in HyperLiDAR, but extending it to any other dataset is likely trivial.
+
 
 
 
