@@ -11,13 +11,13 @@ from modules.ioueval import iouEval
 from dataset.export_semantickitti import KittiConverter
 
 MODEL_DIR = "logs"
-NU_DATA_DIR = "/mnt/alpha/ziw140/nuscenes_all"
+NU_DATA_DIR = "/mnt/alpha/jmfleming/HyperLidar_dataset/nuscenes_all"
 DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
-MAX_HDC_EPOCHS = 50
-FEATURE_EXTRACTOR_EPOCHS = 250
+MAX_HDC_EPOCHS = 20
+FEATURE_EXTRACTOR_EPOCHS = 150
 
 HD_DIM = 10000
 
@@ -367,18 +367,16 @@ def main():
         print(f"Error opening arch yaml file. {e}")
         quit()
     try:
-        DATA = yaml.safe_load(open("config/labels/nuscenes_mini.yaml", 'r'))
+        DATA = yaml.safe_load(open("config/labels/nuscenes_new.yaml", 'r'))
     except Exception as e:
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    # DATA['split']['train'] = [61, 103, 553, 655]
-    DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077]
     ARCH["train"]["batch_size"] = 1
 
     # convert_dataset()
-    # train_extractor(ARCH, DATA)
-    # hdc = train_hdc(ARCH, DATA)
+    train_extractor(ARCH, DATA)
+    hdc = train_hdc(ARCH, DATA)
     init_sub(ARCH, DATA)
     # test_inference(ARCH, DATA)
 

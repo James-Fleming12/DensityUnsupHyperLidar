@@ -1014,12 +1014,12 @@ def main():
         print(f"Error opening arch yaml file. {e}")
         quit()
     try:
-        DATA = yaml.safe_load(open("config/labels/nuscenes_mini.yaml", 'r'))
+        DATA = yaml.safe_load(open("config/labels/nuscenes_new.yaml", 'r'))
     except Exception as e:
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077]
+    # DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077]
     ARCH["train"]["batch_size"] = 1
 
     parser = Parser(root=DATA_DIR,
