@@ -155,7 +155,7 @@ class BasicConv():
             
         encoder.eval()
         semantic_output.train()
-        scaler = torch.cuda.amp.GradScaler()
+        scaler = torch.amp.GradScaler('cuda')
         train_time = []
         for i, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(tqdm(train_loader, desc="Training")):
             proj_in = proj_in.to(self.device)
@@ -164,7 +164,7 @@ class BasicConv():
             if self.gpu:
                 proj_labels = proj_labels.cuda().long()
             start = time.time()
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
                 features = self.encoder(proj_in, only_feat=True)
                 logits = self.semantic_output(features)
                 loss = criterion(logits, proj_labels)

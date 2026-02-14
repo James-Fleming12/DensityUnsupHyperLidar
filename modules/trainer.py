@@ -726,7 +726,7 @@ class Trainer():
         if self.gpu:
             torch.cuda.empty_cache()
 
-        scaler = torch.cuda.amp.GradScaler()
+        scaler = torch.amp.GradScaler('cuda')
 
         # switch to train mode
         model.train()
@@ -750,7 +750,7 @@ class Trainer():
 
             start = time.time()
             # compute output
-            with torch.cuda.amp.autocast():
+            with torch.amp.autocast('cuda'):
 
                 # if self.ARCH["train"]["aux_loss"]:
                 #     [output, z2, z4, z8] = model(in_vol)
