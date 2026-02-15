@@ -25,7 +25,7 @@ HD_DIM = 10000
 
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
-def test_collapse(ARCH, trainloader, inference_epochs=10, ablation=False):
+def test_collapse(ARCH, trainloader, inference_epochs=10, distance_sensitivity=3.0):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     accs = []
@@ -41,8 +41,6 @@ def test_collapse(ARCH, trainloader, inference_epochs=10, ablation=False):
 
     model.to(device)
     model.train()
-
-    distance_sensitivity = 0 if ablation else 5
 
     for _ in range(inference_epochs):
         for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
@@ -75,11 +73,11 @@ def test_collapse(ARCH, trainloader, inference_epochs=10, ablation=False):
     ax2.plot(epochs_range, mious, color=color_miou, marker='s', label='mIoU')
     ax2.tick_params(axis='y', labelcolor=color_miou)
 
-    plt.title(f'Ablation Model Performance During Inference Updating' if ablation else f'Model Performance During Inference Updating')
+    plt.title(f'Ablation Model Performance During Inference Updating' if distance_sensitivity == 0 else f'Model Performance During Inference Updating: {distance_sensitivity}')
     fig.tight_layout() 
     plt.grid(True, linestyle='--', alpha=0.6)
 
-    plt.savefig('ablation_metrics.png' if ablation else 'collapse_metrics.png', dpi=300)
+    plt.savefig('ablation_metrics.png' if distance_sensitivity == 0 else f'collapse_metrics_{distance_sensitivity}.png', dpi=300)
     print(f"Plot saved as collapse_metrics.png")
 
     plt.close()
@@ -1043,8 +1041,9 @@ def main():
     # test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES)
     # test_collapse_debug(ARCH, trainloader)
 
-    # test_collapse(ARCH, trainloader, inference_epochs=50, ablation=True)
-    test_collapse(ARCH, trainloader, inference_epochs=50, ablation=False)
+    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=0)
+    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=3)
+    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=5)
 
 if __name__=="__main__":
     main()
