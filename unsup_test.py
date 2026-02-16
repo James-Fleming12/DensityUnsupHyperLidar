@@ -1023,7 +1023,7 @@ def main():
     parser = Parser(root=DATA_DIR,
                     train_sequences=DATA["split"]["train"],
                     valid_sequences=DATA["split"]["valid"],
-                    test_sequences=None,
+                    test_sequences=DATA["split"]["test"],
                     labels=DATA["labels"],
                     color_map=DATA["color_map"],
                     learning_map=DATA["learning_map"],
@@ -1035,7 +1035,7 @@ def main():
                     gt=True,
                     shuffle_train=True)
     
-    trainloader = parser.get_train_set()
+    trainloader = parser.get_valid_set()
 
     # test_inference_update_verbose(ARCH, trainloader)
     # test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES)
