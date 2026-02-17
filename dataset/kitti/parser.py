@@ -122,12 +122,19 @@ class SemanticKitti(Dataset):
 
     # fill in with names, checking that all sequences are complete
     print("sequences: ", self.sequences)
-    for seq in self.sequences:
-      # to string
-      # seq = '{0:02d}'.format(int(seq))
-      seq = '{0:04d}'.format(int(seq))
-
-      print("parsing seq {}".format(seq))
+    for seq_idx in self.sequences:
+      # Try 2-digit padding (Official KITTI) first, then 4-digit (NuScenes-Kitti)
+      seq_2 = '{0:02d}'.format(int(seq_idx))
+      seq_4 = '{0:04d}'.format(int(seq_idx))
+      
+      # Determine which path exists
+      if os.path.exists(os.path.join(self.root, seq_2)):
+          seq = seq_2
+      elif os.path.exists(os.path.join(self.root, seq_4)):
+          seq = seq_4
+      else:
+          print(f"Warning: Could not find sequence folder for {seq_idx} (tried {seq_2} and {seq_4})")
+          continue
 
       # get paths for each
       scan_path = os.path.join(self.root, seq, "velodyne")
