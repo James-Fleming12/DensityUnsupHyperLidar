@@ -15,6 +15,7 @@ from unsup_main import train_extractor, train_hdc, test_hdc_model, test_hdc_mode
 MODEL_DIR = "logs"
 NU_DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_all"
 DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
+KITTI_DATA_DIR = "/mnt/alpha/jmfleming/KITTI"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
@@ -25,7 +26,7 @@ HD_DIM = 10000
 
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
-def test_collapse(ARCH, trainloader, inference_epochs=10, distance_sensitivity=3.0):
+def test_collapse(ARCH, trainloader, inference_epochs=10, distance_sensitivity=3.0, kitti=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     accs = []
@@ -77,7 +78,10 @@ def test_collapse(ARCH, trainloader, inference_epochs=10, distance_sensitivity=3
     fig.tight_layout() 
     plt.grid(True, linestyle='--', alpha=0.6)
 
-    plt.savefig('ablation_metrics.png' if distance_sensitivity == 0 else f'collapse_metrics_{distance_sensitivity}.png', dpi=300)
+    if not kitti:
+        plt.savefig('ablation_metrics.png' if distance_sensitivity == 0 else f'collapse_metrics_{distance_sensitivity}.png', dpi=300)
+    else: 
+        plt.savefig('kitti_ablation.png' if distance_sensitivity == 0 else f'kitti_collapse_{distance_sensitivity}.png', dpi=300)
     print(f"Plot saved as collapse_metrics.png")
 
     plt.close()
@@ -1016,6 +1020,11 @@ def main():
     except Exception as e:
         print(f"Error opening data yaml file. {e}")
         quit()
+    try:
+        KITTI_DATA = yaml.safe_load(open("config/labels/semantic-kitti-all.yaml", 'r'))
+    except Exception as e:
+        print(f"Error opening data yaml file. {e}")
+        quit()
 
     # DATA['split']['train'] = [61, 103, 553, 655, 757, 796, 916, 1077]
     ARCH["train"]["batch_size"] = 1
@@ -1035,7 +1044,23 @@ def main():
                     gt=True,
                     shuffle_train=True)
     
+    kitti_parser = Parser(root=KITTI_DATA_DIR,
+                    train_sequences=KITTI_DATA["split"]["train"],
+                    valid_sequences=KITTI_DATA["split"]["valid"],
+                    test_sequences=KITTI_DATA["split"]["test"],
+                    labels=KITTI_DATA["labels"],
+                    color_map=KITTI_DATA["color_map"],
+                    learning_map=KITTI_DATA["learning_map"],
+                    learning_map_inv=KITTI_DATA["learning_map_inv"],
+                    sensor=ARCH["dataset"]["sensor"],
+                    max_points=ARCH["dataset"]["max_points"],
+                    batch_size=ARCH["train"]["batch_size"],
+                    workers=ARCH["train"]["workers"],
+                    gt=True,
+                    shuffle_train=True)
+    
     trainloader = parser.get_valid_set()
+    kittiloader = kitti_parser.get_valid_set()
 
     # test_inference_update_verbose(ARCH, trainloader)
     # test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES)
@@ -1044,6 +1069,10 @@ def main():
     test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=0)
     test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=3)
     test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=5)
+
+    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=0, kitti=True)
+    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=3, kitti=True)
+    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=5, kitti=True)
 
 if __name__=="__main__":
     main()
