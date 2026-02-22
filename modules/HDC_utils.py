@@ -714,41 +714,46 @@ class DensityModel(nn.Module):
         return max_similarities, absolute_indices
 
     def inference_update(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=5000, max_updates_per_class=50):
-        """
-        EMA updates
-        Args:
-            beta: Distance threshold (samples closer than this are ignored).
-            learning_rate: The 'pull' strength (momentum factor).
-            chunk_size: Number of pixels to process at once to avoid OOM.
-            max_updates_per_class: Caps the influence of any single class per batch to prevent collapse.
-        """
         self.train()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
-            enc_norm = F.normalize(enc)
+            num_total_samples = enc.shape[0]
+
+            valid_enc_mask = torch.any(enc != 0, dim=1) # ignore background from updates
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
             
             if enc_norm.dtype != self.classify.weight.dtype:
                 enc_norm = enc_norm.to(self.classify.weight.dtype)
 
-            num_samples = enc_norm.shape[0]
+            num_active = active_enc.shape[0]
+
+            curr_chunk_size = num_active if chunk_size == -1 else chunk_size # handle chunk_size=-1 to remove chunking altogether
+
             all_predictions = []
             all_update_masks = []
 
-            for i in range(0, num_samples, chunk_size):
-                chunk_enc = enc_norm[i : i + chunk_size]
-                chunk_logits = self.classify(chunk_enc)
+            if self.subcluster_type == 'bipolar':
+                proto_binary = torch.sign(self.classify.weight)
+
+            for i in range(0, num_active, curr_chunk_size):
+                chunk_enc_norm = enc_norm[i : i + curr_chunk_size]
+                chunk_logits = self.classify(chunk_enc_norm)
                 chunk_preds = torch.argmax(chunk_logits, dim=1)
                 all_predictions.append(chunk_preds)
 
                 if self.subcluster_type == 'bipolar':
-                    chunk_enc_orig = enc[i : i + chunk_size]
+                    chunk_enc_orig = active_enc[i : i + curr_chunk_size]
                     enc_binary = torch.sign(chunk_enc_orig)
-                    proto_binary = torch.sign(self.classify.weight)
                     selected_proto = proto_binary[chunk_preds]
                     sims = torch.sum(enc_binary * selected_proto, dim=1) / self.hd_dim
                 else:
                     selected_proto = F.normalize(self.classify.weight[chunk_preds])
-                    sims = torch.sum(chunk_enc * selected_proto, dim=1)
+                    sims = torch.sum(chunk_enc_norm * selected_proto, dim=1)
 
                 distances = (1.0 - sims) / 2.0
                 all_update_masks.append(distances > beta)
@@ -756,43 +761,41 @@ class DensityModel(nn.Module):
             predictions = torch.cat(all_predictions)
             update_mask = torch.cat(all_update_masks)
 
-            if not torch.any(update_mask):
-                return predictions
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = predictions
 
-            valid_indices = torch.nonzero(update_mask).squeeze(1)
-            unique_classes = torch.unique(predictions[valid_indices])
+            if not torch.any(update_mask):
+                return full_predictions
+
+            valid_indices_in_active = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(predictions[valid_indices_in_active])
 
             for class_id in unique_classes:
-                class_id = class_id.item()
-                class_mask = (predictions == class_id) & update_mask
+                c_id = class_id.item()
+                class_mask = (predictions == c_id) & update_mask
                 class_indices = torch.nonzero(class_mask).squeeze(1)
 
-                if len(class_indices) > max_updates_per_class:
+                if max_updates_per_class != -1 and len(class_indices) > max_updates_per_class:
                     perm = torch.randperm(len(class_indices), device=self.device)[:max_updates_per_class]
                     class_indices = class_indices[perm]
 
                 sample_encs = enc_norm[class_indices]
                 
                 if self.subcluster_type == 'bipolar':
-                    target_encs = torch.sign(enc[class_indices])
-                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, class_id, distance_sensitivity)
+                    target_encs = torch.sign(active_enc[class_indices])
+                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
                 else:
-                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, class_id, distance_sensitivity)
+                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
 
                 weighted_samples = sample_encs * sub_sims.unsqueeze(1)
                 mean_pull_vector = weighted_samples.mean(dim=0)
 
-                current_weight = self.classify.weight[class_id]
+                current_weight = self.classify.weight[c_id]
                 updated_weight = (1.0 - learning_rate) * current_weight + (learning_rate * mean_pull_vector)
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
 
-                self.classify.weight[class_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+            return full_predictions
 
-            return predictions
-
-    def chunked_inference_update(self, x, beta=0.0, distance_sensitivity=1.0, learning_rate=1.0, chunk_size=1000, max_updates_per_class=50):
-        """Alias for memory-efficient inference_update"""
-        return self.inference_update(x, beta, distance_sensitivity, learning_rate, chunk_size=chunk_size, max_updates_per_class=max_updates_per_class)
-                
     def get_accuracy(self, x, labels):
         self.eval()
         with torch.no_grad():

@@ -45,9 +45,7 @@ def test_collapse(ARCH, trainloader, inference_epochs=10, distance_sensitivity=3
 
     for _ in range(inference_epochs):
         for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(trainloader):
-            proj_in = proj_in.to(device)
-            for i in proj_in:
-                model.chunked_inference_update(i.unsqueeze(0), learning_rate=0.001, distance_sensitivity=distance_sensitivity, max_updates_per_class=10000)
+            model.inference_update(proj_in.to(device), chunk_size=-1, learning_rate=0.001, distance_sensitivity=distance_sensitivity, max_updates_per_class=10000)
         acc, miou = test_hdc_model(model, trainloader)
         accs.append(acc)
         mious.append(miou)
@@ -483,7 +481,7 @@ def test_inference_update_mechanics(ARCH, trainloader):
 
     model.train()
     with torch.no_grad():
-        model.chunked_inference_update(
+        model.inference_update(
             proj_in,
             beta=0.05,
             distance_sensitivity=1.0
@@ -507,12 +505,12 @@ def test_inference_update_mechanics(ARCH, trainloader):
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
-        model.chunked_inference_update(proj_in, beta=0.0)
+        model.inference_update(proj_in, beta=0.0)
     delta_beta_0 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
-        model.chunked_inference_update(proj_in, beta=0.5)
+        model.inference_update(proj_in, beta=0.5)
     delta_beta_05 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
     print(f"  beta=0.0 mean Δ: {delta_beta_0:.6f}")
@@ -527,12 +525,12 @@ def test_inference_update_mechanics(ARCH, trainloader):
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
-        model.chunked_inference_update(proj_in, beta=0.1, distance_sensitivity=0.0)
+        model.inference_update(proj_in, beta=0.1, distance_sensitivity=0.0)
     delta_ds_0 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
     model.classify.weight.data.copy_(original)
     with torch.no_grad():
-        model.chunked_inference_update(proj_in, beta=0.1, distance_sensitivity=50.0)
+        model.inference_update(proj_in, beta=0.1, distance_sensitivity=50.0)
     delta_ds_50 = torch.norm(model.classify.weight - original, dim=1).mean().item()
 
     print(f"  ds=0.0 mean Δ: {delta_ds_0:.6f}")
