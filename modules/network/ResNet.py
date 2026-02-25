@@ -151,13 +151,12 @@ class ResNet_34(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def forward(self, x, only_feat = False):
-
+    def forward(self, x, only_feat=False):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
 
-        x_1 = self.layer1(x)  # 1
+        x_1 = self.layer1(x)  # 1/1
         x_2 = self.layer2(x_1)  # 1/2
         x_3 = self.layer3(x_2)  # 1/4
         x_4 = self.layer4(x_3)  # 1/8
@@ -165,43 +164,26 @@ class ResNet_34(nn.Module):
         res_2 = F.interpolate(x_2, size=x.size()[2:], mode='bilinear', align_corners=True)
         res_3 = F.interpolate(x_3, size=x.size()[2:], mode='bilinear', align_corners=True)
         res_4 = F.interpolate(x_4, size=x.size()[2:], mode='bilinear', align_corners=True)
-        res = [x, x_1, res_2, res_3, res_4]
 
-        out = torch.cat(res, dim=1)
-        out = self.conv_1(out)
+        res = [x, x_1, res_2, res_3, res_4]
+        feat_map = torch.cat(res, dim=1) 
+        
+        out = self.conv_1(feat_map)
         out = self.conv_2(out)
+        
         if only_feat:
             return out
-        out = self.semantic_output(out)
-        out = F.softmax(out, dim=1)
+
+        logits = self.semantic_output(out)
+        pred = F.softmax(logits, dim=1)
 
         if self.aux:
-            res_2 = self.aux_head1(res_2)
-            res_2 = F.softmax(res_2, dim=1)
-
-            res_3 = self.aux_head2(res_3)
-            res_3 = F.softmax(res_3, dim=1)
-
-            res_4 = self.aux_head3(res_4)
-            res_4 = F.softmax(res_4, dim=1)
-
-#             res_2 = self.aux_head1(x_2)
-#             res_2 = F.softmax(x_2, dim=1)
-
-#             res_3 = self.aux_head2(x_3)
-#             res_3 = F.softmax(x_3, dim=1)
-
-#             res_4 = self.aux_head3(x_4)
-#             res_4 = F.softmax(x_4, dim=1)
-
-        if self.aux:
-            return [out, res_2, res_3, res_4]
-        else:
-            return out
-
-
-
-
+            aux2 = F.softmax(self.aux_head1(res_2), dim=1)
+            aux3 = F.softmax(self.aux_head2(res_3), dim=1)
+            aux4 = F.softmax(self.aux_head3(res_4), dim=1)
+            return pred, [aux2, aux3, aux4], out
+        
+        return pred, out
 
 if __name__ == "__main__":
     import time

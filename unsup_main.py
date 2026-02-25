@@ -4,7 +4,7 @@ import yaml
 
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import Model, DensityModel
-from modules.trainer import Trainer
+from modules.trainer import DGLSSTrainer, Trainer
 from modules.Basic_HD import BasicHD, DensityTrainer
 from modules.ioueval import iouEval
 
@@ -37,7 +37,7 @@ def convert_dataset():
     print("Conversion Complete: Output Saved to ")
 
 def train_extractor(ARCH, DATA):
-    trainer = Trainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
+    trainer = DGLSSTrainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
     trainer.train(epochs=FEATURE_EXTRACTOR_EPOCHS)
 
 def train_hdc(ARCH, DATA) -> DensityModel:
@@ -372,10 +372,14 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    ARCH["train"]["batch_size"] = 1
-
     # convert_dataset()
+
+    ARCH["train"]["batch_size"] = 32
+
     train_extractor(ARCH, DATA)
+
+    ARCH["train"]["batch_size"] = 2
+
     hdc = train_hdc(ARCH, DATA)
     init_sub(ARCH, DATA)
     # test_inference(ARCH, DATA)

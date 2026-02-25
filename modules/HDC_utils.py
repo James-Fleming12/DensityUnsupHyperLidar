@@ -288,7 +288,7 @@ class DensityModel(nn.Module):
 
             if self.ARCH["train"]["pipeline"] == "fid":
                 from modules.network.Fid import ResNet_34
-                self.net = ResNet_34(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
+                self.net = ResNet_34(self.num_classes, self.ARCH["train"]["aux_loss"])
 
                 if self.ARCH["train"]["act"] == "Hardswish":
                     convert_relu_to_softplus(self.net, nn.Hardswish())
@@ -359,7 +359,7 @@ class DensityModel(nn.Module):
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
         with torch.amp.autocast('cuda', enabled=True):
-            x = self.net(x, True)
+            x = self.net(x, only_feat=True)
 
         x = x.permute(0, 2, 3, 1)
         x = x.reshape(-1, 128)

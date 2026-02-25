@@ -18,7 +18,7 @@ from modules.scheduler.cosine import CosineAnnealingWarmUpRestarts
 
 from tqdm import tqdm
 
-
+import torch.nn.functional as F
 
 def save_to_log(logdir, logfile, message):
     f = open(logdir + '/' + logfile, "a")
@@ -26,17 +26,16 @@ def save_to_log(logdir, logfile, message):
     f.close()
     return
 
-
 def save_checkpoint(to_save, logdir, suffix=""):
     # Save the weights
     torch.save(to_save, logdir +
                "/SENet" + suffix)
 
-class TrainingPipeline():
-    """
-    Simple change that will save the model with the best validation loss to "/models/model.pth" instead of logs
-    """
+class DGLSSTrainer():
     def __init__(self, ARCH, DATA, datadir, logdir, path=None):
+        self.lam1 = 1.0 # loss weight hyperparameters
+        self.lam2 = 1.0
+
         # parameters
         self.ARCH = ARCH
         self.DATA = DATA
@@ -48,8 +47,6 @@ class TrainingPipeline():
         self.data_time_t = AverageMeter()
         self.batch_time_e = AverageMeter()
         self.epoch = 0
-
-        # put logger where it belongs
 
         self.info = {"train_loss": 0,
                      "train_acc": 0,
@@ -85,9 +82,6 @@ class TrainingPipeline():
             x_cl = self.parser.to_xentropy(cl)  # map actual class to xentropy class
             content[x_cl] += freq
         self.loss_w = 1 / (content + epsilon_w)  # get weights
-
-        # power_value = 0.25
-        # self.loss_w = np.power(self.loss_w, power_value) * np.power(10, 1 - power_value)
 
         for x_cl, w in enumerate(self.loss_w):  # ignore the ones necessary to ignore
             if DATA["learning_ignore"][x_cl]:
@@ -126,8 +120,7 @@ class TrainingPipeline():
 
         # save_to_log(self.log, 'model.txt', str(self.model))
         pytorch_total_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
-        # print("Number of parameters: ", pytorch_total_params/1000000, "M")
-        # save_to_log(self.log, 'model.txt', "Number of parameters: %.5f M" %(pytorch_total_params/1000000))
+        print("Number of parameters: ", pytorch_total_params/1000000, "M")
         self.tb_logger = SummaryWriter(log_dir=self.log, flush_secs=20)
 
         # GPU?
@@ -161,11 +154,6 @@ class TrainingPipeline():
             self.criterion = nn.DataParallel(self.criterion).cuda()  # spread in gpus
             self.ls = nn.DataParallel(self.ls).cuda()
 
-        # self.optimizer = optim.AdamW(self.model.parameters(), lr=0.0001, weight_decay=0.0005)
-        # from modules.adam_policy import MyLR
-        # self.scheduler = MyLR(optimizer=self.optimizer, cycle=30)
-        # print(self.optimizer)
-
         if self.ARCH["train"]["scheduler"] == "consine":
             length = self.parser.get_train_size()
             dict = self.ARCH["train"]["consine"]
@@ -197,12 +185,34 @@ class TrainingPipeline():
             w_dict = torch.load(path + "/SENet",
                                 map_location=lambda storage, loc: storage)
             self.model.load_state_dict(w_dict['state_dict'], strict=True)
-            # self.optimizer.load_state_dict(w_dict['optimizer'])
-            # self.epoch = w_dict['epoch'] + 1
-            # self.scheduler.load_state_dict(w_dict['scheduler'])
             print("dict epoch:", w_dict['epoch'])
             # self.info = w_dict['info']
             print("info", w_dict['info'])
+
+    def beam_drop(self, in_vol, p_range=(0.0, 0.7)):
+        bs, channels, h, w = in_vol.shape
+        p = np.random.uniform(p_range[0], p_range[1])
+        num_drop = int(h * p)
+        
+        indices = np.random.choice(h, num_drop, replace=False)
+        # Simulate dropout by zeroing out the entire row (beam)
+        in_vol[:, :, indices, :] = 0 
+        return in_vol
+    
+    def compute_prototypes(self, features, labels): # features: [B, C, H, W], labels: [B, H, W]
+        # Simplified version of Eq 4 in the paper
+        b, c, h, w = features.shape
+        features = features.permute(0, 2, 3, 1).reshape(-1, c)
+        labels = labels.view(-1)
+        
+        prototypes = []
+        for cls in range(self.parser.get_n_classes()):
+            mask = (labels == cls)
+            if mask.any():
+                prototypes.append(features[mask].mean(0))
+            else:
+                prototypes.append(torch.zeros(c).to(features.device))
+        return torch.stack(prototypes) # [num_classes, feature_dim]
 
     def calculate_estimate(self, epoch, iter):
         estimate = int((self.data_time_t.avg + self.batch_time_t.avg) * \
@@ -261,7 +271,7 @@ class TrainingPipeline():
                 name = os.path.join(directory, str(i) + ".png")
                 cv2.imwrite(name, img)
 
-    def train(self):
+    def train(self, epochs=None):
 
         self.ignore_class = []
         for i, w in enumerate(self.loss_w):
@@ -281,7 +291,8 @@ class TrainingPipeline():
                                              save_scans=self.ARCH["train"]["save_scans"])
 
         # train for n epochs
-        for epoch in range(self.epoch, self.ARCH["train"]["max_epochs"]):
+        max_epochs = epochs if epochs is not None else self.ARCH["train"]["max_epochs"]
+        for epoch in range(self.epoch, max_epochs):
             # train for 1 epoch
 
             acc, iou, loss = self.train_epoch(train_loader=self.parser.get_train_set(),
@@ -307,11 +318,11 @@ class TrainingPipeline():
                      'info': self.info,
                      'scheduler': self.scheduler.state_dict()
                      }
-            # save_checkpoint(state, self.log, suffix="")
+            save_checkpoint(state, self.log, suffix="")
             # save_checkpoint(state, self.log, suffix=""+str(epoch))
 
             if self.info['train_iou'] > self.info['best_train_iou']:
-                save_to_log(self.log, 'log.txt', "Best mean iou in training set so far, save model!")
+                # save_to_log(self.log, 'log.txt', "Best mean iou in training set so far, save model!")
                 print("Best mean iou in training set so far, save model!")
                 self.info['best_train_iou'] = self.info['train_iou']
                 state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
@@ -339,20 +350,10 @@ class TrainingPipeline():
 
             # remember best iou and save checkpoint
             if self.info['valid_iou'] > self.info['best_val_iou']:
-                save_to_log(self.log, 'log.txt', "Best mean iou in validation so far, save model!")
+                # save_to_log(self.log, 'log.txt', "Best mean iou in validation so far, save model!")
                 print("Best mean iou in validation so far, save model!")
                 print("*" * 80)
                 self.info['best_val_iou'] = self.info['valid_iou']
-
-                models_dir = "/models"
-
-                best_model_path = os.path.join(models_dir, "model.pth")
-                torch.save({
-                    'epoch': epoch,
-                    'state_dict': self.model.state_dict(),
-                    'info': self.info
-                }, best_model_path)
-                print(f"Saved best validation model to {best_model_path}")
 
                 # save the weights!
                 state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
@@ -364,19 +365,159 @@ class TrainingPipeline():
 
             print("*" * 80)
 
-            # save to log
-            Trainer.save_to_log(logdir=self.log,
-                                logger=self.tb_logger,
-                                info=self.info,
-                                epoch=epoch,
-                                w_summary=self.ARCH["train"]["save_summary"],
-                                model=self.model_single,
-                                img_summary=self.ARCH["train"]["save_scans"],
-                                imgs=rand_img)
-            save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         print('Finished Training')
-        save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
-        return self.model
+        # save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        return
+
+    def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
+                    show_scans=False):
+        losses = AverageMeter()
+        acc = AverageMeter()
+        iou = AverageMeter()
+        train_time = []
+
+        # Empty the cache to train now
+        if self.gpu:
+            torch.cuda.empty_cache()
+
+        scaler = torch.amp.GradScaler('cuda')
+
+        evaluator.reset()
+
+        # Switch to train mode
+        model.train()
+
+        end = time.time()
+        for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in tqdm(enumerate(train_loader), total=len(train_loader)):
+            # Measure data loading time
+            self.data_time_t.update(time.time() - end)
+            
+            if self.gpu:
+                in_vol, proj_labels = in_vol.cuda(), proj_labels.cuda().long()
+
+            start = time.time()
+            
+            with torch.amp.autocast('cuda'):
+                # PASS 1: Dense Source Domain
+                output, aux_list, z8 = model(in_vol) 
+
+                # PASS 2: Augmented Sparse Domain
+                in_vol_aug = self.beam_drop(in_vol.clone()) 
+                output_aug, aux_list_aug, z8_aug = model(in_vol_aug)
+
+                # 1. Standard Semantic Loss
+                loss_sem = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels)
+                # 2. SIFC Loss
+                loss_sifc = F.l1_loss(z8, z8_aug) 
+                # 3. SCC Loss
+                prototypes_s = self.compute_prototypes(z8, proj_labels)
+                prototypes_a = self.compute_prototypes(z8_aug, proj_labels)
+                loss_scc = F.mse_loss(prototypes_s @ prototypes_s.T, prototypes_a @ prototypes_a.T)
+
+                loss_total = loss_sem + (self.lam1 * loss_sifc) + (self.lam2 * loss_scc)
+
+            optimizer.zero_grad()
+            scaler.scale(loss_total).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            # Evaluation and Logging
+            with torch.no_grad():
+                argmax = output.argmax(dim=1)
+                evaluator.addBatch(argmax, proj_labels)
+                accuracy = evaluator.getacc()
+                jaccard, class_jaccard = evaluator.getIoU()
+
+            # Update Meters
+            losses.update(loss_total.item(), in_vol.size(0))
+            acc.update(accuracy.item(), in_vol.size(0))
+            iou.update(jaccard.item(), in_vol.size(0))
+
+            # Measure elapsed time
+            if torch.cuda.is_available():
+                torch.cuda.synchronize()
+            
+            curr_train_time = time.time() - start
+            train_time.append(curr_train_time)
+            
+            self.batch_time_t.update(time.time() - end)
+            end = time.time()
+
+            # Step scheduler per iteration
+            scheduler.step()
+            
+            if i % report == 0:
+                print(f'Epoch: [{epoch}][{i}/{len(train_loader)}] '
+                      f'Loss {losses.val:.4f} ({losses.avg:.4f}) '
+                      f'Acc {acc.val:.3f} ({acc.avg:.3f}) '
+                      f'IoU {iou.val:.3f} ({iou.avg:.3f})')
+
+        print("Mean CNN training time:{:.4f}\t std:{:.4f}".format(np.mean(train_time), np.std(train_time)))
+        return acc.avg, iou.avg, losses.avg
+
+    def validate(self, val_loader, model, criterion, evaluator, class_func, color_fn, save_scans):
+        losses = AverageMeter()
+        jaccs = AverageMeter()
+        wces = AverageMeter()
+        acc = AverageMeter()
+        iou = AverageMeter()
+        rand_imgs = []
+        validation_time = []
+
+        # switch to evaluate mode
+        model.eval()
+        evaluator.reset()
+
+        # empty the cache to infer in high res
+        if self.gpu:
+            torch.cuda.empty_cache()
+
+        with torch.no_grad():
+            end = time.time()
+            for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in tqdm(enumerate(val_loader), total=len(val_loader)):
+                if not self.multi_gpu and self.gpu:
+                    in_vol = in_vol.cuda()
+                    proj_mask = proj_mask.cuda()
+                if self.gpu:
+                    proj_labels = proj_labels.cuda(non_blocking=True).long()
+
+                start = time.time()
+                # compute output
+                if self.ARCH["train"]["aux_loss"]:
+                    [output, z2, z4, z8] = model(in_vol)
+                else:
+                    output, z8 = model(in_vol)
+                # measure elapsed time
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                res = time.time() - start
+                validation_time.append(res)
+                start = time.time()
+
+                log_out = torch.log(output.clamp(min=1e-8))
+                jacc = self.ls(output, proj_labels)
+                wce = criterion(log_out, proj_labels)
+                loss = wce + jacc
+
+                argmax = output.argmax(dim=1)
+                evaluator.addBatch(argmax, proj_labels)
+                losses.update(loss.mean().item(), in_vol.size(0))
+                jaccs.update(jacc.mean().item(),in_vol.size(0))
+
+                wces.update(wce.mean().item(),in_vol.size(0))
+
+                self.batch_time_e.update(time.time() - end)
+                end = time.time()
+
+            accuracy = evaluator.getacc()
+            jaccard, class_jaccard = evaluator.getIoU()
+            acc.update(accuracy.item(), in_vol.size(0))
+            iou.update(jaccard.item(), in_vol.size(0))
+
+            for i, jacc in enumerate(class_jaccard):
+                self.info["valid_classes/" + class_func(i)] = jacc
+
+        return acc.avg, iou.avg, losses.avg, rand_imgs
 
 class Trainer():
     def __init__(self, ARCH, DATA, datadir, logdir, path=None):
