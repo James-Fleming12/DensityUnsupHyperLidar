@@ -484,7 +484,7 @@ class DGLSSTrainer():
                 start = time.time()
                 # compute output
                 if self.ARCH["train"]["aux_loss"]:
-                    [output, z2, z4, z8] = model(in_vol)
+                    output, aux_list, z8 = model(in_vol)
                 else:
                     output, z8 = model(in_vol)
                 # measure elapsed time
