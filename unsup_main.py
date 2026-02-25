@@ -17,7 +17,7 @@ LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
 MAX_HDC_EPOCHS = 20
-FEATURE_EXTRACTOR_EPOCHS = 150
+FEATURE_EXTRACTOR_EPOCHS = 250
 
 HD_DIM = 10000
 
@@ -374,7 +374,7 @@ def main():
 
     # convert_dataset()
 
-    ARCH["train"]["batch_size"] = 32
+    ARCH["train"]["batch_size"] = 16
 
     train_extractor(ARCH, DATA)
 
