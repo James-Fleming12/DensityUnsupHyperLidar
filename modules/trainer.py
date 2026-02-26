@@ -33,8 +33,8 @@ def save_checkpoint(to_save, logdir, suffix=""):
 
 class DGLSSTrainer():
     def __init__(self, ARCH, DATA, datadir, logdir, path=None):
-        self.lam1 = 1.0 # loss weight hyperparameters
-        self.lam2 = 1.0
+        self.lam1 = 0.1 # loss weight hyperparameters
+        self.lam2 = 0.1
 
         # parameters
         self.ARCH = ARCH
@@ -189,7 +189,7 @@ class DGLSSTrainer():
             # self.info = w_dict['info']
             print("info", w_dict['info'])
 
-    def beam_drop(self, in_vol, p_range=(0.0, 0.7)):
+    def beam_drop(self, in_vol, p_range=(0.0, 0.4)):
         bs, channels, h, w = in_vol.shape
         p = np.random.uniform(p_range[0], p_range[1])
         num_drop = int(h * p)
@@ -199,20 +199,23 @@ class DGLSSTrainer():
         in_vol[:, :, indices, :] = 0 
         return in_vol
     
-    def compute_prototypes(self, features, labels): # features: [B, C, H, W], labels: [B, H, W]
-        # Simplified version of Eq 4 in the paper
+    def compute_prototypes(self, features, labels):
+        # features: [B, C, H, W], labels: [B, H, W]
         b, c, h, w = features.shape
         features = features.permute(0, 2, 3, 1).reshape(-1, c)
         labels = labels.view(-1)
         
         prototypes = []
-        for cls in range(self.parser.get_n_classes()):
+        valid_classes = [i for i in range(self.parser.get_n_classes()) if i != 0] # exclude ignore labels like 0 or 255
+        
+        for cls in valid_classes:
             mask = (labels == cls)
-            if mask.any():
+            if mask.any() and mask.sum() > 10:
                 prototypes.append(features[mask].mean(0))
             else:
-                prototypes.append(torch.zeros(c).to(features.device))
-        return torch.stack(prototypes) # [num_classes, feature_dim]
+                prototypes.append(torch.zeros(c, device=features.device))
+        
+        return torch.stack(prototypes)
 
     def calculate_estimate(self, epoch, iter):
         estimate = int((self.data_time_t.avg + self.batch_time_t.avg) * \
@@ -369,8 +372,7 @@ class DGLSSTrainer():
         # save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
         return
 
-    def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10,
-                    show_scans=False):
+    def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10, show_scans=False):
         losses = AverageMeter()
         acc = AverageMeter()
         iou = AverageMeter()
@@ -383,10 +385,9 @@ class DGLSSTrainer():
         scaler = torch.amp.GradScaler('cuda')
 
         evaluator.reset()
-
-        # Switch to train mode
         model.train()
-
+        
+        scaler = torch.amp.GradScaler('cuda')
         end = time.time()
         for i, (in_vol, proj_mask, proj_labels, _, path_seq, path_name, _, _, _, _, _, _, _, _, _) in tqdm(enumerate(train_loader), total=len(train_loader)):
             # Measure data loading time
@@ -398,18 +399,21 @@ class DGLSSTrainer():
             start = time.time()
             
             with torch.amp.autocast('cuda'):
-                # PASS 1: Dense Source Domain
                 output, aux_list, z8 = model(in_vol) 
 
-                # PASS 2: Augmented Sparse Domain
                 in_vol_aug = self.beam_drop(in_vol.clone()) 
                 output_aug, aux_list_aug, z8_aug = model(in_vol_aug)
 
-                # 1. Standard Semantic Loss
-                loss_sem = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels)
-                # 2. SIFC Loss
-                loss_sifc = F.l1_loss(z8, z8_aug) 
-                # 3. SCC Loss
+                loss_sem_orig = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels)
+                loss_sem_aug = criterion(torch.log(output_aug.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output_aug, proj_labels)
+
+                loss_sem = (loss_sem_orig + loss_sem_aug) / 2
+
+                # SIFC Loss (with masking)
+                valid_mask = (proj_labels > 0).unsqueeze(1).expand_as(z8)
+                loss_sifc = F.l1_loss(z8[valid_mask], z8_aug[valid_mask]) if valid_mask.any() else torch.tensor(0.0, device=z8.device)
+
+                # SCC Loss
                 prototypes_s = self.compute_prototypes(z8, proj_labels)
                 prototypes_a = self.compute_prototypes(z8_aug, proj_labels)
                 loss_scc = F.mse_loss(prototypes_s @ prototypes_s.T, prototypes_a @ prototypes_a.T)
