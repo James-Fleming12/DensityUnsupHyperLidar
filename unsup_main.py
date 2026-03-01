@@ -17,7 +17,7 @@ LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
 MAX_HDC_EPOCHS = 20
-FEATURE_EXTRACTOR_EPOCHS = 250
+FEATURE_EXTRACTOR_EPOCHS = 400
 
 HD_DIM = 10000
 

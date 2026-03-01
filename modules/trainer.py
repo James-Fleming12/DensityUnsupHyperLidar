@@ -414,14 +414,16 @@ class DGLSSTrainer():
                 loss_sem = (loss_sem_orig + loss_sem_aug) / 2
 
                 # SIFC Loss (with masking)
-                valid_mask = (proj_labels > 0).unsqueeze(1).expand_as(z8)
+                valid_mask = (proj_labels > 0) # Shape: [B, H, W]
                 if valid_mask.any():
                     if self.dist_type == 'angular':
-                        z8_n = torch.nn.functional.normalize(z8, p=2, dim=1) # Angular Distance (Cosine Similarity)
+                        z8_n = torch.nn.functional.normalize(z8, p=2, dim=1) # Angular distance
                         z8_a_n = torch.nn.functional.normalize(z8_aug, p=2, dim=1)
-                        loss_sifc = (1.0 - (z8_n * z8_a_n).sum(dim=1))[valid_mask.squeeze(1)].mean()
+                        cos_dist = 1.0 - (z8_n * z8_a_n).sum(dim=1) # Cosine Distances
+                        loss_sifc = cos_dist[valid_mask].mean()
                     else:
-                        loss_sifc = F.l1_loss(z8[valid_mask], z8_aug[valid_mask]) # Standard L1 distance
+                        l1_mask = valid_mask.unsqueeze(1).expand_as(z8) # Standard L1 distance: Absolute feature difference
+                        loss_sifc = F.l1_loss(z8[l1_mask], z8_aug[l1_mask])
                 else:
                     loss_sifc = torch.tensor(0.0, device=z8.device)
 
