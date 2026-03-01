@@ -32,7 +32,11 @@ def save_checkpoint(to_save, logdir, suffix=""):
                "/SENet" + suffix)
 
 class DGLSSTrainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, path=None):
+    def __init__(self, ARCH, DATA, datadir, logdir, path=None, dist_type="standard"):
+        """
+        dist_type can be 'standard' (L1/MSE) or 'angular' (Cosine/ArcFace-style)
+        """
+        self.dist_type = dist_type
         self.lam1 = 0.1 # loss weight hyperparameters
         self.lam2 = 0.1
 
@@ -411,12 +415,26 @@ class DGLSSTrainer():
 
                 # SIFC Loss (with masking)
                 valid_mask = (proj_labels > 0).unsqueeze(1).expand_as(z8)
-                loss_sifc = F.l1_loss(z8[valid_mask], z8_aug[valid_mask]) if valid_mask.any() else torch.tensor(0.0, device=z8.device)
+                if valid_mask.any():
+                    if self.dist_type == 'angular':
+                        z8_n = torch.nn.functional.normalize(z8, p=2, dim=1) # Angular Distance (Cosine Similarity)
+                        z8_a_n = torch.nn.functional.normalize(z8_aug, p=2, dim=1)
+                        loss_sifc = (1.0 - (z8_n * z8_a_n).sum(dim=1))[valid_mask.squeeze(1)].mean()
+                    else:
+                        loss_sifc = F.l1_loss(z8[valid_mask], z8_aug[valid_mask]) # Standard L1 distance
+                else:
+                    loss_sifc = torch.tensor(0.0, device=z8.device)
 
                 # SCC Loss
                 prototypes_s = self.compute_prototypes(z8, proj_labels)
                 prototypes_a = self.compute_prototypes(z8_aug, proj_labels)
-                loss_scc = F.mse_loss(prototypes_s @ prototypes_s.T, prototypes_a @ prototypes_a.T)
+
+                if self.dist_type == 'angular':
+                    p_s_n = torch.nn.functional.normalize(prototypes_s, p=2, dim=1) # Angular Correlation (Normalize prototypes first)
+                    p_a_n = torch.nn.functional.normalize(prototypes_a, p=2, dim=1)
+                    loss_scc = F.mse_loss(p_s_n @ p_s_n.T, p_a_n @ p_a_n.T)
+                else:
+                    loss_scc = F.mse_loss(prototypes_s @ prototypes_s.T, prototypes_a @ prototypes_a.T) # Standard Correlation (Raw dot products)
 
                 loss_total = loss_sem + (self.lam1 * loss_sifc) + (self.lam2 * loss_scc)
 
