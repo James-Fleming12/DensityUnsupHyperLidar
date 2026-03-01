@@ -250,7 +250,7 @@ def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, d
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="bipolar"):
+    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="bipolar", gauss_rp=False):
         super(DensityModel, self).__init__()
 
         self.device = device
@@ -315,20 +315,21 @@ class DensityModel(nn.Module):
                 torch.cuda.manual_seed(42)
                 torch.cuda.manual_seed_all(42)
 
-            self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+            if not gauss_rp:
+                self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+            else:
+                self.projection = nn.Linear(self.input_dim, self.hd_dim, bias=False)
+                with torch.no_grad():
+                    shape = (self.hd_dim, self.input_dim)
+                    gaussian_matrix = torch.randn(shape)
+                    q, r = torch.linalg.qr(gaussian_matrix)
+                    orthogonal_map = q * torch.sqrt(torch.tensor(self.hd_dim, dtype=torch.float32))
+                    self.projection.weight.copy_(orthogonal_map)
 
-            # self.projection = nn.Linear(self.input_dim, self.hd_dim, bias=False)
-            # with torch.no_grad():
-            #     shape = (self.hd_dim, self.input_dim)
-            #     gaussian_matrix = torch.randn(shape)
-            #     q, r = torch.linalg.qr(gaussian_matrix)
-            #     orthogonal_map = q * torch.sqrt(torch.tensor(self.hd_dim, dtype=torch.float32))
-            #     self.projection.weight.copy_(orthogonal_map)
-
-            # torch.set_rng_state(torch_rng_state) # set back to random
-            # np.random.set_state(numpy_rng_state)
-            # if torch.cuda.is_available():
-            #     torch.cuda.set_rng_state(cuda_rng_state)
+            torch.set_rng_state(torch_rng_state) # set back to random
+            np.random.set_state(numpy_rng_state)
+            if torch.cuda.is_available():
+                torch.cuda.set_rng_state(cuda_rng_state)
 
         elif self.hd_encoder == 'idlevel':  # ID-level encoding
             # Generate id-level value hv for each floating value
@@ -361,6 +362,8 @@ class DensityModel(nn.Module):
         self.quantile = 0.4
         self.mult = 0.2
         self.dedup = 0.7
+
+        self.gauss_rp = gauss_rp
 
     def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
         if mask is None:
