@@ -5,6 +5,7 @@ import yaml
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import Model, DensityModel
 from modules.trainer import DGLSSTrainer, Trainer
+from modules.ddfe_trainer import DDFETrainer
 from modules.Basic_HD import BasicHD, DensityTrainer
 from modules.ioueval import iouEval
 
@@ -38,6 +39,10 @@ def convert_dataset():
 
 def train_extractor(ARCH, DATA, dist_type="angular"):
     trainer = DGLSSTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, dist_type=dist_type) # saves in "/logs/SENet_..."
+    trainer.train(epochs=FEATURE_EXTRACTOR_EPOCHS)
+
+def DDFEtrain_extractor(ARCH, DATA):
+    trainer = DDFETrainer(ARCH, DATA, DATA_DIR, LOG_DIR)
     trainer.train(epochs=FEATURE_EXTRACTOR_EPOCHS)
 
 def train_hdc(ARCH, DATA) -> DensityModel:
