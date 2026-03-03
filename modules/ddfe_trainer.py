@@ -97,6 +97,11 @@ class BeamDensityEstimator(nn.Module):
         Bv = np.zeros(proj_H, dtype=np.float32)
         Bv[row_indices] = 1.0
 
+        def _convolve_same(signal: np.ndarray, kernel: np.ndarray) -> np.ndarray:
+            full   = np.convolve(signal, kernel, mode='full')
+            offset = (len(kernel) - 1) // 2
+            return full[offset: offset + len(signal)]
+
         Bh_smooth = []
         Bv_smooth = []
         for sigma in sigmas:
@@ -105,8 +110,8 @@ class BeamDensityEstimator(nn.Module):
             xs = np.arange(-half, half + 1, dtype=np.float32)
             g = np.exp(-0.5 * (xs / sigma) ** 2)
             g /= g.sum()
-            Bh_smooth.append(np.convolve(Bh, g, mode="same"))
-            Bv_smooth.append(np.convolve(Bv, g, mode="same"))
+            Bh_smooth.append(_convolve_same(Bh, g))  # always len proj_W
+            Bv_smooth.append(_convolve_same(Bv, g))  # always len proj_H
 
         # [n_sigmas, proj_H, proj_W]  – outer product per scale
         density_map = np.zeros(
