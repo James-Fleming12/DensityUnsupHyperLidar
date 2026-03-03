@@ -365,7 +365,7 @@ class DensityModel(nn.Module):
 
         self.gauss_rp = gauss_rp
 
-    def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None):
+    def encode(self, x, mask=None, PERCENTAGE=None, is_wrong=None, chunk_idx=None):
         if mask is None:
             mask = torch.ones(self.hd_dim, device=self.device).type(torch.bool)
 
@@ -374,6 +374,10 @@ class DensityModel(nn.Module):
 
         x = x.permute(0, 2, 3, 1)
         x = x.reshape(-1, 128)
+
+        if chunk_idx is not None:
+            start, end = chunk_idx
+            x = x[start:end]
 
         if PERCENTAGE is not None:
             wrong_indices = torch.nonzero(is_wrong, as_tuple=False).squeeze()
