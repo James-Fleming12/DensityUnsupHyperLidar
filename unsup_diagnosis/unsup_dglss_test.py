@@ -111,6 +111,76 @@ def diag_subcluster_distinction(model):
         if avg_internal_sim > 0.8:
             print(f"  -> WARNING: Subclusters for class {c} are nearly identical.")
 
+def diag_rp_orthogonality(model):
+    """Checks if the RP matrix is causing dimensional interference."""
+    with torch.no_grad():
+        W = model.projection.weight.data
+        gram = W @ W.T 
+
+        diag = torch.diag(gram)
+        norm_gram = gram / diag.unsqueeze(1)
+
+        identity = torch.eye(W.shape[0], device=W.device)
+        interference = torch.abs(norm_gram - identity).mean().item()
+        
+    print("\n[RP Matrix Topology]")
+    print(f"Mean Dimensional Interference: {interference:.4f}")
+    if interference > 0.15:
+        print("!!! WARNING: RP matrix is not orthogonal. Dimensions are 'bleeding' into each other.")
+
+def diag_hd_bit_entropy(model, dataloader):
+    """Measures how much information is surviving the RP + Quantization process."""
+    device = model.device
+    bit_counts = torch.zeros(model.hd_dim, device=device)
+    total_samples = 0
+
+    model.eval()
+    with torch.no_grad():
+        for proj_in, _, labels, *_ in dataloader:
+            hvs, _, _ = model.encode(proj_in.to(device))
+
+            bit_counts += (hvs > 0).float().sum(dim=0)
+            total_samples += hvs.shape[0]
+
+    p_high = bit_counts / total_samples
+    entropy = - (p_high * torch.log2(p_high + 1e-8) + (1 - p_high) * torch.log2(1 - p_high + 1e-8))
+    mean_entropy = entropy.mean().item()
+
+    print("\n[HD Information Bottleneck]")
+    print(f"Mean Bit Entropy: {mean_entropy:.4f} (Ideal: 1.000)")
+    if mean_entropy < 0.85:
+        print("!!! WARNING: Information Loss. The RP/Quantization is producing 'frozen' bits.")
+
+def diag_mapping_distortion(model, dataloader):
+    """Measures if RP is preserving the distances learned by the DGLSS trainer."""
+    device = model.device
+    distortions = []
+
+    model.eval()
+    with torch.no_grad():
+        for proj_in, _, labels, *_ in dataloader:
+            _, _, feat_map = model.net(proj_in.to(device))
+            x = feat_map.permute(0, 2, 3, 1).reshape(-1, 128)
+            x_norm = F.normalize(x, p=2, dim=1)
+            
+            hvs, _, _ = model.encode(proj_in.to(device))
+            hvs_norm = F.normalize(hvs.float(), p=2, dim=1)
+
+            idx1 = torch.randperm(x.shape[0])[:100]
+            idx2 = torch.randperm(x.shape[0])[:100]
+            
+            cnn_sim = (x_norm[idx1] * x_norm[idx2]).sum(dim=1)
+            hd_sim = (hvs_norm[idx1] * hvs_norm[idx2]).sum(dim=1)
+
+            distortion = torch.abs(cnn_sim - hd_sim).mean().item()
+            distortions.append(distortion)
+
+    print("\n[RP Mapping Distortion]")
+    avg_dist = sum(distortions) / len(distortions)
+    print(f"Mean Distance Distortion: {avg_dist:.4f}")
+    if avg_dist > 0.3:
+        print("!!! WARNING: RP is smearing features. Distances in HD space do not match CNN logic.")
+
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -146,10 +216,14 @@ def main():
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
     model.to(device)
 
-    diag_feature_variance(model, dataloader)
-    diag_class_orthogonality(model)
-    diag_sparsity_invariance_gap(model, dataloader)
-    diag_subcluster_distinction(model)
+    # diag_feature_variance(model, dataloader)
+    # diag_class_orthogonality(model)
+    # diag_sparsity_invariance_gap(model, dataloader)
+    # diag_subcluster_distinction(model)
+
+    diag_rp_orthogonality(model)
+    diag_hd_bit_entropy(model, dataloader)
+    diag_mapping_distortion(model, dataloader)
 
 if __name__=="__main__":
     main()
