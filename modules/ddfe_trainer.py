@@ -17,7 +17,7 @@ from modules.scheduler.warmupLR import warmupLR
 from modules.scheduler.cosine import CosineAnnealingWarmUpRestarts
 from common.avgmeter import AverageMeter
 from modules.ioueval import iouEval
-from trainer import save_checkpoint
+from modules.trainer import save_checkpoint
 
 class BeamDensityEstimator(nn.Module):
     """
