@@ -128,58 +128,65 @@ def diag_rp_orthogonality(model):
     if interference > 0.15:
         print("!!! WARNING: RP matrix is not orthogonal. Dimensions are 'bleeding' into each other.")
 
-def diag_hd_bit_entropy(model, dataloader):
-    """Measures how much information is surviving the RP + Quantization process."""
+def diag_hd_bit_entropy(model, dataloader, chunk_size=5000):
+    """Calculates entropy by processing pixels in smaller batches."""
     device = model.device
     bit_counts = torch.zeros(model.hd_dim, device=device)
-    total_samples = 0
+    total_pixels = 0
 
     model.eval()
     with torch.no_grad():
-        for proj_in, _, labels, *_ in dataloader:
-            hvs, _, _ = model.encode(proj_in.to(device))
+        for proj_in, *_ in dataloader:
+            _, _, feat_map = model.net(proj_in.to(device))
+            x = feat_map.permute(0, 2, 3, 1).reshape(-1, 128)
+            
+            for i in range(0, x.shape[0], chunk_size):
+                end = min(i + chunk_size, x.shape[0])
+                hvs, _, _ = model.encode(proj_in.to(device), chunk_idx=(i, end))
 
-            bit_counts += (hvs > 0).float().sum(dim=0)
-            total_samples += hvs.shape[0]
+                bit_counts += (hvs > 0).float().sum(dim=0)
+                total_pixels += hvs.shape[0]
+                
+            torch.cuda.empty_cache()
 
-    p_high = bit_counts / total_samples
-    entropy = - (p_high * torch.log2(p_high + 1e-8) + (1 - p_high) * torch.log2(1 - p_high + 1e-8))
-    mean_entropy = entropy.mean().item()
+    p_high = (bit_counts / total_pixels).clamp(1e-8, 1-1e-8)
+    entropy = -(p_high * torch.log2(p_high) + (1-p_high) * torch.log2(1-p_high)).mean()
+    print(f"[HD Information Bottleneck] Mean Bit Entropy: {entropy.item():.4f}")
 
-    print("\n[HD Information Bottleneck]")
-    print(f"Mean Bit Entropy: {mean_entropy:.4f} (Ideal: 1.000)")
-    if mean_entropy < 0.85:
-        print("!!! WARNING: Information Loss. The RP/Quantization is producing 'frozen' bits.")
-
-def diag_mapping_distortion(model, dataloader):
-    """Measures if RP is preserving the distances learned by the DGLSS trainer."""
+def diag_mapping_distortion(model, dataloader, chunk_size=5000):
+    """Measures distance preservation between CNN and HD space without OOM."""
     device = model.device
     distortions = []
 
     model.eval()
     with torch.no_grad():
-        for proj_in, _, labels, *_ in dataloader:
+        for proj_in, *_ in dataloader:
             _, _, feat_map = model.net(proj_in.to(device))
             x = feat_map.permute(0, 2, 3, 1).reshape(-1, 128)
-            x_norm = F.normalize(x, p=2, dim=1)
-            
-            hvs, _, _ = model.encode(proj_in.to(device))
-            hvs_norm = F.normalize(hvs.float(), p=2, dim=1)
 
-            idx1 = torch.randperm(x.shape[0])[:100]
-            idx2 = torch.randperm(x.shape[0])[:100]
+            hvs_list = []
+            for i in range(0, x.shape[0], chunk_size):
+                end = min(i + chunk_size, x.shape[0])
+                chunk_hv, _, _ = model.encode(proj_in.to(device), chunk_idx=(i, end)) 
+                hvs_list.append(chunk_hv.cpu()) # Move to CPU to save VRAM
+            
+            hvs = torch.cat(hvs_list, dim=0).to(device)
+
+            x_norm = torch.nn.functional.normalize(x, p=2, dim=1)
+            hvs_norm = torch.nn.functional.normalize(hvs.float(), p=2, dim=1)
+
+            idx1 = torch.randperm(x.shape[0])[:500]
+            idx2 = torch.randperm(x.shape[0])[:500]
             
             cnn_sim = (x_norm[idx1] * x_norm[idx2]).sum(dim=1)
             hd_sim = (hvs_norm[idx1] * hvs_norm[idx2]).sum(dim=1)
+            
+            distortions.append(torch.abs(cnn_sim - hd_sim).mean().item())
 
-            distortion = torch.abs(cnn_sim - hd_sim).mean().item()
-            distortions.append(distortion)
+            del x, hvs, feat_map
+            torch.cuda.empty_cache()
 
-    print("\n[RP Mapping Distortion]")
-    avg_dist = sum(distortions) / len(distortions)
-    print(f"Mean Distance Distortion: {avg_dist:.4f}")
-    if avg_dist > 0.3:
-        print("!!! WARNING: RP is smearing features. Distances in HD space do not match CNN logic.")
+    print(f"\n[RP Mapping Distortion] Avg Distortion: {sum(distortions)/len(distortions):.4f}")
 
 def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
