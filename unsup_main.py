@@ -381,8 +381,8 @@ def main():
 
     ARCH["train"]["batch_size"] = 16
 
-    # train_extractor(ARCH, DATA)
-    DDFEtrain_extractor(ARCH, DATA)
+    train_extractor(ARCH, DATA)
+    # DDFEtrain_extractor(ARCH, DATA)
 
     ARCH["train"]["batch_size"] = 2
 
