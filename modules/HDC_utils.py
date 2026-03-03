@@ -250,7 +250,7 @@ def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, d
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="bipolar", gauss_rp=False):
+    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="bipolar", gauss_rp=True):
         super(DensityModel, self).__init__()
 
         self.device = device
@@ -320,11 +320,9 @@ class DensityModel(nn.Module):
             else:
                 self.projection = nn.Linear(self.input_dim, self.hd_dim, bias=False)
                 with torch.no_grad():
-                    shape = (self.hd_dim, self.input_dim)
-                    gaussian_matrix = torch.randn(shape)
-                    q, r = torch.linalg.qr(gaussian_matrix)
-                    orthogonal_map = q * torch.sqrt(torch.tensor(self.hd_dim, dtype=torch.float32))
-                    self.projection.weight.copy_(orthogonal_map)
+                    gaussian_matrix = torch.randn(self.hd_dim, self.input_dim)
+                    q, _ = torch.linalg.qr(gaussian_matrix)
+                    self.projection.weight.copy_(q * torch.sqrt(torch.tensor(self.hd_dim))) # Scale by the square root of the dimension to preserve variance (Johnson-Lindenstrauss)
 
             torch.set_rng_state(torch_rng_state) # set back to random
             np.random.set_state(numpy_rng_state)
