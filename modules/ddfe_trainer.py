@@ -749,8 +749,6 @@ class DDFETrainer:
 
         print("Finished Training")
 
-    # -----------------------------------------------------------------------
-
     def train_epoch(
         self, train_loader, model, criterion, optimizer, epoch,
         evaluator, scheduler, color_fn, report=10, show_scans=False,
@@ -774,17 +772,8 @@ class DDFETrainer:
             enumerate(train_loader), total=len(train_loader)
         ):
             self.data_time_t.update(time.time() - end)
-
-            # ------------------------------------------------------------------
-            # DDFE pre-processing (Sec. 3.1)
-            # ------------------------------------------------------------------
-            # 1. Drop intensity channel to reduce sensor-specific bias
             in_vol = self._drop_intensity(in_vol)
-
-            # 2. Re-encode as spherical coordinates (cos θ, sin θ, φ, r)
             in_vol = self._to_spherical_input(in_vol)
-
-            # 3. Density augmentation (Sec. 3.5) – training only
             in_vol = self._density_augmentation(in_vol)
 
             if not self.multi_gpu and self.gpu:
@@ -792,9 +781,6 @@ class DDFETrainer:
             if self.gpu:
                 proj_labels = proj_labels.cuda().long()
 
-            # ------------------------------------------------------------------
-            # Beam density estimation + soft clipping (Sec. 3.2 & 3.3)
-            # ------------------------------------------------------------------
             with torch.no_grad():
                 density = self.beam_density_estimator(in_vol)   # [B, 4, H, W]
 
@@ -806,9 +792,7 @@ class DDFETrainer:
 
             with torch.amp.autocast("cuda"):
                 if self.ARCH["train"]["aux_loss"]:
-                    output_list = model(in_vol)   # [output, z2, z4, z8]
-                    output = output_list[0]
-                    z2, z4, z8 = output_list[1], output_list[2], output_list[3]
+                    output, aux_list, z8 = model(in_vol)
                 else:
                     output = model(in_vol)
                 density_feat = self.density_embedding(output, density_c)
@@ -828,26 +812,11 @@ class DDFETrainer:
 
                 if self.ARCH["train"]["aux_loss"]:
                     lamda = self.ARCH["train"]["lamda"]
-                    bdlosss = (
-                        self.bd(output, proj_labels.long())
-                        + lamda * self.bd(z2, proj_labels.long())
-                        + lamda * self.bd(z4, proj_labels.long())
-                        + lamda * self.bd(z8, proj_labels.long())
-                    )
-                    loss_m0 = criterion(
-                        torch.log(output.clamp(min=1e-8)), proj_labels
-                    ) + 1.5 * self.ls(output, proj_labels.long())
-                    loss_m2 = criterion(
-                        torch.log(z2.clamp(min=1e-8)), proj_labels
-                    ) + 1.5 * self.ls(z2, proj_labels.long())
-                    loss_m4 = criterion(
-                        torch.log(z4.clamp(min=1e-8)), proj_labels
-                    ) + 1.5 * self.ls(z4, proj_labels.long())
-                    loss_m8 = criterion(
-                        torch.log(z8.clamp(min=1e-8)), proj_labels
-                    ) + 1.5 * self.ls(z8, proj_labels.long())
-                    loss_m = loss_m0 + lamda * loss_m2 + lamda * loss_m4 + \
-                             lamda * loss_m8 + bdlosss
+                    bdlosss = (self.bd(output, proj_labels.long()) + lamda * self.bd(z8, proj_labels.long()))
+                    loss_m0 = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels.long())
+
+                    loss_m8 = criterion(torch.log(z8.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(z8, proj_labels.long())
+                    loss_m = loss_m0 + lamda * loss_m8 + bdlosss
                 else:
                     bdlosss = self.bd(output, proj_labels.long())
                     loss_m = (
