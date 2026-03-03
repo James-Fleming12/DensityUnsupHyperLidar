@@ -11,16 +11,17 @@ import numpy as np
 import torch.nn.functional as F
 
 MODEL_DIR = "logs"
-NU_DATA_DIR = "v1.0-mini"
-DATA_DIR = "nuscenes_kitti"
+NU_DATA_DIR = "/mnt/alpha/jmfleming/HyperLidar_dataset/nuscenes_all"
+DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
-MAX_EPOCHS = 10
-MAX_HDC_EPOCHS = 10
+MAX_HDC_EPOCHS = 20
+FEATURE_EXTRACTOR_EPOCHS = 400
 
 HD_DIM = 10000
 
+HDC_SAVE_PATH = "logs/hdc.pth"
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
 def diag_feature_variance(model, dataloader):
