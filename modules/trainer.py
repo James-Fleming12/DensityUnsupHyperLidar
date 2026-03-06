@@ -914,30 +914,29 @@ class Trainer():
                 # proj_labels = proj_labels.squeeze(1).cuda().long()
 
             start = time.time()
-            # compute output
             with torch.amp.autocast('cuda'):
-
-                # if self.ARCH["train"]["aux_loss"]:
-                #     [output, z2, z4, z8] = model(in_vol)
-                #     lamda = self.ARCH["train"]["lamda"]
-                #     bdlosss = self.bd(output, proj_labels.long()) + lamda*self.bd(z2, proj_labels_2.long()) + lamda*self.bd(z4, proj_labels_4.long()) + lamda*self.bd(z8, proj_labels_8.long())
-                #     loss_m0 = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels.long())
-                #     loss_m2 = criterion(torch.log(z2.clamp(min=1e-8)), proj_labels_2) + 1.5 * self.ls(z2, proj_labels_2.long())
-                #     loss_m4 = criterion(torch.log(z4.clamp(min=1e-8)), proj_labels_4) + 1.5 * self.ls(z4, proj_labels_4.long())
-                #     loss_m8 = criterion(torch.log(z8.clamp(min=1e-8)), proj_labels_8) + 1.5 * self.ls(z8, proj_labels_8.long())
-                #     loss_m = loss_m0 + lamda*loss_m2 + lamda*loss_m4 + lamda*loss_m8 + bdlosss
+                model_output = model(in_vol)
 
                 if self.ARCH["train"]["aux_loss"]:
-                    [output, z2, z4, z8] = model(in_vol)
+
+                    output, aux_list, _ = model_output
+                    z2, z4, z8 = aux_list
+                    
                     lamda = self.ARCH["train"]["lamda"]
-                    bdlosss = self.bd(output, proj_labels.long()) + lamda*self.bd(z2, proj_labels.long()) + lamda*self.bd(z4, proj_labels.long()) + lamda*self.bd(z8, proj_labels.long())
+
+                    bdlosss = (self.bd(output, proj_labels.long()) + 
+                            lamda * self.bd(z2, proj_labels.long()) + 
+                            lamda * self.bd(z4, proj_labels.long()) + 
+                            lamda * self.bd(z8, proj_labels.long()))
+
                     loss_m0 = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels.long())
                     loss_m2 = criterion(torch.log(z2.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(z2, proj_labels.long())
                     loss_m4 = criterion(torch.log(z4.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(z4, proj_labels.long())
                     loss_m8 = criterion(torch.log(z8.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(z8, proj_labels.long())
+                    
                     loss_m = loss_m0 + lamda*loss_m2 + lamda*loss_m4 + lamda*loss_m8 + bdlosss
                 else:
-                    output = model(in_vol)
+                    output, _ = model_output
                     bdlosss = self.bd(output, proj_labels.long())
                     loss_m = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels.long()) + bdlosss
 
