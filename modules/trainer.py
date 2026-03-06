@@ -1049,11 +1049,9 @@ class Trainer():
         rand_imgs = []
         validation_time = []
 
-        # switch to evaluate mode
         model.eval()
         evaluator.reset()
 
-        # empty the cache to infer in high res
         if self.gpu:
             torch.cuda.empty_cache()
 
@@ -1067,87 +1065,37 @@ class Trainer():
                     proj_labels = proj_labels.cuda(non_blocking=True).long()
 
                 start = time.time()
-                # compute output
+
                 if self.ARCH["train"]["aux_loss"]:
-                    [output, z2, z4, z8] = model(in_vol)
+                    output, aux_list, _ = model(in_vol)
+                    z2, z4, z8 = aux_list
                 else:
-                    output = model(in_vol)
-                # measure elapsed time
+                    output, _ = model(in_vol)
+
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
-                res = time.time() - start
-                validation_time.append(res)
-                start = time.time()
+                validation_time.append(time.time() - start)
 
                 log_out = torch.log(output.clamp(min=1e-8))
                 jacc = self.ls(output, proj_labels)
                 wce = criterion(log_out, proj_labels)
                 loss = wce + jacc
 
-                # measure accuracy and record loss
                 argmax = output.argmax(dim=1)
                 evaluator.addBatch(argmax, proj_labels)
                 losses.update(loss.mean().item(), in_vol.size(0))
-                jaccs.update(jacc.mean().item(),in_vol.size(0))
+                jaccs.update(jacc.mean().item(), in_vol.size(0))
+                wces.update(wce.mean().item(), in_vol.size(0))
 
+                accuracy = evaluator.getacc()
+                jaccard, class_jaccard = evaluator.getIoU()
+                acc.update(accuracy.item(), in_vol.size(0))
+                iou.update(jaccard.item(), in_vol.size(0))
 
-                wces.update(wce.mean().item(),in_vol.size(0))
-
-
-
-                # if save_scans:
-                #     # get the first scan in batch and project points
-                #     mask_np = proj_mask[0].cpu().numpy()
-                #     depth_np = in_vol[0][0].cpu().numpy()
-                #     pred_np = argmax[0].cpu().numpy()
-                #     gt_np = proj_labels[0].cpu().numpy()
-                #     out = Trainer.make_log_img(depth_np,
-                #                                mask_np,
-                #                                pred_np,
-                #                                gt_np,
-                #                                color_fn)
-                #     rand_imgs.append(out)
-
-                # measure elapsed time
                 self.batch_time_e.update(time.time() - end)
                 end = time.time()
 
-            accuracy = evaluator.getacc()
-            jaccard, class_jaccard = evaluator.getIoU()
-            acc.update(accuracy.item(), in_vol.size(0))
-            iou.update(jaccard.item(), in_vol.size(0))
-            # print the results
-            # print("Mean CNN inference time:{}\t std:{}".format(np.mean(validation_time), np.std(validation_time)))
-            # print('Validation set:\n'
-            #       'Time avg per batch {batch_time.avg:.3f}\n'
-            #       'Loss avg {loss.avg:.4f}\n'
-            #       'Jaccard avg {jac.avg:.4f}\n'
-            #       'WCE avg {wces.avg:.4f}\n'
-            #       'Acc avg {acc.avg:.3f}\n'
-            #       'IoU avg {iou.avg:.3f}'.format(batch_time=self.batch_time_e,
-            #                                      loss=losses,
-            #                                      jac=jaccs,
-            #                                      wces=wces,
-            #                                      acc=acc, iou=iou))
-
-            # save_to_log(self.log, 'log.txt', 'Validation set:\n'
-            #                                  'Time avg per batch {batch_time.avg:.3f}\n'
-            #                                  'Loss avg {loss.avg:.4f}\n'
-            #                                  'Jaccard avg {jac.avg:.4f}\n'
-            #                                  'WCE avg {wces.avg:.4f}\n'
-            #                                  'Acc avg {acc.avg:.3f}\n'
-            #                                  'IoU avg {iou.avg:.3f}'.format(batch_time=self.batch_time_e,
-            #                                                                 loss=losses,
-            #                                                                 jac=jaccs,
-            #                                                                 wces=wces,
-            #                                                                 acc=acc, iou=iou))
-            # print also classwise
             for i, jacc in enumerate(class_jaccard):
-                # print('IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-                #     i=i, class_str=class_func(i), jacc=jacc))
-                # save_to_log(self.log, 'log.txt', 'IoU class {i:} [{class_str:}] = {jacc:.3f}'.format(
-                #     i=i, class_str=class_func(i), jacc=jacc))
                 self.info["valid_classes/" + class_func(i)] = jacc
-
 
         return acc.avg, iou.avg, losses.avg, rand_imgs
