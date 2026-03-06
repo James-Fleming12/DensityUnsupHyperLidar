@@ -20,8 +20,8 @@ NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes t
 MAX_HDC_EPOCHS = 20
 FEATURE_EXTRACTOR_EPOCHS = 400
 
-BASE_COUNT = 400
-INC_STEP = 100
+BASE_COUNT = 10
+INC_STEP = 2
 
 HD_DIM = 10000
 

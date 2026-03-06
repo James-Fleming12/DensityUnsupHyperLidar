@@ -101,78 +101,78 @@ content: # as a ratio with the total number of points
   28: 0.1474087
   31: 0.2585672
   24: 0.2901625
-# classes that are indistinguishable from single scan or inconsistent in
-# ground truth are mapped to their closest equivalent
+
 learning_map:
-  0: 0  # "noise" -> "barrier"
-  1: 0  # "animal" -> "barrier"
-  2: 7  # "human.pedestrian.adult" -> "pedestrian"
-  3: 7  # "human.pedestrian.child" -> "pedestrian"
-  4: 7  # "human.pedestrian.construction_worker" -> "pedestrian"
-  5: 0  # "human.pedestrian.personal_mobility" -> "pedestrian"
-  6: 7  # "human.pedestrian.police_officer" -> "pedestrian"
-  7: 0  # "human.pedestrian.stroller" -> "pedestrian"
-  8: 0  # "human.pedestrian.wheelchair" -> "pedestrian"
-  9: 1  # "movable_object.barrier" -> "barrier"
-  10: 0  # "movable_object.debris" -> "traffic_cone"
-  11: 0  # "movable_object.pushable_pullable" -> "traffic_cone"
-  12: 8  # "movable_object.trafficcone" -> "traffic_cone"
-  13: 0  # "static_object.bicycle_rack" -> "barrier"
-  14: 2  # "vehicle.bicycle" -> "bicycle"
-  15: 3  # "vehicle.bus.bendy" -> "bus"
-  16: 3  # "vehicle.bus.rigid" -> "bus"
-  17: 4  # "vehicle.car" -> "car"
-  18: 5  # "vehicle.construction" -> "construction_vehicle"
-  19: 0  # "vehicle.emergency.ambulance" -> "motorcycle"
-  20: 0  # "vehicle.emergency.police" -> "motorcycle"
-  21: 6  # "vehicle.motorcycle" -> "motorcycle"
-  22: 9  # "vehicle.trailer" -> "trailer"
-  23: 10  # "vehicle.truck" -> "truck"
-  24: 11  # "flat.driveable_surface" -> "driveable_surface"
-  25: 12 # "flat.other" -> "barrier"
-  26: 13  # "flat.sidewalk" -> "sidewalk"
-  27: 14  # "flat.terrain" -> "terrain"
-  28: 15  # "static.manmade" -> "manmade"
-  29: 0  # "static.other" -> "barrier"
-  30: 16  # "static.vegetation" -> "vegetation"
-  31: 0  # "vehicle.ego" -> "manmade"
-learning_map_inv: # inverse of previous map
-  0: 0  # "noise" -> "barrier"
-  1: 9  # "animal" -> "barrier"
-  2: 14  # "human.pedestrian.adult" -> "pedestrian"
-  3: 15  # "human.pedestrian.child" -> "pedestrian"
-  4: 17  # "human.pedestrian.construction_worker" -> "pedestrian"
-  5: 18  # "human.pedestrian.personal_mobility" -> "pedestrian"
-  6: 21  # "human.pedestrian.police_officer" -> "pedestrian"
-  7: 2  # "human.pedestrian.stroller" -> "pedestrian"
-  8: 12  # "human.pedestrian.wheelchair" -> "pedestrian"
-  9: 22  # "movable_object.barrier" -> "barrier"
-  10: 23  # "movable_object.debris" -> "traffic_cone"
-  11: 24  # "movable_object.pushable_pullable" -> "traffic_cone"
-  12: 25  # "movable_object.trafficcone" -> "traffic_cone"
-  13: 26  # "static_object.bicycle_rack" -> "barrier"
-  14: 27  # "vehicle.bicycle" -> "bicycle"
-  15: 28  # "vehicle.bus.bendy" -> "bus"
-  16: 30  # "vehicle.bus.rigid" -> "bus"
-  
+  0: 0   # "noise"                              -> unlabeled (ignore)
+  1: 0   # "animal"                             -> unlabeled (ignore)
+  2: 7   # "human.pedestrian.adult"             -> pedestrian
+  3: 7   # "human.pedestrian.child"             -> pedestrian
+  4: 7   # "human.pedestrian.construction_worker" -> pedestrian
+  5: 7   # "human.pedestrian.personal_mobility" -> pedestrian (FIX: was 0)
+  6: 7   # "human.pedestrian.police_officer"    -> pedestrian
+  7: 7   # "human.pedestrian.stroller"          -> pedestrian (FIX: was 0)
+  8: 7   # "human.pedestrian.wheelchair"        -> pedestrian (FIX: was 0)
+  9: 1   # "movable_object.barrier"             -> barrier
+  10: 0  # "movable_object.debris"              -> unlabeled (ignore)
+  11: 0  # "movable_object.pushable_pullable"   -> unlabeled (ignore)
+  12: 8  # "movable_object.trafficcone"         -> traffic_cone
+  13: 1  # "static_object.bicycle_rack"         -> barrier (FIX: was 0)
+  14: 2  # "vehicle.bicycle"                    -> bicycle
+  15: 3  # "vehicle.bus.bendy"                  -> bus
+  16: 3  # "vehicle.bus.rigid"                  -> bus
+  17: 4  # "vehicle.car"                        -> car
+  18: 5  # "vehicle.construction"               -> construction_vehicle
+  19: 5  # "vehicle.emergency.ambulance"        -> construction_vehicle (FIX: was 0)
+  20: 4  # "vehicle.emergency.police"           -> car (FIX: was 0)
+  21: 6  # "vehicle.motorcycle"                 -> motorcycle
+  22: 9  # "vehicle.trailer"                    -> trailer
+  23: 10 # "vehicle.truck"                      -> truck
+  24: 11 # "flat.driveable_surface"             -> driveable_surface
+  25: 12 # "flat.other"                         -> other_flat
+  26: 13 # "flat.sidewalk"                      -> sidewalk
+  27: 14 # "flat.terrain"                       -> terrain
+  28: 15 # "static.manmade"                     -> manmade
+  29: 0  # "static.other"                       -> unlabeled (ignore)
+  30: 16 # "static.vegetation"                  -> vegetation
+  31: 15 # "vehicle.ego"                        -> manmade (FIX: was 0)
+
+learning_map_inv: # maps the 17 learned classes back to a representative original label
+  0: 0   # unlabeled    -> noise
+  1: 9   # barrier      -> movable_object.barrier
+  2: 14  # bicycle      -> vehicle.bicycle
+  3: 15  # bus          -> vehicle.bus.bendy
+  4: 17  # car          -> vehicle.car
+  5: 18  # construction_vehicle -> vehicle.construction
+  6: 21  # motorcycle   -> vehicle.motorcycle
+  7: 2   # pedestrian   -> human.pedestrian.adult
+  8: 12  # traffic_cone -> movable_object.trafficcone
+  9: 22  # trailer      -> vehicle.trailer
+  10: 23 # truck        -> vehicle.truck
+  11: 24 # driveable_surface -> flat.driveable_surface
+  12: 25 # other_flat   -> flat.other
+  13: 26 # sidewalk     -> flat.sidewalk
+  14: 27 # terrain      -> flat.terrain
+  15: 28 # manmade      -> static.manmade
+  16: 30 # vegetation   -> static.vegetation
+
 learning_ignore: # Ignore classes
-  0: True      # "unlabeled", and others ignored
-  1: False     # "car"
-  2: False     # "bicycle"
-  3: False     # "motorcycle"
-  4: False     # "truck"
-  5: False     # "other-vehicle"
-  6: False     # "person"
-  7: False     # "bicyclist"
-  8: False     # "motorcyclist"
-  9: False     # "road"
-  10: False    # "parking"
-  11: False    # "sidewalk"
-  12: False    # "other-ground"
-  13: False    # "building"
-  14: False    # "fence"
-  15: False    # "vegetation"
-  16: False    # "trunk"
+  0: True      # unlabeled
+  1: False     # barrier
+  2: False     # bicycle
+  3: False     # bus
+  4: False     # car
+  5: False     # construction_vehicle
+  6: False     # motorcycle
+  7: False     # pedestrian
+  8: False     # traffic_cone
+  9: False     # trailer
+  10: False    # truck
+  11: False    # driveable_surface
+  12: False    # other_flat
+  13: False    # sidewalk
+  14: False    # terrain
+  15: False    # manmade
+  16: False    # vegetation
 
 split:
   train:
