@@ -33,6 +33,7 @@ def get_loader(ARCH, DATA, sequences, shuffle=True):
         root=DATA_DIR,
         train_sequences=sequences,
         valid_sequences=DATA["split"]["valid"],
+        test_sequences=None,
         labels=DATA["labels"],
         color_map=DATA["color_map"],
         learning_map=DATA["learning_map"],
