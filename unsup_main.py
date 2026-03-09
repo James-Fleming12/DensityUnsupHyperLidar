@@ -38,8 +38,11 @@ def convert_dataset():
     print("Conversion Complete: Output Saved to ")
 
 def train_extractor(ARCH, DATA, dist_type="standard", epochs=FEATURE_EXTRACTOR_EPOCHS):
-    # trainer = DGLSSTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, dist_type=dist_type) # saves in "/logs/SENet_..."
     trainer = Trainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
+    trainer.train(epochs=epochs)
+
+def train_dglss(ARCH, DATA, dist_type="standard", epochs=FEATURE_EXTRACTOR_EPOCHS):
+    trainer = DGLSSTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, dist_type=dist_type) # saves in "/logs/SENet_..."
     trainer.train(epochs=epochs)
 
 def DDFEtrain_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
@@ -382,7 +385,7 @@ def main():
 
     ARCH["train"]["batch_size"] = 16
 
-    train_extractor(ARCH, DATA)
+    train_dglss(ARCH, DATA)
     # DDFEtrain_extractor(ARCH, DATA)
 
     ARCH["train"]["batch_size"] = 2

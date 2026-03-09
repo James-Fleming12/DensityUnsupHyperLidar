@@ -37,8 +37,10 @@ class DGLSSTrainer():
         dist_type can be 'standard' (L1/MSE) or 'angular' (Cosine/ArcFace-style)
         """
         self.dist_type = dist_type
-        self.lam1 = 0.1 # loss weight hyperparameters
-        self.lam2 = 0.1
+        self.lam1_max = 0.1
+        self.lam2_max = 0.1
+        self.lam1 = 0.0
+        self.lam2 = 0.0
 
         # parameters
         self.ARCH = ARCH
@@ -193,7 +195,7 @@ class DGLSSTrainer():
             # self.info = w_dict['info']
             print("info", w_dict['info'])
 
-    def beam_drop(self, in_vol, p_range=(0.0, 0.4)):
+    def beam_drop(self, in_vol, p_range=(0.0, 0.15)):
         bs, channels, h, w = in_vol.shape
         p = np.random.uniform(p_range[0], p_range[1])
         num_drop = int(h * p)
@@ -299,7 +301,17 @@ class DGLSSTrainer():
 
         # train for n epochs
         max_epochs = epochs if epochs is not None else self.ARCH["train"]["max_epochs"]
+        warmup_start = int(0.3 * max_epochs)
+        
         for epoch in range(self.epoch, max_epochs):
+            if epoch < warmup_start:
+                self.lam1 = 0.0
+                self.lam2 = 0.0
+            else:
+                progress = (epoch - warmup_start) / max(1, max_epochs - warmup_start)
+                self.lam1 = self.lam1_max * progress
+                self.lam2 = self.lam2_max * progress
+            
             # train for 1 epoch
 
             acc, iou, loss = self.train_epoch(train_loader=self.parser.get_train_set(),
@@ -411,7 +423,6 @@ class DGLSSTrainer():
                 else:
                     output, z8 = model(in_vol)
                     output_aug, z8_aug = model(in_vol_aug)
-                output_aug, aux_list_aug, z8_aug = model(in_vol_aug)
 
                 loss_sem_orig = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels)
                 loss_sem_aug = criterion(torch.log(output_aug.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output_aug, proj_labels)
@@ -436,12 +447,14 @@ class DGLSSTrainer():
                 prototypes_s = self.compute_prototypes(z8, proj_labels)
                 prototypes_a = self.compute_prototypes(z8_aug, proj_labels)
 
+                valid = (prototypes_s.norm(dim=1) > 0) & (prototypes_a.norm(dim=1) > 0)
                 if self.dist_type == 'angular':
-                    p_s_n = torch.nn.functional.normalize(prototypes_s, p=2, dim=1) # Angular Correlation (Normalize prototypes first)
-                    p_a_n = torch.nn.functional.normalize(prototypes_a, p=2, dim=1)
+                    p_s_n = torch.nn.functional.normalize(prototypes_s[valid], p=2, dim=1)
+                    p_a_n = torch.nn.functional.normalize(prototypes_a[valid], p=2, dim=1)
                     loss_scc = F.mse_loss(p_s_n @ p_s_n.T, p_a_n @ p_a_n.T)
                 else:
-                    loss_scc = F.mse_loss(prototypes_s @ prototypes_s.T, prototypes_a @ prototypes_a.T) # Standard Correlation (Raw dot products)
+                    ps, pa = prototypes_s[valid], prototypes_a[valid]
+                    loss_scc = F.mse_loss(ps @ ps.T, pa @ pa.T)
 
                 loss_total = loss_sem + (self.lam1 * loss_sifc) + (self.lam2 * loss_scc)
 
@@ -538,10 +551,10 @@ class DGLSSTrainer():
                 self.batch_time_e.update(time.time() - end)
                 end = time.time()
 
-            accuracy = evaluator.getacc()
-            jaccard, class_jaccard = evaluator.getIoU()
-            acc.update(accuracy.item(), in_vol.size(0))
-            iou.update(jaccard.item(), in_vol.size(0))
+                accuracy = evaluator.getacc()
+                jaccard, class_jaccard = evaluator.getIoU()
+                acc.update(accuracy.item(), in_vol.size(0))
+                iou.update(jaccard.item(), in_vol.size(0))
 
             for i, jacc in enumerate(class_jaccard):
                 self.info["valid_classes/" + class_func(i)] = jacc
