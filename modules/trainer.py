@@ -400,12 +400,17 @@ class DGLSSTrainer():
             if self.gpu:
                 in_vol, proj_labels = in_vol.cuda(), proj_labels.cuda().long()
 
-            start = time.time()
-            
-            with torch.amp.autocast('cuda'):
-                output, aux_list, z8 = model(in_vol) 
+            in_vol_aug = self.beam_drop(in_vol.clone())
 
-                in_vol_aug = self.beam_drop(in_vol.clone()) 
+            start = time.time()
+
+            with torch.amp.autocast('cuda'):
+                if self.ARCH["train"]["aux_loss"]:
+                    output, aux_list, z8 = model(in_vol)
+                    output_aug, aux_list_aug, z8_aug = model(in_vol_aug)
+                else:
+                    output, z8 = model(in_vol)
+                    output_aug, z8_aug = model(in_vol_aug)
                 output_aug, aux_list_aug, z8_aug = model(in_vol_aug)
 
                 loss_sem_orig = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels)
