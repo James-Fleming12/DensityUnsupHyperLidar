@@ -371,7 +371,7 @@ def test_inference(ARCH, DATA):
 def main():
     try:
         # ARCH = yaml.safe_load(open("config/arch/senet-1024p.yml", 'r'))
-        ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r')) # higher res
+        ARCH = yaml.safe_load(open("config/arch/senet-2048p-gen.yml", 'r')) # higher res
     except Exception as e:
         print(f"Error opening arch yaml file. {e}")
         quit()
