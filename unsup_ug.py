@@ -135,7 +135,7 @@ def save_final_plot(history):
 
 def main():
     try:
-        ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
+        ARCH = yaml.safe_load(open("config/arch/senet-2048p-ug.yml", 'r'))
     except Exception as e:
         print(f"Error opening arch yaml file. {e}")
         quit()
