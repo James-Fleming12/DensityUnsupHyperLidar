@@ -20,9 +20,6 @@ NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes t
 MAX_HDC_EPOCHS = 20
 FEATURE_EXTRACTOR_EPOCHS = 400
 
-BASE_COUNT = 4
-INC_STEP = 2
-
 HD_DIM = 10000
 
 HDC_SAVE_PATH = "logs/hdc.pth"
@@ -46,7 +43,7 @@ def get_loader(ARCH, DATA, sequences, shuffle=True):
         shuffle_train=shuffle
     )
 
-def pretrain_pipeline(ARCH, DATA, base_count=BASE_COUNT):
+def pretrain_pipeline(ARCH, DATA, base_count=10):
     """
     Executes the standard training flow on a subset of the data.
     """
@@ -76,7 +73,7 @@ def pretrain_pipeline(ARCH, DATA, base_count=BASE_COUNT):
     
     return model
 
-def incremental_update_test(ARCH, DATA, base_count=BASE_COUNT, inc_step=INC_STEP):
+def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2):
     """
     Performs incremental inference updates and tracks Pre vs Post performance 
     to create a multi-step dumbbell plot showing the jump at every chunk.
@@ -122,7 +119,7 @@ def incremental_update_test(ARCH, DATA, base_count=BASE_COUNT, inc_step=INC_STEP
         
         print(f"Batch {current_range} Jump: mIoU {miou_pre:.4f} -> {miou_post:.4f}")
 
-    save_multi_step_dumbbell(history)
+    save_multi_step_dumbbell(history, file_suffix=f"_{base_count}")
 
 def save_final_plot(history):
     plt.figure(figsize=(10, 6))
@@ -137,7 +134,7 @@ def save_final_plot(history):
     plt.close()
     print("Plot saved to incremental_update_test.png")
 
-def save_multi_step_dumbbell(history):
+def save_multi_step_dumbbell(history, file_suffix=""):
     """
     Creates a multi-row dumbbell plot showing improvement at every incremental step.
     """
@@ -166,9 +163,9 @@ def save_multi_step_dumbbell(history):
     
     plt.suptitle("Impact of Incremental Inference Updates on Unseen Data", fontsize=18)
     plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-    plt.savefig('incremental_dumbbell_results.png', dpi=300)
+    plt.savefig(f"incremental_dumbbell_results{file_suffix}.png", dpi=300)
     plt.close()
-    print("Dumbbell plot saved to incremental_dumbbell_results.png")
+    print("Dumbbell plot saved to incremental_dumbbell_results{file_suffix}.png")
 
 def main():
     try:
@@ -182,8 +179,12 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    _ = pretrain_pipeline(ARCH, DATA)
-    incremental_update_test(ARCH, DATA)
+    base_counts = [4, 6, 8, 10, 12]
+    inc_steps = [2]
+
+    for base in base_counts:
+        _ = pretrain_pipeline(ARCH, DATA, base_count=base)
+        incremental_update_test(ARCH, DATA, base_count=base, inc_step=inc_steps[0])
 
 if __name__=="__main__":
     main()
