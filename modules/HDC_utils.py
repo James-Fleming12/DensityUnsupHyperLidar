@@ -803,7 +803,8 @@ class DensityModel(nn.Module):
                 else:
                     sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
 
-                valid_mask = (sub_sims > thresholds[0]) & (sub_sims < thresholds[1])
+                proto_sims = torch.sum(sample_encs * F.normalize(self.classify.weight[c_id]).unsqueeze(0), dim=1)
+                valid_mask = (sub_sims > thresholds[0]) & (proto_sims < thresholds[1])
                 if not torch.any(valid_mask):
                     continue
 
