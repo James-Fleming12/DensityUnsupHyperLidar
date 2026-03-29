@@ -728,7 +728,7 @@ class DensityModel(nn.Module):
         
         return max_similarities, absolute_indices
 
-    def inference_update(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=5000, max_updates_per_class=50, thresholds=[0.45, 0.80]):
+    def inference_update(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
         self.train()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -797,14 +797,21 @@ class DensityModel(nn.Module):
 
                 sample_encs = enc_norm[class_indices]
 
+                proto_sims = torch.sum(sample_encs * F.normalize(self.classify.weight[c_id]).unsqueeze(0), dim=1)
+                proto_valid = proto_sims < thresholds[1] # masks based on proximity to class prototype
+                if not torch.any(proto_valid):
+                    continue
+
+                class_indices = class_indices[proto_valid]
+                sample_encs = sample_encs[proto_valid]
+
                 if self.subcluster_type == 'bipolar':
                     target_encs = torch.sign(active_enc[class_indices])
                     sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
                 else:
                     sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
 
-                proto_sims = torch.sum(sample_encs * F.normalize(self.classify.weight[c_id]).unsqueeze(0), dim=1)
-                valid_mask = (sub_sims > thresholds[0]) & (proto_sims < thresholds[1])
+                valid_mask = sub_sims > thresholds[0] # masks based on proximity to class subclusters
                 if not torch.any(valid_mask):
                     continue
 
@@ -812,7 +819,6 @@ class DensityModel(nn.Module):
                 sub_sims = sub_sims[valid_mask]
 
                 effective_lr = learning_rate * sub_sims.mean().item()
-
                 mean_pull_vector = sample_encs.mean(dim=0)
 
                 current_weight = self.classify.weight[c_id]
