@@ -189,93 +189,89 @@ def save_multi_step_dumbbell(history, DATA=None, file_suffix=""):
     labels = history["steps_labels"]
     acc_pairs = np.array(history["acc_pairs"])
     miou_pairs = np.array(history["miou_pairs"])
-    novel_classes = history.get("novel_classes", [set()] * len(labels))
- 
-    has_novel_info = DATA is not None and any(len(s) > 0 for s in novel_classes)
+    novel_classes = history.get("novel_classes", [set() for _ in labels])
 
-    if has_novel_info:
-        fig = plt.figure(figsize=(22, max(8, len(labels) * 0.7 + 3)))
-        gs = GridSpec(1, 3, figure=fig, width_ratios=[5, 5, 4], wspace=0.35)
+    while len(novel_classes) < len(labels):
+        novel_classes.append(set())
+
+    show_table = DATA is not None
+
+    if show_table:
+        fig = plt.figure(figsize=(24, max(8, len(labels) * 0.8 + 3)))
+        gs = GridSpec(1, 3, figure=fig, width_ratios=[5, 5, 4], wspace=0.4)
         ax1 = fig.add_subplot(gs[0])
         ax2 = fig.add_subplot(gs[1], sharey=ax1)
-        ax3 = fig.add_subplot(gs[2], sharey=ax1)
+        ax3 = fig.add_subplot(gs[2])
     else:
-        fig = plt.figure(figsize=(16, max(8, len(labels) * 0.7 + 3)))
+        fig = plt.figure(figsize=(16, max(8, len(labels) * 0.8 + 3)))
         gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 1], wspace=0.35)
         ax1 = fig.add_subplot(gs[0])
         ax2 = fig.add_subplot(gs[1], sharey=ax1)
         ax3 = None
- 
+
     y_pos = np.arange(len(labels))
- 
-    COLOR_PRE  = '#4C9BE8'
+
+    COLOR_PRE = '#4C9BE8'
     COLOR_POST = '#E8574C'
     COLOR_NOVEL_ROW = '#FFF3CD'
-    COLOR_NONE_ROW  = '#F4F4F4'
- 
+    COLOR_NONE_ROW = '#F4F4F4'
+
     def draw_ax(ax, pairs, title):
-        for yi, (pre, post) in enumerate(pairs):
+        for yi in range(len(pairs)):
             has_novel = len(novel_classes[yi]) > 0
-            row_color = COLOR_NOVEL_ROW if has_novel else COLOR_NONE_ROW
-            ax.axhspan(yi - 0.45, yi + 0.45, color=row_color, zorder=0, alpha=0.6)
- 
+            ax.axhspan(yi - 0.45, yi + 0.45, color=COLOR_NOVEL_ROW if has_novel else COLOR_NONE_ROW, zorder=0, alpha=0.6)
+
         ax.hlines(y_pos, pairs[:, 0], pairs[:, 1], color='#AAAAAA', alpha=0.6, linewidth=2, zorder=1)
-        ax.scatter(pairs[:, 0], y_pos, color=COLOR_PRE,  s=130, label='Pre-Update',  zorder=3, edgecolors='white', linewidths=0.8)
+        ax.scatter(pairs[:, 0], y_pos, color=COLOR_PRE, s=130, label='Pre-Update', zorder=3, edgecolors='white', linewidths=0.8)
         ax.scatter(pairs[:, 1], y_pos, color=COLOR_POST, s=130, label='Post-Update', zorder=3, edgecolors='white', linewidths=0.8)
- 
+
         ax.set_title(title, fontsize=13, fontweight='bold', pad=10)
         ax.grid(axis='x', linestyle='--', alpha=0.35)
         ax.set_xlabel("Metric Value", fontsize=10)
         ax.spines[['top', 'right']].set_visible(False)
         ax.legend(loc='lower right', fontsize=9)
- 
+
     draw_ax(ax1, acc_pairs,  "Accuracy Gain per Batch")
     draw_ax(ax2, miou_pairs, "mIoU Gain per Batch")
- 
+
     ax1.set_yticks(y_pos)
     ax1.set_yticklabels(labels, fontsize=9)
     ax2.tick_params(labelleft=False)
 
-    if ax3 is not None and DATA is not None:
+    if ax3 is not None:
         ax3.set_xlim(0, 1)
-        ax3.set_ylim(-0.5, len(labels) - 0.5)
-        ax3.invert_yaxis()
+        ax3.set_ylim(len(labels) - 0.5, -0.5)
         ax3.axis('off')
- 
         ax3.set_title("Novel Labels in Chunk", fontsize=13, fontweight='bold', pad=10)
- 
-        col_header_y = len(labels) - 0.5 + 0.1
-        ax3.text(0.5, -0.6, "Novel Classes vs Pretraining", ha='center', va='center', fontsize=9, fontweight='bold', color='#444444', transform=ax3.get_yaxis_transform())
- 
+
         for yi, step_label in enumerate(labels):
             novel = novel_classes[yi]
             has_novel = len(novel) > 0
 
             row_color = COLOR_NOVEL_ROW if has_novel else COLOR_NONE_ROW
             ax3.axhspan(yi - 0.45, yi + 0.45, color=row_color, alpha=0.7, zorder=0)
- 
+
             if has_novel:
                 names = class_ids_to_names(novel, DATA)
                 cell_text = ", ".join(names)
+                if len(cell_text) > 38:
+                    cell_text = cell_text[:35] + "..."
                 text_color = '#7B4F00'
                 marker = "⚑ "
             else:
-                cell_text = "-"
+                cell_text = "—"
                 text_color = '#888888'
                 marker = ""
 
-            if len(cell_text) > 38:
-                cell_text = cell_text[:35] + "..."
- 
-            ax3.text(0.05, yi, marker + cell_text, va='center', ha='left', fontsize=8, color=text_color, wrap=True)
- 
+            ax3.text(0.05, yi, marker + cell_text, va='center', ha='left', fontsize=8, color=text_color)
+
         novel_patch = mpatches.Patch(color=COLOR_NOVEL_ROW, alpha=0.7, label='Contains novel labels')
         none_patch  = mpatches.Patch(color=COLOR_NONE_ROW,  alpha=0.7, label='No novel labels')
         ax3.legend(handles=[novel_patch, none_patch], loc='lower center', fontsize=8, bbox_to_anchor=(0.5, -0.06), frameon=True, framealpha=0.9)
- 
+
     plt.suptitle("Impact of Incremental Inference Updates on Unseen Data", fontsize=16, fontweight='bold', y=1.01)
     plt.tight_layout()
- 
+
     out_path = f"incremental_dumbbell_results{file_suffix}.png"
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()

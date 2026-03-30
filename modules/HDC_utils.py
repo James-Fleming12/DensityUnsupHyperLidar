@@ -250,7 +250,7 @@ def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, d
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 5, subcluster_type="bipolar", gauss_rp=True):
+    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 10, subcluster_type="bipolar", gauss_rp=True):
         super(DensityModel, self).__init__()
 
         self.device = device
@@ -495,8 +495,6 @@ class DensityModel(nn.Module):
                     
                     del proj_in, proj_labels
                     self._clear_memory()
-                    
-                    print(f"  Batch {batch_idx}: collected {total_samples} samples so far")
 
                     if total_samples >= MAX_SAMPLES: # collect extra for better sampling
                         break
@@ -624,8 +622,9 @@ class DensityModel(nn.Module):
                 center_tensor = torch.tensor(center, device='cpu', dtype=torch.float16)
                 subclusters.append(center_tensor)
         else:
-            indices = np.random.choice(num_clusters_found, num_sub_per_cluster, replace=False)
-            for idx in indices:
+            center_tensor = torch.tensor(cluster_centers, dtype=torch.float32)
+            fps_indices = self._farthest_point_sample(center_tensor, num_sub_per_cluster)
+            for idx in fps_indices.tolist():
                 center = torch.tensor(cluster_centers[idx], device='cpu', dtype=torch.float16)
                 subclusters.append(center)
 
@@ -797,7 +796,7 @@ class DensityModel(nn.Module):
 
                 sample_encs = enc_norm[class_indices]
 
-                proto_sims = torch.sum(sample_encs * F.normalize(self.classify.weight[c_id]).unsqueeze(0), dim=1)
+                proto_sims = torch.sum(sample_encs * F.normalize(self.classify.weight[c_id].unsqueeze(0), dim=1), dim=1)
                 proto_valid = proto_sims < thresholds[1] # masks based on proximity to class prototype
                 if not torch.any(proto_valid):
                     continue
