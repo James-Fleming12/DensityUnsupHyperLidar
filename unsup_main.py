@@ -37,7 +37,7 @@ def convert_dataset():
 
     print("Conversion Complete: Output Saved to ")
 
-def train_extractor(ARCH, DATA, dist_type="standard", epochs=FEATURE_EXTRACTOR_EPOCHS):
+def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
     trainer = Trainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
     trainer.train(epochs=epochs)
 

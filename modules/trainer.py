@@ -32,7 +32,7 @@ def save_checkpoint(to_save, logdir, suffix=""):
                "/SENet" + suffix)
 
 class DGLSSTrainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, path=None, dist_type="standard"):
+    def __init__(self, ARCH, DATA, datadir, logdir, path=None, dist_type="standard", depth=False):
         """
         dist_type can be 'standard' (L1/MSE) or 'angular' (Cosine/ArcFace-style)
         """
@@ -101,8 +101,9 @@ class DGLSSTrainer():
                 self.model = HarDNet(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
 
             if self.ARCH["train"]["pipeline"] == "res":
+                print("!!! Using ResNet") # just making sure
                 from modules.network.ResNet import ResNet_34
-                self.model = ResNet_34(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
+                self.model = ResNet_34(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"], depth=depth)
 
                 def convert_relu_to_softplus(model, act):
                     for child_name, child in model.named_children():
