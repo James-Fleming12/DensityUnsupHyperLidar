@@ -817,11 +817,12 @@ class DensityModel(nn.Module):
                 sample_encs = sample_encs[valid_mask]
                 sub_sims = sub_sims[valid_mask]
 
+                weights = sub_sims / sub_sims.sum()  # normalize weights to sum to 1
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
                 effective_lr = learning_rate * sub_sims.mean().item()
-                mean_pull_vector = sample_encs.mean(dim=0)
 
                 current_weight = self.classify.weight[c_id]
-                self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * mean_pull_vector
+                self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
                 updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
 
