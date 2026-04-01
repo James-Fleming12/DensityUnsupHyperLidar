@@ -93,7 +93,7 @@ class BasicBlock(nn.Module):
 class ResNet_34(nn.Module):
 
     def __init__(self, nclasses, aux, block=BasicBlock, layers=[3, 4, 6, 3], if_BN=True, zero_init_residual=False,
-                 norm_layer=None, groups=1, width_per_group=64, depth=False):
+                 norm_layer=None, groups=1, width_per_group=64):
         super(ResNet_34, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -113,16 +113,12 @@ class ResNet_34(nn.Module):
         self.conv4 = BasicConv2d(256, 512, kernel_size=1)
         self.inplanes = 512
 
-        self.depth = depth
-
         self.layer1 = self._make_layer(block, 128, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 128, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 128, layers[3], stride=2)
-        if self.depth:
-            self.layer5 = self._make_layer(block, 128, layers[0], stride=2)
 
-        self.conv_1 = BasicConv2d(1152 if depth else 1024, 512, kernel_size=1)
+        self.conv_1 = BasicConv2d(1024, 512, kernel_size=1)
         self.conv_2 = BasicConv2d(512, 128, kernel_size=1)
         self.semantic_output = nn.Conv2d(128, nclasses, 1)
 
@@ -167,21 +163,15 @@ class ResNet_34(nn.Module):
         x = self.conv3(x)
         x = self.conv4(x)
 
-        x_1 = self.layer1(x)
-        x_2 = self.layer2(x_1)
-        x_3 = self.layer3(x_2)
-        x_4 = self.layer4(x_3)
+        x_1 = self.layer1(x)  # 1
+        x_2 = self.layer2(x_1)  # 1/2
+        x_3 = self.layer3(x_2)  # 1/4
+        x_4 = self.layer4(x_3)  # 1/8
 
         res_2 = F.interpolate(x_2, size=x.size()[2:], mode='bilinear', align_corners=True)
         res_3 = F.interpolate(x_3, size=x.size()[2:], mode='bilinear', align_corners=True)
         res_4 = F.interpolate(x_4, size=x.size()[2:], mode='bilinear', align_corners=True)
-
-        if self.depth:
-            x_5 = self.layer5(x_4)
-            res_5 = F.interpolate(x_5, size=x.size()[2:], mode='bilinear', align_corners=True)
-            res = [x, x_1, res_2, res_3, res_4, res_5]
-        else:
-            res = [x, x_1, res_2, res_3, res_4]
+        res = [x, x_1, res_2, res_3, res_4]
         out = torch.cat(res, dim=1)
 
         out = self.conv_1(out)

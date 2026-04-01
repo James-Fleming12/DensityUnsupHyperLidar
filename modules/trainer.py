@@ -101,7 +101,6 @@ class DGLSSTrainer():
                 self.model = HarDNet(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"])
 
             if self.ARCH["train"]["pipeline"] == "res":
-                print("!!! Using ResNet") # just making sure
                 from modules.network.ResNet import ResNet_34
                 self.model = ResNet_34(self.parser.get_n_classes(), self.ARCH["train"]["aux_loss"], depth=depth)
 
