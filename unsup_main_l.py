@@ -38,8 +38,8 @@ def main():
 
     ARCH["train"]["batch_size"] = 2
 
-    hdc = train_hdc(ARCH, DATA)
-    init_sub(ARCH, DATA)
+    hdc = train_hdc(ARCH, DATA, depth=True)
+    init_sub(ARCH, DATA, depth=True)
 
 if __name__ == "__main__":
     main()
