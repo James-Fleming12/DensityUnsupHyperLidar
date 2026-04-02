@@ -170,7 +170,7 @@ def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=
 
         print(f"Batch {current_range} Jump: mIoU {miou_pre:.4f} -> {miou_post:.4f}")
 
-    save_multi_step_dumbbell(history, DATA, file_suffix=f"_{base_count}")
+    save_multi_step_dumbbell_ug(history, DATA, file_suffix=f"_{base_count}")
 
 def save_final_plot(history):
     plt.figure(figsize=(10, 6))
@@ -185,7 +185,7 @@ def save_final_plot(history):
     plt.close()
     print("Plot saved to incremental_update_test.png")
 
-def save_multi_step_dumbbell(history, DATA=None, file_suffix=""):
+def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
     labels = history["steps_labels"]
     acc_pairs = np.array(history["acc_pairs"])
     miou_pairs = np.array(history["miou_pairs"])
