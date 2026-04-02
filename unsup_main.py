@@ -41,8 +41,8 @@ def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
     trainer = Trainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
     trainer.train(epochs=epochs)
 
-def train_dglss(ARCH, DATA, dist_type="standard", epochs=FEATURE_EXTRACTOR_EPOCHS, depth=False):
-    trainer = DGLSSTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, dist_type=dist_type, depth=depth) # saves in "/logs/SENet_..."
+def train_dglss(ARCH, DATA, dist_type="standard", epochs=FEATURE_EXTRACTOR_EPOCHS):
+    trainer = DGLSSTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, dist_type=dist_type) # saves in "/logs/SENet_..."
     trainer.train(epochs=epochs)
 
 def DDFEtrain_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
@@ -385,12 +385,12 @@ def main():
 
     ARCH["train"]["batch_size"] = 16
 
-    train_dglss(ARCH, DATA, depth=True)
+    train_dglss(ARCH, DATA)
     # DDFEtrain_extractor(ARCH, DATA)
 
     ARCH["train"]["batch_size"] = 2
 
-    hdc = train_hdc(ARCH, DATA, depth=True)
+    hdc = train_hdc(ARCH, DATA)
     init_sub(ARCH, DATA)
     # test_inference(ARCH, DATA)
 
