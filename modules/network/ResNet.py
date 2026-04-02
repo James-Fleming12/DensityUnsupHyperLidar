@@ -115,9 +115,9 @@ class ResNet_34(nn.Module):
         self.layer3 = self._make_layer(block, 128, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 128, layers[3], stride=2)
         if self.depth:
-            self.layer5 = self._make_layer(block, 128, layers[0], stride=2)
+            self.layer5 = self._make_layer(block, 256, layers[2], stride=2)
 
-        self.conv_1 = BasicConv2d(768 if depth else 640, 256, kernel_size=3, padding=1)
+        self.conv_1 = BasicConv2d(896 if depth else 640, 256, kernel_size=3, padding=1)
         self.conv_2 = BasicConv2d(256, 128, kernel_size=3, padding=1)
         self.semantic_output = nn.Conv2d(128, nclasses, 1)
 
