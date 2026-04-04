@@ -796,13 +796,12 @@ class DensityModel(nn.Module):
 
                 sample_encs = enc_norm[class_indices]
 
-                proto_sims = torch.sum(sample_encs * F.normalize(self.classify.weight[c_id].unsqueeze(0), dim=1), dim=1)
-                proto_valid = proto_sims < thresholds[1] # masks based on proximity to class prototype
-                if not torch.any(proto_valid):
-                    continue
-
-                class_indices = class_indices[proto_valid]
-                sample_encs = sample_encs[proto_valid]
+                # proto_sims = torch.sum(sample_encs * F.normalize(self.classify.weight[c_id].unsqueeze(0), dim=1), dim=1)
+                # proto_valid = proto_sims < thresholds[1] # masks based on proximity to class prototype
+                # if not torch.any(proto_valid):
+                #     continue
+                # class_indices = class_indices[proto_valid]
+                # sample_encs = sample_encs[proto_valid]
 
                 if self.subcluster_type == 'bipolar':
                     target_encs = torch.sign(active_enc[class_indices])
