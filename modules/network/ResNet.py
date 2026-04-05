@@ -99,7 +99,7 @@ class ResNet_34(nn.Module):
         self.dilation = 1
         self.aux = aux
 
-        self.depth = depth
+        # self.depth = depth
 
         self.groups = groups
         self.base_width = width_per_group
@@ -114,8 +114,8 @@ class ResNet_34(nn.Module):
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 128, layers[2], stride=2)
         self.layer4 = self._make_layer(block, 128, layers[3], stride=2)
-        if self.depth:
-            self.layer5 = self._make_layer(block, 256, layers[2], stride=2)
+        # if self.depth:
+        #     self.layer5 = self._make_layer(block, 256, layers[2], stride=2)
 
         self.conv_1 = BasicConv2d(896 if depth else 640, 256, kernel_size=3, padding=1)
         self.conv_2 = BasicConv2d(256, 128, kernel_size=3, padding=1)
@@ -169,12 +169,12 @@ class ResNet_34(nn.Module):
         res_3 = F.interpolate(x_3, size=x.size()[2:], mode='bilinear', align_corners=True)
         res_4 = F.interpolate(x_4, size=x.size()[2:], mode='bilinear', align_corners=True)
 
-        if self.depth:
-            x_5 = self.layer5(x_4)
-            res_5 = F.interpolate(x_5, size=x.size()[2:], mode='bilinear', align_corners=True)
-            res = [x, x_1, res_2, res_3, res_4, res_5]
-        else:
-            res = [x, x_1, res_2, res_3, res_4]
+        # if self.depth:
+        #     x_5 = self.layer5(x_4)
+        #     res_5 = F.interpolate(x_5, size=x.size()[2:], mode='bilinear', align_corners=True)
+        #     res = [x, x_1, res_2, res_3, res_4, res_5]
+        # else:
+        res = [x, x_1, res_2, res_3, res_4]
         feat_map = torch.cat(res, dim=1) 
         
         out = self.conv_1(feat_map)

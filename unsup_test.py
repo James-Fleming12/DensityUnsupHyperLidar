@@ -1064,13 +1064,13 @@ def main():
     # test_subcluster_similarity_diagnostics(ARCH, trainloader, NUM_CLASSES)
     # test_collapse_debug(ARCH, trainloader)
 
-    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=0, depth=True)
-    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=3, depth=True)
-    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=5, depth=True)
+    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=0)
+    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=3)
+    test_collapse(ARCH, trainloader, inference_epochs=50, distance_sensitivity=5)
 
-    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=0, kitti=True, depth=True)
-    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=3, kitti=True, depth=True)
-    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=5, kitti=True, depth=True)
+    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=0, kitti=True)
+    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=3, kitti=True)
+    test_collapse(ARCH, kittiloader, inference_epochs=50, distance_sensitivity=5, kitti=True)
 
 if __name__=="__main__":
     main()
