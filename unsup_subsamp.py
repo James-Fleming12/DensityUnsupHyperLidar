@@ -5,12 +5,15 @@ import yaml
 
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import DensityModel
-from modules.trainer import Trainer
-from modules.ioueval import iouEval
 
 import numpy as np
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
+
+from torch import optim
+from torch import nn
+from modules.losses.boundary_loss import BoundaryLoss
+from modules.losses.Lovasz_Softmax import Lovasz_softmax
 
 MODEL_DIR = "logs"
 NU_DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_all"
@@ -72,7 +75,7 @@ def multistep_dumbbell(history, file_suffix=""):
     plt.close()
     print(f"Dumbbell plot saved to {out_path}")
 
-def subsample_online_update(model, dataloader, section_size=100):
+def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
     """
     section_size defines the number of batches per section
     """
@@ -117,16 +120,37 @@ def subsample_online_update(model, dataloader, section_size=100):
 
         print(f"  Fine-tuning on {len(supervised_batches)} supervised batches...")
         model.net.train()
-        optimizer = torch.optim.SGD(model.net.parameters(), lr=1e-4, momentum=0.9, weight_decay=1e-4)
+
+        optimizer = optim.SGD(model.net.parameters(), lr=ARCH["train"]["decay"]["lr"], momentum=ARCH["train"]["momentum"], weight_decay=ARCH["train"]["w_decay"])
+
+        criterion = nn.NLLLoss(weight=loss_w, ignore_index=0).to(device)
+        ls = Lovasz_softmax(ignore=0).to(device)
+        bd = BoundaryLoss().to(device)
+
+        scaler = torch.amp.GradScaler('cuda')
+        
         for proj_in, _, proj_labels, *_ in supervised_batches:
             proj_in = proj_in.to(device)
-            proj_labels = proj_labels.to(device).long()
+
+            proj_labels = proj_labels.to(device).long().squeeze(1) 
+            
             optimizer.zero_grad()
+            
             with torch.amp.autocast('cuda'):
-                pred, _ = model.net(proj_in)
-                loss = F.nll_loss(torch.log(pred.clamp(min=1e-8)), proj_labels.squeeze(1))
-            loss.backward()
-            optimizer.step()
+                output = model.net(proj_in)
+                pred = output[0] if isinstance(output, tuple) else output
+
+                bdlosss = bd(pred, proj_labels)
+                nll_loss = criterion(torch.log(pred.clamp(min=1e-8)), proj_labels)
+                lovasz_loss = 1.5 * ls(pred, proj_labels)
+                
+                loss_m = nll_loss + lovasz_loss + bdlosss
+                loss = loss_m.mean()
+
+            scaler.scale(loss).backward()
+            scaler.step(optimizer)
+            scaler.update()
+            
         model.net.eval()
 
         print(f"  Inference updating on unsupervised batches...")
@@ -220,11 +244,24 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
+    epsilon_w = ARCH["train"]["epsilon_w"]
+    content = torch.zeros(kitti_parser.get_n_classes(), dtype=torch.float)
+    for cl, freq in KITTI_DATA["content"].items():
+        x_cl = kitti_parser.to_xentropy(cl)
+        content[x_cl] += freq
+    loss_w = 1 / (content + epsilon_w)
+    
+    for x_cl, w in enumerate(loss_w):
+        if KITTI_DATA["learning_ignore"][x_cl]:
+            loss_w[x_cl] = 0
+            
+    loss_w = loss_w.to(device)
+
     model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
     model.to(device)
-    
-    _ = subsample_online_update(model, kittiloader)
+
+    _ = subsample_online_update(model, kittiloader, ARCH, loss_w)
 
 if __name__=="__main__":
     main()
