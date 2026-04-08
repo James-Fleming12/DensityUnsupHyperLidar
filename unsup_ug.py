@@ -48,13 +48,7 @@ def get_loader(ARCH, DATA, sequences, shuffle=True):
 
 def pretrain_pipeline(ARCH, DATA, base_count=10):
     """
-    Executes the standard training flow on a subset of the data.
- 
-    Returns
-    -------
-    model : DensityModel
-    seen_classes : set of int
-        Mapped class IDs observed in the pretraining sequences.
+    returns model : DensityModel, seen_classes : set of int (Mapped class IDs observed in the pretraining sequences)
     """
     print(f"--- Starting Pretraining on first {base_count} scenarios ---")
 
@@ -119,7 +113,7 @@ def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=
     remaining_seqs = DATA["split"]["train"][base_count:]
     valid_seqs = DATA["split"]["valid"]
 
-    model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+    model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
     model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
     model.to(device)
 

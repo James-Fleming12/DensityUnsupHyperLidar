@@ -430,7 +430,7 @@ class BasicHD():
         return iou.avg
     
 class DensityTrainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, modeldir, logger, bipolar_prototypes=False, depth=False):
+    def __init__(self, ARCH, DATA, datadir, logdir, modeldir, logger, bipolar_prototypes=False, bipolar_subclusters=False, depth=False):
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.logger = logger
@@ -469,7 +469,7 @@ class DensityTrainer():
                 self.loss_w[x_cl] = 0
         print("Loss weights from content: ", self.loss_w.data)
 
-        self.model = set_dense_model(ARCH, modeldir, 'rp', 0, 0, self.num_classes, self.device, depth=depth)
+        self.model = set_dense_model(ARCH, modeldir, 'rp', 0, 0, self.num_classes, self.device, depth=depth, subcluster_type='bipolar' if bipolar_subclusters else 'continuous')
         print(self.parser.get_n_classes())
         self.post = None
         if self.ARCH["post"]["KNN"]["use"]:

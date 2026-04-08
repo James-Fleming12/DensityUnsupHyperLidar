@@ -616,7 +616,8 @@ class DensityModel(nn.Module):
             bandwidth_multiplier=self.mult,
             dedup_scale=self.dedup
         )
-        cluster_centers = np.sign(cluster_centers)
+        if self.subcluster_type == "bipolar":
+            cluster_centers = np.sign(cluster_centers)
         
         num_clusters_found = len(cluster_centers)
         print(f"  Found {num_clusters_found} clusters")
