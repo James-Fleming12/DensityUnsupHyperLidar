@@ -316,7 +316,12 @@ class DensityModel(nn.Module):
                 torch.cuda.manual_seed_all(42)
 
             if not gauss_rp:
-                self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+                # self.projection = embeddings.Projection(self.input_dim, self.hd_dim)
+
+                self.projection = nn.Linear(self.input_dim, self.hd_dim, bias=False)
+                with torch.no_grad():
+                    gaussian_matrix = torch.randn(self.hd_dim, self.input_dim) 
+                    self.projection.weight.copy_(gaussian_matrix / np.sqrt(self.input_dim))
             else:
                 self.projection = nn.Linear(self.input_dim, self.hd_dim, bias=False)
                 with torch.no_grad():
