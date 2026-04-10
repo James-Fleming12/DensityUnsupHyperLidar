@@ -303,7 +303,7 @@ def main():
 
     ARCH["train"]["batch_size"] = 16
 
-    # train_dglss(ARCH, DATA)
+    train_dglss(ARCH, DATA)
 
     w_dict = torch.load(MODEL_DIR + "/SENet_valid_best", map_location=lambda storage, loc: storage)
 
