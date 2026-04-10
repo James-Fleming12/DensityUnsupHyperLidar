@@ -206,22 +206,18 @@ class DGLSSTrainer():
         return in_vol
     
     def compute_prototypes(self, features, labels):
-        # features: [B, C, H, W], labels: [B, H, W]
         b, c, h, w = features.shape
-        features = features.permute(0, 2, 3, 1).reshape(-1, c)
-        labels = labels.view(-1)
-        
-        prototypes = []
-        valid_classes = [i for i in range(self.parser.get_n_classes()) if i != 0] # exclude ignore labels like 0 or 255
-        
-        for cls in valid_classes:
-            mask = (labels == cls)
-            if mask.any() and mask.sum() > 10:
-                prototypes.append(features[mask].mean(0))
-            else:
-                prototypes.append(torch.zeros(c, device=features.device))
-        
-        return torch.stack(prototypes)
+        valid_classes = [i for i in range(self.parser.get_n_classes()) if i != 0]
+        n_valid = len(valid_classes)
+        prototypes = torch.zeros(b, n_valid, c, device=features.device)
+        for bi in range(b):
+            feat_i = features[bi].permute(1, 2, 0).reshape(-1, c)
+            lbl_i  = labels[bi].reshape(-1)
+            for ci, cls in enumerate(valid_classes):
+                mask = (lbl_i == cls)
+                if mask.sum() > 10:
+                    prototypes[bi, ci] = feat_i[mask].mean(0)
+        return prototypes
 
     def calculate_estimate(self, epoch, iter):
         estimate = int((self.data_time_t.avg + self.batch_time_t.avg) * \
@@ -398,8 +394,6 @@ class DGLSSTrainer():
         if self.gpu:
             torch.cuda.empty_cache()
 
-        scaler = torch.amp.GradScaler('cuda')
-
         evaluator.reset()
         model.train()
         
@@ -418,11 +412,11 @@ class DGLSSTrainer():
 
             with torch.amp.autocast('cuda'):
                 if self.ARCH["train"]["aux_loss"]:
-                    output, aux_list, z8 = model(in_vol)
-                    output_aug, aux_list_aug, z8_aug = model(in_vol_aug)
+                    output, aux_list, z8, enc_s = model(in_vol, return_enc=True)
+                    output_aug, aux_list_aug, z8_aug, enc_a = model(in_vol_aug, return_enc=True)
                 else:
-                    output, z8 = model(in_vol)
-                    output_aug, z8_aug = model(in_vol_aug)
+                    output, z8, enc_s = model(in_vol, return_enc=True)
+                    output_aug, z8_aug, enc_a = model(in_vol_aug, return_enc=True)
 
                 loss_sem_orig = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels)
                 loss_sem_aug = criterion(torch.log(output_aug.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output_aug, proj_labels)
@@ -431,30 +425,82 @@ class DGLSSTrainer():
 
                 # SIFC Loss (with masking)
                 valid_mask = (proj_labels > 0) # Shape: [B, H, W]
-                if valid_mask.any():
+                tau = 0.5
+                beam_present = (in_vol_aug[:, 0, :, :] != 0)
+                paired_mask   = valid_mask & beam_present
+                unpaired_mask = valid_mask & ~beam_present
+
+                loss_sifc = torch.tensor(0.0, device=enc_s.device)
+
+                if paired_mask.any():
                     if self.dist_type == 'angular':
-                        z8_n = torch.nn.functional.normalize(z8, p=2, dim=1) # Angular distance
-                        z8_a_n = torch.nn.functional.normalize(z8_aug, p=2, dim=1)
-                        cos_dist = 1.0 - (z8_n * z8_a_n).sum(dim=1) # Cosine Distances
-                        loss_sifc = cos_dist[valid_mask].mean()
+                        es_n = F.normalize(enc_s, p=2, dim=1)
+                        ea_n = F.normalize(enc_a, p=2, dim=1)
+                        cos_dist = 1.0 - (es_n * ea_n).sum(dim=1)
+                        loss_sifc = loss_sifc + cos_dist[paired_mask].mean()
                     else:
-                        l1_mask = valid_mask.unsqueeze(1).expand_as(z8) # Standard L1 distance: Absolute feature difference
-                        loss_sifc = F.l1_loss(z8[l1_mask], z8_aug[l1_mask])
-                else:
-                    loss_sifc = torch.tensor(0.0, device=z8.device)
+                        pm = paired_mask.unsqueeze(1).expand_as(enc_s)
+                        loss_sifc = loss_sifc + F.l1_loss(enc_s[pm], enc_a[pm])
+
+                if unpaired_mask.any():
+                    B, C, H, W = enc_s.shape
+                    enc_s_flat = enc_s.permute(0, 2, 3, 1).reshape(B, H*W, C)
+                    enc_a_flat = enc_a.permute(0, 2, 3, 1).reshape(B, H*W, C)
+                    paired_flat   = paired_mask.reshape(B, H*W)
+                    unpaired_flat = unpaired_mask.reshape(B, H*W)
+
+                    agg_losses = []
+                    for b in range(B):
+                        p_idx = paired_flat[b].nonzero(as_tuple=True)[0]
+                        u_idx = unpaired_flat[b].nonzero(as_tuple=True)[0]
+                        if len(p_idx) == 0 or len(u_idx) == 0:
+                            continue
+
+                        f_s_p = enc_s_flat[b][p_idx]
+                        f_a_p = enc_a_flat[b][p_idx]
+                        f_s_u = enc_s_flat[b][u_idx]
+
+                        f_s_u_n = F.normalize(f_s_u, p=2, dim=1)
+                        f_s_p_n = F.normalize(f_s_p, p=2, dim=1)
+                        affinity = f_s_u_n @ f_s_p_n.T
+
+                        affinity = affinity * (affinity >= tau).float()
+
+                        pu = torch.stack([p_idx % W, p_idx // W], dim=1).float()
+                        uu = torch.stack([u_idx % W, u_idx // W], dim=1).float()
+                        sp_dist = torch.cdist(uu, pu)
+                        inv_dist = 1.0 / (sp_dist + 1e-6)
+                        weights = affinity * inv_dist
+                        weight_sum = weights.sum(dim=1, keepdim=True).clamp(min=1e-6)
+                        weights = weights / weight_sum
+
+                        f_agg = weights @ f_a_p
+
+                        valid_agg = weights.sum(dim=1) > 0
+                        if valid_agg.any():
+                            agg_losses.append(F.l1_loss(f_s_u[valid_agg], f_agg[valid_agg]))
+
+                    if agg_losses:
+                        loss_sifc = loss_sifc + torch.stack(agg_losses).mean()
 
                 # SCC Loss
                 prototypes_s = self.compute_prototypes(z8, proj_labels)
                 prototypes_a = self.compute_prototypes(z8_aug, proj_labels)
 
-                valid = (prototypes_s.norm(dim=1) > 0) & (prototypes_a.norm(dim=1) > 0)
-                if self.dist_type == 'angular':
-                    p_s_n = torch.nn.functional.normalize(prototypes_s[valid], p=2, dim=1)
-                    p_a_n = torch.nn.functional.normalize(prototypes_a[valid], p=2, dim=1)
-                    loss_scc = F.mse_loss(p_s_n @ p_s_n.T, p_a_n @ p_a_n.T)
-                else:
-                    ps, pa = prototypes_s[valid], prototypes_a[valid]
-                    loss_scc = F.mse_loss(ps @ ps.T, pa @ pa.T)
+                all_protos = torch.cat([prototypes_s, prototypes_a], dim=0)
+
+                valid_mask_proto = all_protos.norm(dim=2) > 0
+                shared_valid = valid_mask_proto.all(dim=0)
+
+                loss_scc = torch.tensor(0.0, device=z8.device)
+
+                if shared_valid.sum() >= 2:
+                    p = all_protos[:, shared_valid, :]
+                    if self.dist_type == 'angular':
+                        p = F.normalize(p, p=2, dim=2)
+                    corr = torch.bmm(p, p.transpose(1, 2))
+                    corr_mean = corr.mean(dim=0, keepdim=True)
+                    loss_scc = ((corr - corr_mean) ** 2).mean()
 
                 loss_total = loss_sem + (self.lam1 * loss_sifc) + (self.lam2 * loss_scc)
 
