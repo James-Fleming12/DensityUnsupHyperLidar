@@ -625,13 +625,13 @@ class DensityModel(nn.Module):
         subclusters = []
         if num_clusters_found <= num_sub_per_cluster:
             for center in cluster_centers:
-                center_tensor = torch.tensor(center, device='cpu', dtype=torch.float16)
+                center_tensor = torch.tensor(center, device='cpu', dtype=torch.float32)
                 subclusters.append(center_tensor)
         else:
             center_tensor = torch.tensor(cluster_centers, dtype=torch.float32)
             fps_indices = self._farthest_point_sample(center_tensor, num_sub_per_cluster)
             for idx in fps_indices.tolist():
-                center = torch.tensor(cluster_centers[idx], device='cpu', dtype=torch.float16)
+                center = torch.tensor(cluster_centers[idx], device='cpu', dtype=torch.float32)
                 subclusters.append(center)
 
         return subclusters
@@ -703,8 +703,8 @@ class DensityModel(nn.Module):
         Handles both bipolar and continuous subclusters.
         """
         mask = self.subcluster_to_class == class_id
-        relevant_subclusters = self.subclusters[mask]
-        
+        relevant_subclusters = self.subclusters[mask].to(enc.dtype) # datatype conversion just in case
+
         if self.subcluster_type == 'bipolar':
             enc_binary = torch.sign(enc).to(dtype=self.subclusters.dtype)
             hd_dim = enc_binary.shape[1]
