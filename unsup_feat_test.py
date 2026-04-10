@@ -77,11 +77,9 @@ def validate_points_per_class(points_per_class_per_batch: int, profile: dict) ->
     adjusted = points_per_class_per_batch
 
     if points_per_class_per_batch > rarest_median:
-        adjusted = rarest_median
         print(f"  WARNING OVERSHOOT: value ({points_per_class_per_batch}) exceeds the rarest class "
-              f"median ({rarest_median}). The cap would never fire for that class.\n"
-              f"     Auto-adjusting to {adjusted} (rarest-class median).")
-
+              f"median ({rarest_median}). The cap will not fire for that class — it will always "
+              f"contribute all its points, which is fine.")
     elif points_per_class_per_batch < most_common_p10:
         print(f"  WARNING UNDERSHOOT: value ({points_per_class_per_batch}) is below the 10th-percentile count of the most common class ({most_common_p10}).\n     You may be discarding too aggressively — consider raising it if RAM allows.")
     else:
@@ -90,7 +88,7 @@ def validate_points_per_class(points_per_class_per_batch: int, profile: dict) ->
     print(f"  Final value          : {adjusted}\n")
     return adjusted
 
-def test_features(ARCH, DATA, net, points_per_class_per_batch: int = 50):
+def test_features(ARCH, DATA, net, points_per_class_per_batch: int = 200):
     parser = Parser(
         root=DATA_DIR,
         train_sequences=DATA["split"]["train"],
@@ -170,8 +168,7 @@ def display_separability(feats: np.ndarray, labels: np.ndarray, id_to_name: dict
     classifiers = {
         "Logistic Regression (L2)": Pipeline([
             ("scaler", StandardScaler()),
-            ("clf", LogisticRegression(max_iter=1000, C=1.0, solver="lbfgs",
-                                       multi_class="auto", n_jobs=-1)),
+            ("clf", LogisticRegression(max_iter=1000, C=1.0, solver="lbfgs", n_jobs=-1)),
         ]),
         "Linear SVM (OvR)": Pipeline([
             ("scaler", StandardScaler()),
@@ -306,7 +303,7 @@ def main():
 
     ARCH["train"]["batch_size"] = 16
 
-    train_dglss(ARCH, DATA)
+    # train_dglss(ARCH, DATA)
 
     w_dict = torch.load(MODEL_DIR + "/SENet_valid_best", map_location=lambda storage, loc: storage)
 
