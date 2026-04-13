@@ -37,8 +37,8 @@ class DGLSSTrainer():
         dist_type can be 'standard' (L1/MSE) or 'angular' (Cosine/ArcFace-style)
         """
         self.dist_type = dist_type
-        self.lam1_max = 0.1
-        self.lam2_max = 0.1
+        self.lam1_max = 0.5
+        self.lam2_max = 0.5
         self.lam1 = 0.0
         self.lam2 = 0.0
 
@@ -297,7 +297,7 @@ class DGLSSTrainer():
 
         # train for n epochs
         max_epochs = epochs if epochs is not None else self.ARCH["train"]["max_epochs"]
-        warmup_start = int(0.3 * max_epochs)
+        warmup_start = int(0.1 * max_epochs)
         
         for epoch in range(self.epoch, max_epochs):
             if epoch < warmup_start:

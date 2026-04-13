@@ -152,7 +152,33 @@ def test_features(ARCH, DATA, net, points_per_class_per_batch: int = 200):
 
     display_separability(all_feats, all_labels, id_to_name)
 
-def display_separability(feats: np.ndarray, labels: np.ndarray, id_to_name: dict = None):
+    print("\nRunning separability on encoder features (feat_map)...")
+    all_enc_feats = []
+
+    train_loader_enc = parser.get_train_set()
+
+    net.eval()
+    with torch.no_grad():
+        for i, (in_vol, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in tqdm(enumerate(train_loader_enc), total=len(train_loader_enc), desc="Extracting encoder features"):
+            _, _, enc_feat = net(in_vol, return_enc=True)
+            B, C, H, W = enc_feat.shape
+            feats_flat = enc_feat.permute(0, 2, 3, 1).reshape(-1, C).cpu().numpy()
+            labels_flat = proj_labels.reshape(-1).cpu().numpy()
+            mask = labels_flat != 0
+            feats_flat = feats_flat[mask]
+            labels_flat = labels_flat[mask]
+            if len(labels_flat) == 0:
+                continue
+            feats_flat, labels_flat = subsample_per_class(
+                feats_flat, labels_flat, points_per_class=points_per_class_per_batch
+            )
+            all_enc_feats.append(feats_flat)
+
+    all_enc_feats = np.concatenate(all_enc_feats, axis=0)
+    print(f"Encoder feature dimensionality: {all_enc_feats.shape[1]}")
+    display_separability(all_enc_feats, all_labels, id_to_name, f_suffix="_enc")
+
+def display_separability(feats: np.ndarray, labels: np.ndarray, id_to_name: dict = None, f_suffix: str = ""):
     if id_to_name is None:
         unique = np.unique(labels)
         id_to_name = {k: str(k) for k in unique}
@@ -285,7 +311,7 @@ def display_separability(feats: np.ndarray, labels: np.ndarray, id_to_name: dict
 
     fig.suptitle("LiDAR Feature Separability Dashboard", fontsize=16, fontweight="bold", color=text_color, y=1.01)
 
-    plt.savefig("feature_separability.png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.savefig(f"feature_separability{f_suffix}.png", dpi=150, bbox_inches="tight", facecolor=fig.get_facecolor())
     plt.show()
     print("\nPlot saved to feature_separability.png")
 
