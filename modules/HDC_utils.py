@@ -467,6 +467,126 @@ class DensityModel(nn.Module):
             pair_simil[:self.num_classes, :self.num_classes] = torch.eye(self.num_classes)
         return pair_simil.detach().cpu().numpy(), class_hv.detach().cpu().numpy()
     
+    def update_subclusters(self, x, proj_labels, learning_rate=0.1, min_samples=10, method="proximity_pull"):
+        """
+        Updates subclusters from labeled data.
+        method: 'proximity_pull', 'soft_weighted', 'mean_shift'
+        """
+        self.eval()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            labels_flat = proj_labels.view(-1)
+
+            assert enc.shape[0] == labels_flat.shape[0], f"Encoding size {enc.shape[0]} doesn't match label size {labels_flat.shape[0]}"
+
+            for class_id in range(self.num_classes):
+                class_mask = labels_flat == class_id
+                if class_mask.sum() < min_samples:
+                    continue
+
+                class_enc = enc[class_mask].float()
+                mask = self.subcluster_to_class == class_id
+                relevant_subclusters = self.subclusters[mask]
+                subcluster_indices = torch.nonzero(mask).squeeze(1)
+                n_subs = relevant_subclusters.shape[0]
+
+                if self.subcluster_type == 'bipolar':
+                    class_enc_binary = torch.sign(class_enc).to(dtype=self.subclusters.dtype)
+                    similarities = (torch.matmul(class_enc_binary, relevant_subclusters.T) + self.hd_dim) / (2 * self.hd_dim)
+                else:
+                    similarities = torch.matmul(F.normalize(class_enc, dim=1), F.normalize(relevant_subclusters, dim=1).T)
+
+                if method == "proximity_pull": # each sample updates only its closest subcluster
+                    assignments = torch.argmax(similarities, dim=1)
+                    assignments_expanded = assignments.unsqueeze(1).expand(-1, class_enc.shape[1])
+
+                    sum_per_sub = torch.zeros(n_subs, class_enc.shape[1], device=self.device, dtype=torch.float32)
+                    sum_per_sub.scatter_add_(0, assignments_expanded, class_enc)
+
+                    counts = torch.zeros(n_subs, device=self.device, dtype=torch.float32)
+                    counts.scatter_add_(0, assignments, torch.ones(assignments.shape[0], device=self.device))
+
+                    valid = counts >= min_samples
+                    if not valid.any():
+                        continue
+
+                    new_means = sum_per_sub[valid] / counts[valid].unsqueeze(1)
+                elif method == "soft_weighted": # each sample contributes to all subclusters weighted by similarity
+                    weights = F.softmax(similarities, dim=1)
+
+                    new_means = torch.matmul(weights.T, class_enc)
+                    weight_sums = weights.sum(dim=0)
+
+                    valid = weight_sums >= (min_samples * 0.1)
+                    if not valid.any():
+                        continue
+
+                    new_means = new_means[valid] / weight_sums[valid].unsqueeze(1)
+                elif method == "mean_shift":
+                    class_emb_np = class_enc.cpu().numpy()
+
+                    estimated_bandwidth = estimate_bandwidth_binary(
+                        class_emb_np,
+                        quantile=self.quantile,
+                        n_samples=min(500, len(class_emb_np)),
+                        bandwidth_multiplier=self.mult
+                    )
+
+                    try:
+                        new_centers = mean_shift_binary(
+                            X=class_emb_np,
+                            bandwidth=estimated_bandwidth,
+                            quantile=self.quantile,
+                            bandwidth_multiplier=self.mult,
+                            dedup_scale=self.dedup
+                        )
+                    except Exception as e:
+                        print(f"  Mean shift failed for class {class_id}: {e}, skipping")
+                        continue
+
+                    new_centers = np.sign(new_centers)
+                    new_centers_t = F.normalize(torch.tensor(new_centers, dtype=torch.float32, device=self.device), dim=1)
+
+                    for new_center in new_centers_t: # find similar existing subcluster and pull towards
+                        if self.subcluster_type == 'bipolar':
+                            new_binary = torch.sign(new_center).to(dtype=self.subclusters.dtype)
+                            sims = (torch.matmul(new_binary.unsqueeze(0), relevant_subclusters.T) + self.hd_dim) / (2 * self.hd_dim)
+                        else:
+                            sims = torch.matmul(F.normalize(new_center.unsqueeze(0), dim=1), F.normalize(relevant_subclusters, dim=1).T)
+
+                        sims = sims.squeeze(0)
+                        closest_idx = sims.argmax().item()
+                        absolute_idx = subcluster_indices[closest_idx].item()
+
+                        current = self.subclusters.data[absolute_idx].float()
+                        updated = (1.0 - learning_rate) * current + learning_rate * new_center.float()
+
+                        if self.subcluster_type == 'bipolar':
+                            updated = torch.sign(updated)
+                            updated[updated == 0] = -1.0
+
+                        self.subclusters.data[absolute_idx] = F.normalize(updated.unsqueeze(0), dim=1).squeeze(0)
+
+                        relevant_subclusters = self.subclusters[mask]
+                else:
+                    raise ValueError(f"Unknown method: {method}. Choose 'proximity_pull' or 'soft_weighted'.")
+
+                if self.subcluster_type == 'bipolar': # Normalize new means
+                    new_means = torch.sign(new_means)
+                    new_means[new_means == 0] = -1.0
+
+                new_means = F.normalize(new_means, dim=1)
+
+                valid_absolute_indices = subcluster_indices[valid]
+                current = self.subclusters.data[valid_absolute_indices].float()
+                updated = (1.0 - learning_rate) * current + learning_rate * new_means # EMA Update
+
+                if self.subcluster_type == 'bipolar':
+                    updated = torch.sign(updated)
+                    updated[updated == 0] = -1.0
+
+                self.subclusters.data[valid_absolute_indices] = F.normalize(updated, dim=1)
+
     def init_subclusters(self, dataloader, bandwidth=None, max_samples_per_class=8000, sampling_strategy='diverse'):
         """
         sampling_strategy: 'random' (simple random sampling), 'diverse' (stratified, temporal diversity), or 'fps' (farthest point sampling)

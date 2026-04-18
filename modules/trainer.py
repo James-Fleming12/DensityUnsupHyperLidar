@@ -20,6 +20,8 @@ from tqdm import tqdm
 
 import torch.nn.functional as F
 
+import matplotlib.pyplot as plt
+
 def save_to_log(logdir, logfile, message):
     f = open(logdir + '/' + logfile, "a")
     f.write(message + '\n')
@@ -37,8 +39,8 @@ class DGLSSTrainer():
         dist_type can be 'standard' (L1/MSE) or 'angular' (Cosine/ArcFace-style)
         """
         self.dist_type = dist_type
-        self.lam1_max = 0.5
-        self.lam2_max = 0.5
+        self.lam1_max = 1
+        self.lam2_max = 1
         self.lam1 = 0.0
         self.lam2 = 0.0
 
@@ -62,6 +64,9 @@ class DGLSSTrainer():
                      "valid_iou": 0,
                      "best_train_iou": 0,
                      "best_val_iou": 0}
+        
+        self.train_losses = []
+        self.val_losses = []
 
         # get the data
         from dataset.kitti.parser import Parser
@@ -327,6 +332,9 @@ class DGLSSTrainer():
             self.info["train_acc"] = acc
             self.info["train_iou"] = iou
 
+            self.train_losses.append(loss)
+            self.val_losses.append(iou)
+
             # remember best iou and save checkpoint
             state = {'epoch': epoch, 'state_dict': self.model.state_dict(),
                      'optimizer': self.optimizer.state_dict(),
@@ -382,6 +390,22 @@ class DGLSSTrainer():
 
         print('Finished Training')
         # save_to_log(self.log, 'log.txt', time.strftime("%Y-%m-%d %H:%M:%S", time.localtime()))
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(self.train_losses, label='Train Loss')
+        if self.val_losses:
+            # Scale val x-axis to match epochs since validation runs less frequently
+            val_epochs = [i * self.ARCH["train"]["report_epoch"] for i in range(len(self.val_losses))]
+            ax.plot(val_epochs, self.val_losses, label='Val Loss')
+        ax.set_xlabel('Epoch')
+        ax.set_ylabel('Loss')
+        ax.set_title('Training and Validation Loss')
+        ax.legend()
+        ax.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(self.log, 'loss_curve.png'))
+        plt.close()
+        print(f"Loss curve saved to {self.log}/loss_curve.png")
+
         return
 
     def train_epoch(self, train_loader, model, criterion, optimizer, epoch, evaluator, scheduler, color_fn, report=10, show_scans=False):

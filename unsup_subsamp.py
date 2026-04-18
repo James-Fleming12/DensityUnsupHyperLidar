@@ -150,6 +150,8 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
+
+            model.update_subclusters(proj_in, proj_labels) # also update subclusters to reflect new domain
             
         model.net.eval()
 
