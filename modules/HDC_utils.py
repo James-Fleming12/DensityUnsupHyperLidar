@@ -826,14 +826,14 @@ class DensityModel(nn.Module):
         relevant_subclusters = self.subclusters[mask].to(enc.dtype) # datatype conversion just in case
 
         if self.subcluster_type == 'bipolar':
-            enc_binary = torch.sign(enc).to(dtype=self.subclusters.dtype)
+            enc_binary = torch.sign(enc).float()
             hd_dim = enc_binary.shape[1]
             
             dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
 
             base_similarity = (dot_products + hd_dim) / (2 * hd_dim)
         elif self.subcluster_type == 'continuous':
-            enc_norm = F.normalize(enc, dim=1)
+            enc_norm = F.normalize(enc.float(), dim=1)
             sub_norm = F.normalize(relevant_subclusters, dim=1)
             cosine_sim = torch.matmul(enc_norm, sub_norm.T)
 
