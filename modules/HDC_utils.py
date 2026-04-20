@@ -637,7 +637,7 @@ class DensityModel(nn.Module):
             batch_indices = torch.as_tensor(batch_indices[:len(class_emb_cpu)])
             
             class_emb_cpu = torch.cat(class_embeddings, dim=0)
-            batch_indices = torch.tensor(batch_indices)
+            batch_indices = batch_indices.detach().clone()
 
             if len(class_emb_cpu) > max_samples_per_class:
                 if sampling_strategy == 'random':
