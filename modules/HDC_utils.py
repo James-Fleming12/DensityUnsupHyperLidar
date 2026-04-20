@@ -771,20 +771,9 @@ class DensityModel(nn.Module):
                 end_idx = min(i + batch_size, total_centers)
 
                 if self.subcluster_type == 'bipolar':
-                    batch = torch.stack([
-                        self._make_bipolar(c.to(self.device)) if c.device.type == 'cpu' 
-                        else self._make_bipolar(c) 
-                        for c in centers_list[i:end_idx]
-                    ])
-
-                    batch = F.normalize(batch.float(), dim=1) # normalize (temp change to check)
-                    
-                    assert torch.all(torch.abs(batch) <= 1.0), f"Subclusters must be normalized!"
+                    batch = torch.stack([self._make_bipolar(c.to(self.device)) for c in centers_list[i:end_idx]])
                 elif self.subcluster_type == 'continuous':
-                    batch = torch.stack([
-                        c.to(self.device) if c.device.type == 'cpu' else c 
-                        for c in centers_list[i:end_idx]
-                    ])
+                    batch = torch.stack([c.to(self.device) if c.device.type == 'cpu' else c for c in centers_list[i:end_idx]])
                     batch = F.normalize(batch, dim=1)
 
                     norms = torch.norm(batch, dim=1)
@@ -823,7 +812,7 @@ class DensityModel(nn.Module):
         Handles both bipolar and continuous subclusters.
         """
         mask = self.subcluster_to_class == class_id
-        relevant_subclusters = self.subclusters[mask].to(enc.dtype) # datatype conversion just in case
+        relevant_subclusters = self.subclusters[mask].float()
 
         if self.subcluster_type == 'bipolar':
             enc_binary = torch.sign(enc).float()
