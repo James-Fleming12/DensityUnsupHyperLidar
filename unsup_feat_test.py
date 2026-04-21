@@ -25,7 +25,7 @@ DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17
 
-FEATURE_EXTRACTOR_EPOCHS = 400
+FEATURE_EXTRACTOR_EPOCHS = 800
 
 def subsample_per_class(feats: np.ndarray, labels: np.ndarray, points_per_class: int) -> tuple:
     keep_idx = []
@@ -160,7 +160,7 @@ def test_features(ARCH, DATA, net, points_per_class_per_batch: int = 200):
     net.eval()
     with torch.no_grad():
         for i, (in_vol, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in tqdm(enumerate(train_loader_enc), total=len(train_loader_enc), desc="Extracting encoder features"):
-            _, _, enc_feat = net(in_vol, return_enc=True)
+            _, _, _, enc_feat = net(in_vol, return_enc=True) # needs 4 for aux loss, 3 is no aux
             B, C, H, W = enc_feat.shape
             feats_flat = enc_feat.permute(0, 2, 3, 1).reshape(-1, C).cpu().numpy()
             labels_flat = proj_labels.reshape(-1).cpu().numpy()
@@ -169,9 +169,7 @@ def test_features(ARCH, DATA, net, points_per_class_per_batch: int = 200):
             labels_flat = labels_flat[mask]
             if len(labels_flat) == 0:
                 continue
-            feats_flat, labels_flat = subsample_per_class(
-                feats_flat, labels_flat, points_per_class=points_per_class_per_batch
-            )
+            feats_flat, labels_flat = subsample_per_class(feats_flat, labels_flat, points_per_class=points_per_class_per_batch)
             all_enc_feats.append(feats_flat)
 
     all_enc_feats = np.concatenate(all_enc_feats, axis=0)
@@ -329,7 +327,7 @@ def main():
 
     ARCH["train"]["batch_size"] = 16
 
-    train_dglss(ARCH, DATA)
+    train_dglss(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
     w_dict = torch.load(MODEL_DIR + "/SENet_valid_best", map_location=lambda storage, loc: storage)
 

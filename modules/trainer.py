@@ -39,8 +39,8 @@ class DGLSSTrainer():
         dist_type can be 'standard' (L1/MSE) or 'angular' (Cosine/ArcFace-style)
         """
         self.dist_type = dist_type
-        self.lam1_max = 1
-        self.lam2_max = 1
+        self.lam1_max = 4
+        self.lam2_max = 4
         self.lam1 = 0.0
         self.lam2 = 0.0
 
