@@ -568,6 +568,8 @@ class DensityModel(nn.Module):
                         self.subclusters.data[absolute_idx] = F.normalize(updated.unsqueeze(0), dim=1).squeeze(0)
 
                         relevant_subclusters = self.subclusters[mask]
+
+                    continue # skip the rest of the update logic (only used with the other two methods)
                 else:
                     raise ValueError(f"Unknown method: {method}. Choose 'proximity_pull' or 'soft_weighted'.")
 

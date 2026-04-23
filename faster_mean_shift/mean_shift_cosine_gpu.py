@@ -191,11 +191,7 @@ def get_binary_density_centroids(binary_vectors, bandwidth=0.2):
     """Get density centroids for binary hypervectors"""
     binary_vectors = (binary_vectors > 0.5).astype(np.uint8)
 
-    cluster_centers, labels = mean_shift_binary(
-        X=binary_vectors,
-        bandwidth=bandwidth,
-        GPU=True
-    )
+    cluster_centers, labels = mean_shift_binary(X=binary_vectors, bandwidth=bandwidth)
     return cluster_centers, labels
 
 def estimate_bandwidth_binary(X, quantile=0.3, n_samples=500, bandwidth_multiplier=0.3):

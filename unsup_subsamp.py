@@ -31,154 +31,172 @@ HDC_SUB_PATH = "logs/hdc_sub.pth"
 
 SUBSAMPLE_RATIO = 0.1
 
-def multistep_dumbbell(history, file_suffix=""):
-    labels = history["steps_labels"]
-    acc_pairs = np.array(history["acc_pairs"])
-    miou_pairs = np.array(history["miou_pairs"])
+ITER_COLORS = {
+    "pre":  ["#4C9BE8", "#F5A623", "#7ED321"],
+    "post": ["#E8574C", "#9B59B6", "#1ABC9C"],
+}
 
-    fig = plt.figure(figsize=(16, max(8, len(labels) * 0.8 + 3)))
+NUM_ITERS = 3
+
+def multistep_dumbbell(all_histories, file_suffix=""):
+    """
+    all_histories: list of history dicts, one per iteration.
+    All iterations must share the same steps_labels.
+    """
+    labels = all_histories[0]["steps_labels"]
+    y_pos = np.arange(len(labels))
+    n_iters = len(all_histories)
+
+    fig = plt.figure(figsize=(18, max(8, len(labels) * 0.8 + 3)))
     gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 1], wspace=0.35)
     ax1 = fig.add_subplot(gs[0])
     ax2 = fig.add_subplot(gs[1], sharey=ax1)
 
-    y_pos = np.arange(len(labels))
+    def draw_ax(ax, metric_key, title):
+        for yi in range(len(labels)):
+            ax.axhspan(yi - 0.45, yi + 0.45, color="#F4F4F4", zorder=0, alpha=0.6)
 
-    COLOR_PRE  = '#4C9BE8'
-    COLOR_POST = '#E8574C'
+        for it_idx, history in enumerate(all_histories):
+            pairs = np.array(history[metric_key])
+            c_pre = ITER_COLORS["pre"][it_idx]
+            c_post = ITER_COLORS["post"][it_idx]
+            iter_label = f"Iter {it_idx + 1}"
 
-    def draw_ax(ax, pairs, title):
-        for yi in range(len(pairs)):
-            ax.axhspan(yi - 0.45, yi + 0.45, color='#F4F4F4', zorder=0, alpha=0.6)
+            ax.hlines(y_pos, pairs[:, 0], pairs[:, 1], color=c_pre, alpha=0.35, linewidth=1.5, zorder=1)
 
-        ax.hlines(y_pos, pairs[:, 0], pairs[:, 1], color='#AAAAAA', alpha=0.6, linewidth=2, zorder=1)
-        ax.scatter(pairs[:, 0], y_pos, color=COLOR_PRE, s=130, label='Pre-Update', zorder=3, edgecolors='white', linewidths=0.8)
-        ax.scatter(pairs[:, 1], y_pos, color=COLOR_POST, s=130, label='Post-Update', zorder=3, edgecolors='white', linewidths=0.8)
+            ax.scatter(pairs[:, 0], y_pos, color=c_pre,  s=120, zorder=3, edgecolors="white", linewidths=0.8, label=f"Pre-Update ({iter_label})",  marker="o")
+            ax.scatter(pairs[:, 1], y_pos, color=c_post, s=120, zorder=3, edgecolors="white", linewidths=0.8, label=f"Post-Update ({iter_label})", marker="D")
 
-        ax.set_title(title, fontsize=13, fontweight='bold', pad=10)
-        ax.grid(axis='x', linestyle='--', alpha=0.35)
+        ax.set_title(title, fontsize=13, fontweight="bold", pad=10)
+        ax.grid(axis="x", linestyle="--", alpha=0.35)
         ax.set_xlabel("Metric Value", fontsize=10)
-        ax.spines[['top', 'right']].set_visible(False)
-        ax.legend(loc='lower right', fontsize=9)
+        ax.spines[["top", "right"]].set_visible(False)
+        ax.legend(loc="lower right", fontsize=8, ncol=n_iters)
 
-    draw_ax(ax1, acc_pairs,  "Accuracy Gain per Section")
-    draw_ax(ax2, miou_pairs, "mIoU Gain per Section")
+    draw_ax(ax1, "acc_pairs",  "Accuracy Gain per Section")
+    draw_ax(ax2, "miou_pairs", "mIoU Gain per Section")
 
     ax1.set_yticks(y_pos)
     ax1.set_yticklabels(labels, fontsize=9)
     ax2.tick_params(labelleft=False)
 
-    plt.suptitle("Impact of Subsample Online Updates on Unseen Data", fontsize=16, fontweight='bold', y=1.01)
+    plt.suptitle(f"Impact of Subsample Online Updates on Unseen Data  ({n_iters} iterations)", fontsize=16, fontweight="bold", y=1.01)
     plt.tight_layout()
 
     out_path = f"subsample_online_dumbbell{file_suffix}.png"
-    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    plt.savefig(out_path, dpi=300, bbox_inches="tight")
     plt.close()
     print(f"Dumbbell plot saved to {out_path}")
 
 def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
     """
-    section_size defines the number of batches per section
+    Repeats the full dataset pass NUM_ITERS times.
+    section_size defines the number of batches per section.
     """
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     n_supervised = max(1, int(section_size * SUBSAMPLE_RATIO))
     n_unsupervised = section_size - n_supervised
 
-    history = {
-        "steps_labels": [],
-        "acc_pairs": [],
-        "miou_pairs": [],
-    }
-
     print(f"Section size: {section_size} | Supervised per section: {n_supervised} | Unsupervised: {n_unsupervised}")
 
-    section_idx = 0
-    batch_iter = iter(dataloader)
-    exhausted = False
+    all_histories = []
 
-    while not exhausted:
-        section_start = section_idx * section_size
+    for iteration in range(NUM_ITERS):
+        print(f"\n{'='*60}")
+        print(f"  DATASET ITERATION {iteration + 1} / {NUM_ITERS}")
+        print(f"{'='*60}")
 
-        supervised_batches = []
-        for _ in range(n_supervised):
-            try:
-                supervised_batches.append(next(batch_iter))
-            except StopIteration:
-                exhausted = True
+        history = {
+            "steps_labels": [],
+            "acc_pairs":    [],
+            "miou_pairs":   [],
+        }
+
+        section_idx = 0
+        batch_iter = iter(dataloader)
+        exhausted = False
+
+        while not exhausted:
+            section_start = section_idx * section_size
+
+            supervised_batches = []
+            for _ in range(n_supervised):
+                try:
+                    supervised_batches.append(next(batch_iter))
+                except StopIteration:
+                    exhausted = True
+                    break
+
+            if not supervised_batches:
                 break
 
-        if not supervised_batches:
-            break
+            section_end = section_start + section_size
+            label = f"Batches {section_start}-{section_end}"
+            history["steps_labels"].append(label)
+            print(f"\n--- Section: {label} ---")
 
-        section_end = section_start + section_size
-        label = f"Batches {section_start}-{section_end}"
-        history["steps_labels"].append(label)
-        print(f"\n--- Section: {label} ---")
+            acc_pre, miou_pre = _eval_on_batches(model, supervised_batches, device)
+            print(f"  Pre-update  | Acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
-        acc_pre, miou_pre = _eval_on_batches(model, supervised_batches, device)
-        print(f"  Pre-update  | Acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
+            print(f"  Fine-tuning on {len(supervised_batches)} supervised batches...")
+            model.net.train()
 
-        print(f"  Fine-tuning on {len(supervised_batches)} supervised batches...")
-        model.net.train()
+            optimizer = optim.SGD(model.net.parameters(), lr=ARCH["train"]["decay"]["lr"], momentum=ARCH["train"]["momentum"], weight_decay=ARCH["train"]["w_decay"],)
 
-        optimizer = optim.SGD(model.net.parameters(), lr=ARCH["train"]["decay"]["lr"], momentum=ARCH["train"]["momentum"], weight_decay=ARCH["train"]["w_decay"])
+            criterion = nn.NLLLoss(weight=loss_w, ignore_index=0).to(device)
+            ls = Lovasz_softmax(ignore=0).to(device)
+            bd = BoundaryLoss().to(device)
 
-        criterion = nn.NLLLoss(weight=loss_w, ignore_index=0).to(device)
-        ls = Lovasz_softmax(ignore=0).to(device)
-        bd = BoundaryLoss().to(device)
+            scaler = torch.amp.GradScaler("cuda")
 
-        scaler = torch.amp.GradScaler('cuda')
-        
-        for proj_in, _, proj_labels, *_ in supervised_batches:
-            proj_in = proj_in.to(device)
+            for proj_in, _, proj_labels, *_ in supervised_batches:
+                proj_in = proj_in.to(device)
+                proj_labels = proj_labels.to(device).long().squeeze(1)
 
-            proj_labels = proj_labels.to(device).long().squeeze(1) 
-            
-            optimizer.zero_grad()
-            
-            with torch.amp.autocast('cuda'):
-                output = model.net(proj_in)
-                pred = output[0] if isinstance(output, tuple) else output
+                optimizer.zero_grad()
 
-                bdlosss = bd(pred, proj_labels)
-                nll_loss = criterion(torch.log(pred.clamp(min=1e-8)), proj_labels)
-                lovasz_loss = 1.5 * ls(pred, proj_labels)
-                
-                loss_m = nll_loss + lovasz_loss + bdlosss
-                loss = loss_m.mean()
+                with torch.amp.autocast("cuda"):
+                    output = model.net(proj_in)
+                    pred = output[0] if isinstance(output, tuple) else output
 
-            scaler.scale(loss).backward()
-            scaler.step(optimizer)
-            scaler.update()
+                    bdlosss = bd(pred, proj_labels)
+                    nll_loss = criterion(torch.log(pred.clamp(min=1e-8)), proj_labels)
+                    lovasz_loss = 1.5 * ls(pred, proj_labels)
+                    loss = (nll_loss + lovasz_loss + bdlosss).mean()
 
-            model.update_subclusters(proj_in, proj_labels) # also update subclusters to reflect new domain
-            
-        model.net.eval()
+                scaler.scale(loss).backward()
+                scaler.step(optimizer)
+                scaler.update()
 
-        print(f"  Inference updating on unsupervised batches...")
-        model.train()
-        n_unsup_processed = 0
-        for _ in tqdm(range(n_unsupervised)):
-            try:
-                proj_in, *_ = next(batch_iter)
-            except StopIteration:
-                exhausted = True
-                break
-            if proj_in.shape[1] > 0:
-                model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0)
-            n_unsup_processed += 1
+                model.update_subclusters(proj_in, proj_labels)
 
-        acc_post, miou_post = _eval_on_batches(model, supervised_batches, device)
-        print(f"  Post-update | Acc: {acc_post:.4f}  mIoU: {miou_post:.4f}")
+            model.net.eval()
 
-        history["acc_pairs"].append((acc_pre, acc_post))
-        history["miou_pairs"].append((miou_pre, miou_post))
+            print(f"  Inference updating on unsupervised batches...")
+            model.train()
+            for _ in tqdm(range(n_unsupervised)):
+                try:
+                    proj_in, *_ = next(batch_iter)
+                except StopIteration:
+                    exhausted = True
+                    break
+                if proj_in.shape[1] > 0:
+                    model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0)
 
-        section_idx += 1
-        del supervised_batches
+            acc_post, miou_post = _eval_on_batches(model, supervised_batches, device)
+            print(f"  Post-update | Acc: {acc_post:.4f}  mIoU: {miou_post:.4f}")
 
-    multistep_dumbbell(history)
-    return history
+            history["acc_pairs"].append((acc_pre, acc_post))
+            history["miou_pairs"].append((miou_pre, miou_post))
+
+            section_idx += 1
+            del supervised_batches
+
+        all_histories.append(history)
+
+    multistep_dumbbell(all_histories)
+    return all_histories
 
 def _eval_on_batches(model, batches, device):
     model.eval()
