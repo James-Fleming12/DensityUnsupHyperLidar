@@ -485,8 +485,8 @@ class DGLSSTrainer():
                     output, aux_list, z8, enc_s = model(in_vol, return_enc=True)
                     output_aug, aux_list_aug, z8_aug, enc_a = model(in_vol_aug, return_enc=True)
                 else:
-                    output, z8, enc_s = model(in_vol, return_enc=True)
-                    output_aug, z8_aug, enc_a = model(in_vol_aug, return_enc=True)
+                    output, enc_s, z8 = model(in_vol, return_enc=True)
+                    output_aug, enc_a, z8_aug = model(in_vol_aug, return_enc=True)
 
                 loss_sem_orig = criterion(torch.log(output.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output, proj_labels)
                 loss_sem_aug = criterion(torch.log(output_aug.clamp(min=1e-8)), proj_labels) + 1.5 * self.ls(output_aug, proj_labels)
