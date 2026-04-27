@@ -256,19 +256,18 @@ class DGLSSTrainer():
     
     @staticmethod
     def single_class_mask(labels):
-        """
-        Returns a bool mask [B,H,W] that is True where the 3x3 neighbourhood
-        around each pixel is *entirely* the same class (and non-background).
-        This approximates masking out semantically-mixed sparse voxel features.
-        """
+        if labels.dim() == 4 and labels.size(1) == 1:
+            labels = labels.squeeze(1)
+        if labels.dim() != 3:
+            raise ValueError(f"Expected labels [B,H,W], got {labels.shape}")
+
         B, H, W = labels.shape
-        lbl_f = labels.float().unsqueeze(1)   # [B,1,H,W]
-        # neighbourhood min and max via max-pool
+        lbl_f = labels.float().unsqueeze(1)
         pad = torch.nn.functional.pad(lbl_f, (1,1,1,1), mode='replicate')
         local_max = torch.nn.functional.max_pool2d(pad, 3, stride=1)
         local_min = -torch.nn.functional.max_pool2d(-pad, 3, stride=1)
-        pure = (local_max == local_min) & (labels > 0)   # same class, non-bg
-        return pure.squeeze(1) if pure.dim() == 4 else pure
+        pure = (local_max == local_min) & (labels > 0)
+        return pure.squeeze(1)
 
     def calculate_estimate(self, epoch, iter):
         estimate = int((self.data_time_t.avg + self.batch_time_t.avg) * \
@@ -499,14 +498,14 @@ class DGLSSTrainer():
                 source_present = (in_vol[:, 0, :, :] != 0)
                 beam_present = (in_vol_aug[:, 0, :, :] != 0)
 
-                paired_mask = valid_mask & source_present & beam_present & semantic_mask # both have it
-                unpaired_s_mask = valid_mask & source_present & ~beam_present & semantic_mask # source only
-                unpaired_a_mask = valid_mask & ~source_present & beam_present & semantic_mask # aug only (dense aug)
+                paired_mask = valid_mask & source_present & beam_present & semantic_mask
+                unpaired_s_mask = valid_mask & source_present & ~beam_present & semantic_mask
+                unpaired_a_mask = valid_mask & ~source_present & beam_present & semantic_mask
 
                 loss_gmsifc = torch.tensor(0.0, device=enc_s.device)
 
                 if paired_mask.any():
-                    pm = paired_mask.unsqueeze(1).expand_as(enc_s)
+                    pm = paired_mask.unsqueeze(1).expand(-1, enc_s.size(1), -1, -1)
                     loss_gmsifc = loss_gmsifc + F.l1_loss(enc_s[pm], enc_a[pm])
 
                 if unpaired_s_mask.any():
