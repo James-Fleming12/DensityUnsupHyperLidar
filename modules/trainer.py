@@ -256,17 +256,20 @@ class DGLSSTrainer():
     
     @staticmethod
     def single_class_mask(labels):
+        """
+        Returns [B,H,W] bool mask
+        """
         if labels.dim() == 4 and labels.size(1) == 1:
             labels = labels.squeeze(1)
-        if labels.dim() != 3:
-            raise ValueError(f"Expected labels [B,H,W], got {labels.shape}")
 
-        B, H, W = labels.shape
-        lbl_f = labels.float().unsqueeze(1)
-        pad = torch.nn.functional.pad(lbl_f, (1,1,1,1), mode='replicate')
-        local_max = torch.nn.functional.max_pool2d(pad, 3, stride=1)
-        local_min = -torch.nn.functional.max_pool2d(-pad, 3, stride=1)
-        pure = (local_max == local_min) & (labels > 0)
+        lbl_f = labels.float().unsqueeze(1)   # [B,1,H,W]
+
+        pad = F.pad(lbl_f, (1,1,1,1), mode='replicate')
+        local_max = F.max_pool2d(pad, 3, stride=1)
+        local_min = -F.max_pool2d(-pad, 3, stride=1)
+
+        pure = (local_max == local_min) & (labels.unsqueeze(1) > 0)
+
         return pure.squeeze(1)
 
     def calculate_estimate(self, epoch, iter):
