@@ -25,7 +25,7 @@ DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17
 
-FEATURE_EXTRACTOR_EPOCHS = 800
+FEATURE_EXTRACTOR_EPOCHS = 400
 
 def subsample_per_class(feats: np.ndarray, labels: np.ndarray, points_per_class: int) -> tuple:
     keep_idx = []

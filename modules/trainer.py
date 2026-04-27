@@ -663,7 +663,7 @@ class DGLSSTrainer():
                         pos_v = lbl_matrix[valid_pts]
                         neg_v = ~lbl_matrix[valid_pts] & ~eye[valid_pts]
 
-                        INF = 1e9
+                        INF = 1e4
                         pos_sim = sim_v.masked_fill(~pos_v, -INF)
                         all_sim  = sim_v.masked_fill(~(pos_v | neg_v), -INF)
 
