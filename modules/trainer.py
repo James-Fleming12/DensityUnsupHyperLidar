@@ -34,15 +34,19 @@ def save_checkpoint(to_save, logdir, suffix=""):
                "/SENet" + suffix)
 
 class DGLSSTrainer():
-    def __init__(self, ARCH, DATA, datadir, logdir, path=None, dist_type="standard", depth=False):
+    def __init__(self, ARCH, DATA, datadir, logdir, path=None, dist_type="standard", depth=False, max_cells=64):
         """
         dist_type can be 'standard' (L1/MSE) or 'angular' (Cosine/ArcFace-style)
         """
         self.dist_type = dist_type
-        self.lam1_max = 4
-        self.lam2_max = 4
+        self.lam1_max = 1
+        self.lam2_max = 1
         self.lam1 = 0.0
         self.lam2 = 0.0
+
+        self.tau = 0.7 # DGLSS++
+
+        self.max_cells = max_cells # DGLSS++
 
         # parameters
         self.ARCH = ARCH
@@ -200,29 +204,71 @@ class DGLSSTrainer():
             # self.info = w_dict['info']
             print("info", w_dict['info'])
 
-    def beam_drop(self, in_vol, p_range=(0.0, 0.15)):
+    def beam_drop(self, in_vol, p_range = (0.0, 0.7)):
+        """
+        Sparse augmentation per DGLSS++ Sec. III-A.1:
+        Randomly drops entire beam rows from the range-view image.
+        p_range follows paper defaults: (0.3, 0.7) for SemanticKITTI/Waymo.
+        """
         bs, channels, h, w = in_vol.shape
-        p = np.random.uniform(p_range[0], p_range[1])
-        num_drop = int(h * p)
-        
-        indices = np.random.choice(h, num_drop, replace=False)
-        # Simulate dropout by zeroing out the entire row (beam)
-        in_vol[:, :, indices, :] = 0 
-        return in_vol
+        result = in_vol.clone()
+        for b in range(bs):
+            p = np.random.uniform(p_range[0], p_range[1])
+            num_drop = int(h * p)
+            indices = np.random.choice(h, num_drop, replace=False)
+            result[b, :, indices, :] = 0
+        return result
     
-    def compute_prototypes(self, features, labels):
-        b, c, h, w = features.shape
+    def compute_local_prototypes(self, features, labels, grid_size=6.4, voxel_size=0.2):
+        B, C, H, W = features.shape
         valid_classes = [i for i in range(self.parser.get_n_classes()) if i != 0]
         n_valid = len(valid_classes)
-        prototypes = torch.zeros(b, n_valid, c, device=features.device)
-        for bi in range(b):
-            feat_i = features[bi].permute(1, 2, 0).reshape(-1, c)
-            lbl_i  = labels[bi].reshape(-1)
-            for ci, cls in enumerate(valid_classes):
-                mask = (lbl_i == cls)
-                if mask.sum() > 10:
-                    prototypes[bi, ci] = feat_i[mask].mean(0)
-        return prototypes
+        cls_tensor = torch.tensor(valid_classes, device=features.device)
+
+        cell_w = max(1, int(grid_size / voxel_size))
+        cell_h = max(1, int(grid_size / voxel_size))
+
+        all_local_protos = []
+        for bi in range(B):
+            feat_i = features[bi]
+            lbl_i = labels[bi]
+            cell_protos = []
+            for row in range(0, H, cell_h):
+                for col in range(0, W, cell_w):
+                    f_cell = feat_i[:, row:row+cell_h, col:col+cell_w]
+                    l_cell = lbl_i[row:row+cell_h, col:col+cell_w]
+                    f_flat = f_cell.permute(1, 2, 0).reshape(-1, C)
+                    l_flat = l_cell.reshape(-1)
+
+                    class_masks = (l_flat.unsqueeze(0) == cls_tensor.unsqueeze(1))
+                    counts = class_masks.sum(dim=1)
+                    valid = counts > 0
+
+                    if valid.sum() < 2:
+                        continue
+
+                    protos = torch.zeros(n_valid, C, device=features.device)
+                    protos[valid] = (class_masks[valid].float() @ f_flat) / counts[valid].unsqueeze(1).float()
+
+                    cell_protos.append((protos, valid))
+            all_local_protos.append(cell_protos)
+        return all_local_protos
+    
+    @staticmethod
+    def single_class_mask(labels):
+        """
+        Returns a bool mask [B,H,W] that is True where the 3x3 neighbourhood
+        around each pixel is *entirely* the same class (and non-background).
+        This approximates masking out semantically-mixed sparse voxel features.
+        """
+        B, H, W = labels.shape
+        lbl_f = labels.float().unsqueeze(1)   # [B,1,H,W]
+        # neighbourhood min and max via max-pool
+        pad = torch.nn.functional.pad(lbl_f, (1,1,1,1), mode='replicate')
+        local_max = torch.nn.functional.max_pool2d(pad, 3, stride=1)
+        local_min = -torch.nn.functional.max_pool2d(-pad, 3, stride=1)
+        pure = (local_max == local_min) & (labels > 0)   # same class, non-bg
+        return pure.squeeze(1) if pure.dim() == 4 else pure
 
     def calculate_estimate(self, epoch, iter):
         estimate = int((self.data_time_t.avg + self.batch_time_t.avg) * \
@@ -447,31 +493,28 @@ class DGLSSTrainer():
 
                 loss_sem = (loss_sem_orig + loss_sem_aug) / 2
 
-                # SIFC Loss (with masking)
-                valid_mask = (proj_labels > 0) # Shape: [B, H, W]
-                tau = 0.5
-                beam_present = (in_vol_aug[:, 0, :, :] != 0)
-                paired_mask   = valid_mask & beam_present
-                unpaired_mask = valid_mask & ~beam_present
+                valid_mask = (proj_labels > 0)
+                semantic_mask = self.single_class_mask(proj_labels)
 
-                loss_sifc = torch.tensor(0.0, device=enc_s.device)
+                source_present = (in_vol[:, 0, :, :] != 0)
+                beam_present = (in_vol_aug[:, 0, :, :] != 0)
+
+                paired_mask = valid_mask & source_present & beam_present & semantic_mask # both have it
+                unpaired_s_mask = valid_mask & source_present & ~beam_present & semantic_mask # source only
+                unpaired_a_mask = valid_mask & ~source_present & beam_present & semantic_mask # aug only (dense aug)
+
+                loss_gmsifc = torch.tensor(0.0, device=enc_s.device)
 
                 if paired_mask.any():
-                    if self.dist_type == 'angular':
-                        es_n = F.normalize(enc_s, p=2, dim=1)
-                        ea_n = F.normalize(enc_a, p=2, dim=1)
-                        cos_dist = 1.0 - (es_n * ea_n).sum(dim=1)
-                        loss_sifc = loss_sifc + cos_dist[paired_mask].mean()
-                    else:
-                        pm = paired_mask.unsqueeze(1).expand_as(enc_s)
-                        loss_sifc = loss_sifc + F.l1_loss(enc_s[pm], enc_a[pm])
+                    pm = paired_mask.unsqueeze(1).expand_as(enc_s)
+                    loss_gmsifc = loss_gmsifc + F.l1_loss(enc_s[pm], enc_a[pm])
 
-                if unpaired_mask.any():
+                if unpaired_s_mask.any():
                     B, C, H, W = enc_s.shape
                     enc_s_flat = enc_s.permute(0, 2, 3, 1).reshape(B, H*W, C)
                     enc_a_flat = enc_a.permute(0, 2, 3, 1).reshape(B, H*W, C)
-                    paired_flat   = paired_mask.reshape(B, H*W)
-                    unpaired_flat = unpaired_mask.reshape(B, H*W)
+                    paired_flat = paired_mask.reshape(B, H*W)
+                    unpaired_flat = unpaired_s_mask.reshape(B, H*W)
 
                     agg_losses = []
                     for b in range(B):
@@ -487,8 +530,7 @@ class DGLSSTrainer():
                         f_s_u_n = F.normalize(f_s_u, p=2, dim=1)
                         f_s_p_n = F.normalize(f_s_p, p=2, dim=1)
                         affinity = f_s_u_n @ f_s_p_n.T
-
-                        affinity = affinity * (affinity >= tau).float()
+                        affinity = affinity * (affinity >= self.tau).float()
 
                         pu = torch.stack([p_idx % W, p_idx // W], dim=1).float()
                         uu = torch.stack([u_idx % W, u_idx // W], dim=1).float()
@@ -505,28 +547,132 @@ class DGLSSTrainer():
                             agg_losses.append(F.l1_loss(f_s_u[valid_agg], f_agg[valid_agg]))
 
                     if agg_losses:
-                        loss_sifc = loss_sifc + torch.stack(agg_losses).mean()
+                        loss_gmsifc = loss_gmsifc + torch.stack(agg_losses).mean()
 
-                # SCC Loss
-                prototypes_s = self.compute_prototypes(z8, proj_labels)
-                prototypes_a = self.compute_prototypes(z8_aug, proj_labels)
+                if unpaired_a_mask.any():
+                    B, C, H, W = enc_s.shape
+                    enc_s_flat = enc_s.permute(0, 2, 3, 1).reshape(B, H*W, C)
+                    enc_a_flat = enc_a.permute(0, 2, 3, 1).reshape(B, H*W, C)
+                    paired_flat = paired_mask.reshape(B, H*W)
+                    unpaired_a_flat = unpaired_a_mask.reshape(B, H*W)
 
-                all_protos = torch.cat([prototypes_s, prototypes_a], dim=0)
+                    agg_losses_sym = []
+                    for b in range(B):
+                        p_idx = paired_flat[b].nonzero(as_tuple=True)[0]
+                        ua_idx = unpaired_a_flat[b].nonzero(as_tuple=True)[0]
+                        if len(p_idx) == 0 or len(ua_idx) == 0:
+                            continue
 
-                valid_mask_proto = all_protos.norm(dim=2) > 0
-                shared_valid = valid_mask_proto.all(dim=0)
+                        f_s_p = enc_s_flat[b][p_idx]
+                        f_a_p = enc_a_flat[b][p_idx]
+                        f_a_u = enc_a_flat[b][ua_idx]
 
-                loss_scc = torch.tensor(0.0, device=z8.device)
+                        f_a_u_n = F.normalize(f_a_u, p=2, dim=1)
+                        f_a_p_n = F.normalize(f_a_p, p=2, dim=1)
+                        affinity = f_a_u_n @ f_a_p_n.T
+                        affinity = affinity * (affinity >= self.tau).float()
 
-                if shared_valid.sum() >= 2:
-                    p = all_protos[:, shared_valid, :]
-                    if self.dist_type == 'angular':
-                        p = F.normalize(p, p=2, dim=2)
-                    corr = torch.bmm(p, p.transpose(1, 2))
-                    corr_mean = corr.mean(dim=0, keepdim=True)
-                    loss_scc = ((corr - corr_mean) ** 2).mean()
+                        pu = torch.stack([p_idx % W, p_idx // W], dim=1).float()
+                        uu = torch.stack([ua_idx % W, ua_idx // W], dim=1).float()
+                        sp_dist = torch.cdist(uu, pu)
+                        inv_dist = 1.0 / (sp_dist + 1e-6)
+                        weights = affinity * inv_dist
+                        weight_sum = weights.sum(dim=1, keepdim=True).clamp(min=1e-6)
+                        weights = weights / weight_sum
 
-                loss_total = loss_sem + (self.lam1 * loss_sifc) + (self.lam2 * loss_scc)
+                        f_agg_s = weights @ f_s_p
+
+                        valid_agg = weights.sum(dim=1) > 0
+                        if valid_agg.any():
+                            agg_losses_sym.append(F.l1_loss(f_a_u[valid_agg], f_agg_s[valid_agg]))
+
+                    if agg_losses_sym:
+                        loss_gmsifc = loss_gmsifc + torch.stack(agg_losses_sym).mean()
+
+                local_protos_s = self.compute_local_prototypes(z8,     proj_labels)
+                local_protos_a = self.compute_local_prototypes(z8_aug, proj_labels)
+
+                loss_lscc = torch.tensor(0.0, device=z8.device)
+                n_pairs = 0
+
+                all_cell_protos = []
+
+                for b in range(len(local_protos_s)):
+                    for (p, v) in local_protos_s[b]:
+                        all_cell_protos.append((p, v))
+                    for (p, v) in local_protos_a[b]:
+                        all_cell_protos.append((p, v))
+
+                if len(all_cell_protos) > self.max_cells:
+                    idx = np.random.choice(len(all_cell_protos), self.max_cells, replace=False)
+                    all_cell_protos = [all_cell_protos[k] for k in idx]
+
+
+                for ci in range(len(all_cell_protos)):
+                    pi, vi = all_cell_protos[ci]
+                    for cj in range(ci + 1, len(all_cell_protos)):
+                        pj, vj = all_cell_protos[cj]
+
+                        shared = vi & vj
+                        if shared.sum() < 2:
+                            continue
+                        pi_s = pi[shared]
+                        pj_s = pj[shared]
+                        corr_i = pi_s @ pi_s.T
+                        corr_j = pj_s @ pj_s.T
+
+                        loss_lscc = loss_lscc + ((corr_i - corr_j) ** 2).mean()
+                        n_pairs += 1
+
+                if n_pairs > 0:
+                    loss_lscc = loss_lscc / n_pairs
+
+                B, C, H, W = z8.shape
+                contrast_losses = []
+                for bi in range(B):
+                    feat_i = z8[bi].permute(1, 2, 0).reshape(-1, C)
+                    lbl_i = proj_labels[bi].reshape(-1)
+
+                    valid_mask_i = lbl_i > 0
+                    feat_i = feat_i[valid_mask_i]
+                    lbl_i = lbl_i[valid_mask_i]
+                    if len(feat_i) < 4:
+                        continue
+
+                    max_pts = 256
+                    if len(feat_i) > max_pts:
+                        idx = torch.randperm(len(feat_i), device=z8.device)[:max_pts]
+                        feat_i = feat_i[idx]
+                        lbl_i = lbl_i[idx]
+
+                    feat_norm = F.normalize(feat_i, p=2, dim=1)
+                    sim = feat_norm @ feat_norm.T
+
+                    lbl_matrix = lbl_i.unsqueeze(0) == lbl_i.unsqueeze(1)
+                    eye = torch.eye(len(feat_i), dtype=torch.bool, device=z8.device)
+                    lbl_matrix = lbl_matrix & ~eye
+
+                    has_pos = lbl_matrix.any(dim=1)
+                    has_neg = (~lbl_matrix & ~eye).any(dim=1)
+                    valid_pts = has_pos & has_neg
+
+                    if valid_pts.any():
+                        sim_v = sim[valid_pts]
+                        pos_v = lbl_matrix[valid_pts]
+                        neg_v = ~lbl_matrix[valid_pts] & ~eye[valid_pts]
+
+                        INF = 1e9
+                        pos_sim = sim_v.masked_fill(~pos_v, -INF)
+                        all_sim  = sim_v.masked_fill(~(pos_v | neg_v), -INF)
+
+                        log_num = torch.logsumexp(pos_sim, dim=1)
+                        log_den = torch.logsumexp(all_sim, dim=1)
+                        contrast_losses.append((log_den - log_num).mean())
+
+                if contrast_losses:
+                    loss_lscc = loss_lscc + torch.stack(contrast_losses).mean()
+
+                loss_total = loss_sem + (self.lam1 * loss_gmsifc) + (self.lam2 * loss_lscc)
 
             optimizer.zero_grad()
             scaler.scale(loss_total).backward()

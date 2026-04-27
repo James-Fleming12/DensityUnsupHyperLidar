@@ -160,7 +160,13 @@ def test_features(ARCH, DATA, net, points_per_class_per_batch: int = 200):
     net.eval()
     with torch.no_grad():
         for i, (in_vol, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in tqdm(enumerate(train_loader_enc), total=len(train_loader_enc), desc="Extracting encoder features"):
-            _, _, _, enc_feat = net(in_vol, return_enc=True) # needs 4 for aux loss, 3 is no aux
+            result = net(in_vol, return_enc=True)
+            
+            if ARCH["train"]["aux_loss"]:
+                _, _, _, enc_feat = result
+            else:
+                _, _, enc_feat = result
+            
             B, C, H, W = enc_feat.shape
             feats_flat = enc_feat.permute(0, 2, 3, 1).reshape(-1, C).cpu().numpy()
             labels_flat = proj_labels.reshape(-1).cpu().numpy()
