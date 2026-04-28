@@ -250,7 +250,7 @@ def set_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, d
     return Model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device)
 
 class DensityModel(nn.Module):
-    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 10, subcluster_type="bipolar", gauss_rp=True, depth=False):
+    def __init__(self, ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, max_subclusters = 10, subcluster_type="bipolar", gauss_rp=True):
         super(DensityModel, self).__init__()
 
         self.device = device
@@ -272,7 +272,7 @@ class DensityModel(nn.Module):
 
             if self.ARCH["train"]["pipeline"] == "res":
                 from modules.network.ResNet import ResNet_34
-                self.net = ResNet_34(self.num_classes, self.ARCH["train"]["aux_loss"], depth=depth)
+                self.net = ResNet_34(self.num_classes, self.ARCH["train"]["aux_loss"])
 
                 def convert_relu_to_softplus(model, act):
                     for child_name, child in model.named_children():
@@ -983,5 +983,5 @@ class DensityModel(nn.Module):
 
         return accuracy, confidence_map, class_accuracies
 
-def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type='bipolar', depth=False):
-    return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type=subcluster_type, depth=depth)
+def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type='bipolar'):
+    return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type=subcluster_type)

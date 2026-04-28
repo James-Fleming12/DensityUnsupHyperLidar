@@ -26,13 +26,13 @@ HD_DIM = 10000
 
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
-def test_collapse(ARCH, trainloader, inference_epochs=10, distance_sensitivity=3.0, kitti=False, depth=False):
+def test_collapse(ARCH, trainloader, inference_epochs=10, distance_sensitivity=3.0, kitti=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     accs = []
     mious = []
 
-    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, depth=depth)
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
     model.to(device)
 

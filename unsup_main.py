@@ -49,7 +49,7 @@ def DDFEtrain_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
     trainer = DDFETrainer(ARCH, DATA, DATA_DIR, LOG_DIR)
     trainer.train(epochs=epochs)
 
-def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, depth=False) -> DensityModel:
+def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS) -> DensityModel:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     parser = Parser(root=DATA_DIR,
@@ -78,7 +78,7 @@ def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, depth=False) -> DensityModel:
 
     evaluator = iouEval(NUM_CLASSES, device, ignore)
 
-    trainer = DensityTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, None, depth=depth)
+    trainer = DensityTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, None)
 
     trainer.train(dataloader, trainer.model, None)
 
@@ -308,7 +308,7 @@ def test_orig(ARCH, DATA) -> Model:
 
     return model
 
-def init_sub(ARCH, DATA, depth=False):
+def init_sub(ARCH, DATA):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     parser = Parser(root=DATA_DIR,
@@ -328,7 +328,7 @@ def init_sub(ARCH, DATA, depth=False):
     
     dataloader = parser.get_train_set()
 
-    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, depth=depth)
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
     model = torch.load(HDC_SAVE_PATH, weights_only=False)
 
     model.init_subclusters(dataloader)

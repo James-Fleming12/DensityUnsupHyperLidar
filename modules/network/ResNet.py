@@ -90,7 +90,7 @@ class BasicBlock(nn.Module):
 
 class ResNet_34(nn.Module):
     def __init__(self, nclasses, aux, block=BasicBlock, layers=[3, 4, 6, 3], if_BN=True, zero_init_residual=False,
-                 norm_layer=None, groups=1, width_per_group=64, depth=False):
+                 norm_layer=None, groups=1, width_per_group=64):
         super(ResNet_34, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d

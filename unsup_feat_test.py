@@ -337,7 +337,7 @@ def main():
 
     w_dict = torch.load(MODEL_DIR + "/SENet_valid_best", map_location=lambda storage, loc: storage)
 
-    net = ResNet_34(NUM_CLASSES, ARCH["train"]["aux_loss"], depth=False)
+    net = ResNet_34(NUM_CLASSES, ARCH["train"]["aux_loss"])
     net.load_state_dict(w_dict['state_dict'], strict=True)
 
     test_features(ARCH, DATA, net)
