@@ -14,6 +14,7 @@ from torch import optim
 from torch import nn
 from modules.losses.boundary_loss import BoundaryLoss
 from modules.losses.Lovasz_Softmax import Lovasz_softmax
+from modules.network.ResNet import Adaptor
 
 MODEL_DIR = "logs"
 NU_DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_all"
@@ -88,10 +89,49 @@ def multistep_dumbbell(all_histories, file_suffix=""):
     plt.close()
     print(f"Dumbbell plot saved to {out_path}")
 
+def get_adaptor_optimizer(model, lr):
+    """Return an SGD optimizer over only the adaptor parameters."""
+    adaptor_params = [p for module in model.net.modules() if isinstance(module, Adaptor) for p in module.parameters()]
+    if not adaptor_params:
+        raise RuntimeError("No Adaptor modules found in model.net. Ensure ResNet_34 was instantiated with use_adaptor=True.")
+    return optim.SGD(adaptor_params, lr=lr), adaptor_params
+
+def freeze_backbone(model):
+    """Freeze all params except adaptors."""
+    for p in model.net.parameters():
+        p.requires_grad_(False)
+    for module in model.net.modules():
+        if isinstance(module, Adaptor):
+            for p in module.parameters():
+                p.requires_grad_(True)
+
+def unfreeze_backbone(model):
+    """Restore full gradient flow after a TTA section."""
+    for p in model.net.parameters():
+        p.requires_grad_(True)
+
+@torch.no_grad()
+def compute_train_feature_stats(model, batches, device):
+    model.net.eval()
+    all_feats = []
+    for proj_in, _, _proj_labels, *_ in batches:
+        proj_in = proj_in.to(device)
+        feat = model.net(proj_in, only_feat=True)
+        all_feats.append(feat.mean(dim=[0, 2, 3]))
+
+    stacked = torch.stack(all_feats, dim=0)
+    mu_tr    = stacked.mean(dim=0)
+    sigma_tr = stacked.var(dim=0).clamp(min=1e-6)
+    return mu_tr, sigma_tr
+
+def tta_image_loss(feat, mu_tr, sigma_tr, mu_te):
+    loss = (0.5 * (mu_tr - mu_te) ** 2 / sigma_tr).sum()
+    return loss
+
 def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
     """
-    Repeats the full dataset pass NUM_ITERS times.
-    section_size defines the number of batches per section.
+    Supervised sections -> freeze backbone, fine-tune adaptors only (+ subcluster update).
+    Unsupervised sections -> original inference_update calls only, no network gradient updates whatsoever.
     """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -139,15 +179,15 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
             acc_pre, miou_pre = _eval_on_batches(model, supervised_batches, device)
             print(f"  Pre-update  | Acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
-            print(f"  Fine-tuning on {len(supervised_batches)} supervised batches...")
+            print(f"  Fine-tuning adaptors on {len(supervised_batches)} supervised batches...")
+            freeze_backbone(model)
             model.net.train()
 
-            optimizer = optim.SGD(model.net.parameters(), lr=ARCH["train"]["decay"]["lr"], momentum=ARCH["train"]["momentum"], weight_decay=ARCH["train"]["w_decay"],)
+            optimizer, _ = get_adaptor_optimizer(model, lr=ARCH["train"]["decay"]["lr"])
 
             criterion = nn.NLLLoss(weight=loss_w, ignore_index=0).to(device)
             ls = Lovasz_softmax(ignore=0).to(device)
             bd = BoundaryLoss().to(device)
-
             scaler = torch.amp.GradScaler("cuda")
 
             for proj_in, _, proj_labels, *_ in supervised_batches:
@@ -155,15 +195,14 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
                 proj_labels = proj_labels.to(device).long().squeeze(1)
 
                 optimizer.zero_grad()
-
                 with torch.amp.autocast("cuda"):
                     output = model.net(proj_in)
                     pred = output[0] if isinstance(output, tuple) else output
 
-                    bdlosss = bd(pred, proj_labels)
+                    bdloss = bd(pred, proj_labels)
                     nll_loss = criterion(torch.log(pred.clamp(min=1e-8)), proj_labels)
                     lovasz_loss = 1.5 * ls(pred, proj_labels)
-                    loss = (nll_loss + lovasz_loss + bdlosss).mean()
+                    loss = (nll_loss + lovasz_loss + bdloss).mean()
 
                 scaler.scale(loss).backward()
                 scaler.step(optimizer)
@@ -171,9 +210,10 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
 
                 model.update_subclusters(proj_in, proj_labels)
 
+            unfreeze_backbone(model)
             model.net.eval()
 
-            print(f"  Inference updating on unsupervised batches...")
+            print(f"  Inference updating on {n_unsupervised} unsupervised batches...")
             model.train()
             for _ in tqdm(range(n_unsupervised)):
                 try:
@@ -181,6 +221,7 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
                 except StopIteration:
                     exhausted = True
                     break
+
                 if proj_in.shape[1] > 0:
                     model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0)
 

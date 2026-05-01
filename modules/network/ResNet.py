@@ -50,7 +50,7 @@ class BasicBlock(nn.Module):
     expansion = 1
 
     def __init__(self, inplanes, planes, stride=1, downsample=None, groups=1,
-                 base_width=64, dilation=1, if_BN=None):
+                 base_width=64, dilation=1, if_BN=None, use_adaptor=False):
         super(BasicBlock, self).__init__()
         self.if_BN = if_BN
         if self.if_BN:
@@ -70,6 +70,8 @@ class BasicBlock(nn.Module):
         self.downsample = downsample
         self.stride = stride
 
+        self.adaptor = Adaptor(planes) if use_adaptor else None
+
     def forward(self, x):
         identity = x
 
@@ -81,16 +83,37 @@ class BasicBlock(nn.Module):
         out = self.conv2(out)
         if self.if_BN:
             out = self.bn2(out)
+
+        if self.adaptor is not None:
+            out = out + self.adaptor(out)
+
         if self.downsample is not None:
             identity = self.downsample(x)
         out += identity
         out = self.relu(out)
         return out
 
+class Adaptor(nn.Module):
+    """
+    Lightweight parallel adaptor for a ResNet block (paper Sec 3.2).
+    Down-projects channels by ratio r, applies ReLU, up-projects back.
+    Up-projection is zero-initialised so the adaptor is a no-op at
+    the start of test-time adaptation.
+    """
+    def __init__(self, channels: int, r: int = 32):
+        super().__init__()
+        bottleneck = max(1, channels // r)
+        self.down = nn.Conv2d(channels, bottleneck, kernel_size=1, bias=False)
+        self.relu = nn.ReLU()
+        self.up   = nn.Conv2d(bottleneck, channels, kernel_size=1, bias=False)
+        nn.init.zeros_(self.up.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.up(self.relu(self.down(x)))
 
 class ResNet_34(nn.Module):
     def __init__(self, nclasses, aux, block=BasicBlock, layers=[3, 4, 6, 3], if_BN=True, zero_init_residual=False,
-                 norm_layer=None, groups=1, width_per_group=64):
+                 norm_layer=None, groups=1, width_per_group=64, use_adaptor=True):
         super(ResNet_34, self).__init__()
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
@@ -108,10 +131,12 @@ class ResNet_34(nn.Module):
 
         self.inplanes = 128
 
-        self.layer1 = self._make_layer(block, 128, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 128, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 128, layers[3], stride=2)
+        self.use_adaptor = use_adaptor
+
+        self.layer1 = self._make_layer(block, 128, layers[0], use_adaptor=use_adaptor)
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, use_adaptor=use_adaptor)
+        self.layer3 = self._make_layer(block, 128, layers[2], stride=2, use_adaptor=use_adaptor)
+        self.layer4 = self._make_layer(block, 128, layers[3], stride=2, use_adaptor=use_adaptor)
 
         self.conv_1 = BasicConv2d(640, 256, kernel_size=3, padding=1)
         self.conv_2 = BasicConv2d(256, 128, kernel_size=3, padding=1)
@@ -122,7 +147,7 @@ class ResNet_34(nn.Module):
             self.aux_head2 = nn.Conv2d(128, nclasses, 1)
             self.aux_head3 = nn.Conv2d(128, nclasses, 1)
 
-    def _make_layer(self, block, planes, blocks, stride=1, dilate=False):
+    def _make_layer(self, block, planes, blocks, stride=1, dilate=False, use_adaptor=False):
         norm_layer = self._norm_layer
         downsample = None
         previous_dilation = self.dilation
@@ -141,14 +166,11 @@ class ResNet_34(nn.Module):
                 )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, self.groups,
-                            self.base_width, previous_dilation, if_BN=self.if_BN))
+        layers.append(block(self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, if_BN=self.if_BN, use_adaptor=use_adaptor))
         self.inplanes = planes * block.expansion
         for _ in range(1, blocks):
-            layers.append(block(self.inplanes, planes, groups=self.groups,
-                                base_width=self.base_width, dilation=self.dilation,
-                                if_BN=self.if_BN))
-
+            layers.append(block(self.inplanes, planes, groups=self.groups, base_width=self.base_width, dilation=self.dilation, if_BN=self.if_BN, use_adaptor=use_adaptor))
+            
         return nn.Sequential(*layers)
 
     def forward(self, x, only_feat=False, return_enc=False):
@@ -189,6 +211,66 @@ class ResNet_34(nn.Module):
             return pred, out, feat_map
 
         return pred, out
+    
+    def adaptor_parameters(self):
+        """Yield only the adaptor parameters (what gets updated at test time)."""
+        for module in self.modules():
+            if isinstance(module, Adaptor):
+                yield from module.parameters()
+
+    @torch.enable_grad()
+    def test_time_adapt(
+        self,
+        x: torch.Tensor,
+        mu_tr: torch.Tensor,
+        sigma_tr: torch.Tensor,
+        mu_te_prev: torch.Tensor,
+        alpha: float = 0.01,
+        lr: float = 1e-3,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """
+        Freezes all backbone params; updates only adaptor weights via
+        image-level KL divergence loss between training and (EMA-updated)
+        test feature distributions.
+
+        Args:
+            x:           Current test batch  [B, C, H, W]
+            mu_tr:       Pre-computed training feature mean  [C]
+            sigma_tr:    Pre-computed training feature variance  [C]
+            mu_te_prev:  EMA mean from the previous step  [C]
+            alpha:       EMA momentum for test mean (default 0.01)
+            lr:          SGD learning rate for the adaptor
+
+        Returns:
+            pred:        Softmax prediction on x  [B, nclasses, H, W]
+            mu_te_new:   Updated EMA test mean for the next step  [C]
+        """
+        for p in self.parameters():
+            p.requires_grad_(False)
+        adaptor_params = list(self.adaptor_parameters())
+        for p in adaptor_params:
+            p.requires_grad_(True)
+
+        optimizer = torch.optim.SGD(adaptor_params, lr=lr)
+
+        self.train()
+        pred, feat = self(x)[:2]
+
+        mu_te_curr = feat.mean(dim=[0, 2, 3]).detach()
+        mu_te_new = (1 - alpha) * mu_te_prev + alpha * mu_te_curr
+
+        eps = 1e-6
+        loss_img = (0.5 * ((mu_tr - mu_te_new) ** 2) / (sigma_tr + eps)).sum()
+
+        optimizer.zero_grad()
+        loss_img.backward()
+        optimizer.step()
+
+        self.eval()
+        with torch.no_grad():
+            pred, _ = self(x)[:2]
+
+        return pred, mu_te_new.detach()
 
 if __name__ == "__main__":
     import time
