@@ -44,9 +44,13 @@ class WaymoParquetConverter:
     def convert_all(self):
         print(f"Reading Parquet metadata from {self.parquet_dir}...")
 
+        def read_tag(tag, directory):
+            """Loads a Waymo parquet component using Dask."""
+            return dd.read_parquet(f"{directory}/{tag}/*.parquet")
+
         stats_dict = {}
         try:
-            stats_df = v2.read('stats', self.parquet_dir).compute() 
+            stats_df = read_tag('stats', self.parquet_dir).compute() 
             for _, row in stats_df.iterrows():
                 seg_name = row.get('key.segment_context_name')
                 if not seg_name:
@@ -67,11 +71,11 @@ class WaymoParquetConverter:
         except Exception as e:
             print(f"Warning: Could not load 'stats' component, defaulting to sunny for all. ({e})")
 
-        lidar_df = v2.read('lidar', self.parquet_dir)
-        lidar_pose_df = v2.read('lidar_pose', self.parquet_dir)
-        lidar_calib_df = v2.read('lidar_calibration', self.parquet_dir)
-        vehicle_pose_df = v2.read('vehicle_pose', self.parquet_dir)
-        lidar_seg_df = v2.read('lidar_segmentation', self.parquet_dir)
+        lidar_df = read_tag('lidar', self.parquet_dir)
+        lidar_pose_df = read_tag('lidar_pose', self.parquet_dir)
+        lidar_calib_df = read_tag('lidar_calibration', self.parquet_dir)
+        vehicle_pose_df = read_tag('vehicle_pose', self.parquet_dir)
+        lidar_seg_df = read_tag('lidar_segmentation', self.parquet_dir)
 
         lidar_df = lidar_df[lidar_df['key.laser_name'] == 1]
         lidar_pose_df = lidar_pose_df[lidar_pose_df['key.laser_name'] == 1]
