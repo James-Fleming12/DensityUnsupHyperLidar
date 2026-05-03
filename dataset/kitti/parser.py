@@ -9,20 +9,41 @@ import torch
 import math
 import random
 from PIL import Image
-try:
-    import accimage
-except ImportError:
-    accimage = None
+
+from dataset.waymo_data import WaymoDataset
+import torch.utils.data as data
 import numpy as np
 import numbers
 import types
 from collections.abc import Sequence, Iterable
 import warnings
 
+CURRICULUM_PHASES = {
+    0: ["sunny"],
+    1: ["rain", "fog", "night"],
+    2: ["sunny", "rain", "fog", "night"],   # i.e. no filter = all
+}
 
 EXTENSIONS_SCAN = ['.bin']
 EXTENSIONS_LABEL = ['.label']
 
+def _make_seed_worker():
+    def seed_worker(worker_id):
+        worker_seed = torch.initial_seed() % 2 ** 32
+        np.random.seed(worker_seed)
+        random.seed(worker_seed)
+    return seed_worker
+
+def _make_loader(dataset, batch_size, shuffle, workers, drop_last=True, generator=None):
+    return data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=workers,
+        worker_init_fn=_make_seed_worker(),
+        generator=generator,
+        drop_last=drop_last,
+    )
 
 def is_scan(filename):
   return any(filename.endswith(ext) for ext in EXTENSIONS_SCAN)
@@ -302,170 +323,249 @@ class SemanticKitti(Dataset):
     # do the mapping
     return lut[label]
 
+class Parser:
+    """
+    Unified parser that initializes as exactly one of two modes.
+ 
+    mode="kitti"  (default)
+        Wraps SemanticKitti. Identical behaviour to the original Parser.
+        set_curriculum_phase() is silently ignored.
+ 
+    mode="waymo"
+        Wraps WaymoDataset with curriculum weather scheduling.
+        root / train_sequences / valid_sequences point at the converted
+        Waymo sequences/ directory and its 4-digit sequence IDs.
+        Call set_curriculum_phase(0/1/2) from Trainer to advance the schedule.
+ 
+    All constructor arguments are the same in both modes so Trainer only
+    needs to change mode="kitti" → mode="waymo" (and update root/sequences).
+ 
+    Args:
+        mode              : "kitti" or "waymo"
+        root              : Dataset root (contains sequences/).
+        train_sequences   : List[int] sequence IDs for training.
+        valid_sequences   : List[int] sequence IDs for validation.
+        test_sequences    : List[int] sequence IDs for test, or None.
+        labels            : {id: name} dict.
+        color_map         : {id: [B,G,R]} dict.
+        learning_map      : {original_id: xentropy_id} dict.
+        learning_map_inv  : {xentropy_id: original_id} dict.
+        sensor            : Sensor config dict.
+        max_points        : Max points per scan.
+        batch_size        : Batch size for all loaders.
+        workers           : DataLoader worker threads.
+        gt                : Load ground-truth labels.
+        shuffle_train     : Shuffle training loader.
+        initial_curriculum: Starting curriculum phase (Waymo only, default 0).
+    """
+    def __init__(self,
+                 mode: str,
+                 root: str,
+                 train_sequences: list,
+                 valid_sequences: list,
+                 test_sequences,
+                 labels: dict,
+                 color_map: dict,
+                 learning_map: dict,
+                 learning_map_inv: dict,
+                 sensor: dict,
+                 max_points: int,
+                 batch_size: int,
+                 workers: int,
+                 gt: bool = True,
+                 shuffle_train: bool = True,
+                 initial_curriculum: int = 0):
+        if mode not in ("kitti", "waymo"):
+            raise ValueError(f"mode must be 'kitti' or 'waymo', got '{mode}'")
+ 
+        self._mode             = mode
+        self._root             = root
+        self._train_seqs       = train_sequences
+        self._valid_seqs       = valid_sequences
+        self._test_seqs        = test_sequences
+        self._labels           = labels
+        self._color_map        = color_map
+        self._learning_map     = learning_map
+        self._learning_map_inv = learning_map_inv
+        self._sensor           = sensor
+        self._max_points       = max_points
+        self._batch_size       = batch_size
+        self._workers          = workers
+        self._gt               = gt
+        self._shuffle_train    = shuffle_train
+        self._curriculum_phase = -1
+ 
+        self.nclasses = len(learning_map_inv)
+ 
+        self._g = torch.Generator()
+        self._g.manual_seed(1024)
+ 
+        if mode == "kitti":
+            self._build_kitti_loaders()
+        else:
+            self.set_curriculum_phase(initial_curriculum)
 
-class Parser():
-  # standard conv, BN, relu
-  def __init__(self,
-               root,              # directory for data
-               train_sequences,   # sequences to train
-               valid_sequences,   # sequences to validate.
-               test_sequences,    # sequences to test (if none, don't get)
-               labels,            # labels in data
-               color_map,         # color for each label
-               learning_map,      # mapping for training labels
-               learning_map_inv,  # recover labels from xentropy
-               sensor,            # sensor to use
-               max_points,        # max points in each scan in entire dataset
-               batch_size,        # batch size for train and val
-               workers,           # threads to load data
-               gt=True,           # get gt?
-               shuffle_train=True):  # shuffle training set?
-    super(Parser, self).__init__()
+    def _build_kitti_loaders(self):
+        def _ds(seqs, transform=False, gt=None):
+            return SemanticKitti(
+                root=self._root,
+                sequences=seqs,
+                labels=self._labels,
+                color_map=self._color_map,
+                learning_map=self._learning_map,
+                learning_map_inv=self._learning_map_inv,
+                sensor=self._sensor,
+                max_points=self._max_points,
+                transform=transform,
+                gt=self._gt if gt is None else gt,
+            )
+ 
+        train_ds = _ds(self._train_seqs, transform=True)
+        valid_ds = _ds(self._valid_seqs)
+ 
+        self.trainloader = _make_loader(train_ds, self._batch_size, shuffle=self._shuffle_train, workers=self._workers, generator=self._g)
+        assert len(self.trainloader) > 0, "KITTI train loader is empty!"
+        self.trainiter = iter(self.trainloader)
+ 
+        self.validloader = _make_loader(
+            valid_ds, self._batch_size,
+            shuffle=False, workers=self._workers)
+        assert len(self.validloader) > 0, "KITTI valid loader is empty!"
+        self.validiter = iter(self.validloader)
+ 
+        if self._test_seqs:
+            test_ds = _ds(self._test_seqs, gt=False)
+            self.testloader = _make_loader(test_ds, self._batch_size, shuffle=False, workers=self._workers, drop_last=False)
+            self.testiter = iter(self.testloader)
+        else:
+            self.testloader = None
+            self.testiter = None
+ 
+        print(f"[Parser|kitti] train={len(train_ds)}  valid={len(valid_ds)}")
 
-    # if I am training, get the dataset
-    self.root = root
-    self.train_sequences = train_sequences
-    self.valid_sequences = valid_sequences
-    self.test_sequences = test_sequences
-    self.labels = labels
-    self.color_map = color_map
-    self.learning_map = learning_map
-    self.learning_map_inv = learning_map_inv
-    self.sensor = sensor
-    self.max_points = max_points
-    self.batch_size = batch_size
-    self.workers = workers
-    self.gt = gt
-    self.shuffle_train = shuffle_train
+    def set_curriculum_phase(self, phase: int):
+        """
+        Switch curriculum phase.
+ 
+        In KITTI mode this is a no-op — safe to call unconditionally from
+        Trainer regardless of which mode is active.
+ 
+        Phase 0 → sunny frames only           base model warm-up
+        Phase 1 → rain / fog / night only     adverse-condition fine-tuning
+        Phase 2 → all conditions              full robustness
+ 
+        Rebuilds train and validation loaders in-place.
+        Test loader is built once at phase 0 with NO weather filter so the
+        held-out evaluation always covers all conditions.
+        """
+        if self._mode == "kitti":
+            return
+ 
+        if phase == self._curriculum_phase:
+            return
+        if phase not in CURRICULUM_PHASES:
+            raise ValueError(f"phase must be 0, 1, or 2; got {phase}")
+ 
+        self._curriculum_phase = phase
+        weather_filter = CURRICULUM_PHASES[phase]
+ 
+        print(f"[Parser|waymo] Curriculum phase {phase} → weather filter: {weather_filter if weather_filter else 'ALL'}")
+ 
+        def _ds(seqs, transform=False, gt=None, override_filter=None):
+            return WaymoDataset(
+                root=self._root,
+                sequences=seqs,
+                labels=self._labels,
+                color_map=self._color_map,
+                learning_map=self._learning_map,
+                learning_map_inv=self._learning_map_inv,
+                sensor=self._sensor,
+                max_points=self._max_points,
+                transform=transform,
+                gt=self._gt if gt is None else gt,
+                weather_filter=override_filter if override_filter is not None else weather_filter,
+            )
+ 
+        train_ds = _ds(self._train_seqs, transform=True)
+        valid_ds = _ds(self._valid_seqs)
+ 
+        if len(train_ds) == 0:
+            raise RuntimeError(f"Waymo train dataset is empty for phase {phase} (filter={weather_filter}). Check weather.txt files or sequence IDs.")
+        if len(valid_ds) == 0:
+            raise RuntimeError(
+                f"Waymo valid dataset is empty for phase {phase} (filter={weather_filter}).")
+ 
+        self.trainloader = _make_loader(train_ds, self._batch_size, shuffle=self._shuffle_train, workers=self._workers, generator=self._g)
+        self.trainiter = iter(self.trainloader)
+ 
+        self.validloader = _make_loader(valid_ds, self._batch_size, shuffle=False, workers=self._workers)
+        self.validiter = iter(self.validloader)
 
-    # number of classes that matters is the one for xentropy
-    self.nclasses = len(self.learning_map_inv)
+        if not hasattr(self, "testloader"):
+            if self._test_seqs:
+                test_ds = WaymoDataset(
+                    root=self._root,
+                    sequences=self._test_seqs,
+                    labels=self._labels,
+                    color_map=self._color_map,
+                    learning_map=self._learning_map,
+                    learning_map_inv=self._learning_map_inv,
+                    sensor=self._sensor,
+                    max_points=self._max_points,
+                    transform=False,
+                    gt=False,
+                    weather_filter=None,
+                )
+                self.testloader = _make_loader(test_ds, self._batch_size, shuffle=False, workers=self._workers, drop_last=False)
+                self.testiter = iter(self.testloader)
+            else:
+                self.testloader = None
+                self.testiter   = None
+ 
+        print(f"[Parser|waymo] phase={phase}  train={len(train_ds)}  valid={len(valid_ds)}")
 
-    # Data loading code
-    self.train_dataset = SemanticKitti(root=self.root,
-                                       sequences=self.train_sequences,
-                                       labels=self.labels,
-                                       color_map=self.color_map,
-                                       learning_map=self.learning_map,
-                                       learning_map_inv=self.learning_map_inv,
-                                       sensor=self.sensor,
-                                       max_points=max_points,
-                                       transform=True,
-                                       gt=self.gt)
-
-#     np.random.seed(0)
-#     dataset_size = len(self.train_dataset)
-#     indices = list(range(dataset_size))
-#     split = int(0.5 * dataset_size)
-#     np.random.shuffle(indices)
-#     train_indices = indices[:split]
-#     train_sampler = torch.utils.data.SubsetRandomSampler(train_indices)
-#     print('Subsample:', len(train_indices))
-
-    def seed_worker(worker_id):
-        worker_seed = torch.initial_seed() % 2**32
-        np.random.seed(worker_seed)
-        random.seed(worker_seed)
-    g = torch.Generator()
-    g.manual_seed(1024)
-#                                                    #sampler=train_sampler,
-
-    self.trainloader = torch.utils.data.DataLoader(self.train_dataset,
-                                                   batch_size=self.batch_size,
-                                                   shuffle=self.shuffle_train,
-                                                   num_workers=self.workers,
-                                                   worker_init_fn=seed_worker,
-                                                   generator=g,
-                                                   drop_last=True)
-    assert len(self.trainloader) > 0
-    self.trainiter = iter(self.trainloader)
-
-    self.valid_dataset = SemanticKitti(root=self.root,
-                                       sequences=self.valid_sequences,
-                                       labels=self.labels,
-                                       color_map=self.color_map,
-                                       learning_map=self.learning_map,
-                                       learning_map_inv=self.learning_map_inv,
-                                       sensor=self.sensor,
-                                       max_points=max_points,
-                                       gt=self.gt)
-
-    self.validloader = torch.utils.data.DataLoader(self.valid_dataset,
-                                                   batch_size=self.batch_size,
-                                                   shuffle=False,
-                                                   num_workers=self.workers,
-                                                   drop_last=True)
-    assert len(self.validloader) > 0
-    self.validiter = iter(self.validloader)
-
-    if self.test_sequences:
-      self.test_dataset = SemanticKitti(root=self.root,
-                                        sequences=self.test_sequences,
-                                        labels=self.labels,
-                                        color_map=self.color_map,
-                                        learning_map=self.learning_map,
-                                        learning_map_inv=self.learning_map_inv,
-                                        sensor=self.sensor,
-                                        max_points=max_points,
-                                        gt=False)
-
-      self.testloader = torch.utils.data.DataLoader(self.test_dataset,
-                                                    batch_size=self.batch_size,
-                                                    shuffle=False,
-                                                    num_workers=self.workers,
-                                                    drop_last=True)
-#       assert len(self.testloader) > 0
-      self.testiter = iter(self.testloader)
-
-  def get_train_batch(self):
-    scans = self.trainiter.next()
-    return scans
-
-  def get_train_set(self):
-    return self.trainloader
-
-  def get_valid_batch(self):
-    scans = self.validiter.next()
-    return scans
-
-  def get_valid_set(self):
-    return self.validloader
-
-  def get_test_batch(self):
-    scans = self.testiter.next()
-    return scans
-
-  def get_test_set(self):
-    return self.testloader
-
-  def get_train_size(self):
-    return len(self.trainloader)
-
-  def get_valid_size(self):
-    return len(self.validloader)
-
-  def get_test_size(self):
-    return len(self.testloader)
-
-  def get_n_classes(self):
-    return self.nclasses
-
-  def get_original_class_string(self, idx):
-    return self.labels[idx]
-
-  def get_xentropy_class_string(self, idx):
-    return self.labels[self.learning_map_inv[idx]]
-
-  def to_original(self, label):
-    # put label in original values
-    return SemanticKitti.map(label, self.learning_map_inv)
-
-  def to_xentropy(self, label):
-    # put label in xentropy values
-    return SemanticKitti.map(label, self.learning_map)
-
-  def to_color(self, label):
-    # put label in original values
-    label = SemanticKitti.map(label, self.learning_map_inv)
-    # put label in color
-    return SemanticKitti.map(label, self.color_map)
+    def get_train_batch(self):
+        return next(self.trainiter)
+ 
+    def get_train_set(self):
+        return self.trainloader
+ 
+    def get_valid_batch(self):
+        return next(self.validiter)
+ 
+    def get_valid_set(self):
+        return self.validloader
+ 
+    def get_test_batch(self):
+        return next(self.testiter)
+ 
+    def get_test_set(self):
+        return self.testloader
+ 
+    def get_train_size(self):
+        return len(self.trainloader)
+ 
+    def get_valid_size(self):
+        return len(self.validloader)
+ 
+    def get_test_size(self):
+        return len(self.testloader) if self.testloader else 0
+ 
+    def get_n_classes(self):
+        return self.nclasses
+ 
+    def get_original_class_string(self, idx):
+        return self._labels[idx]
+ 
+    def get_xentropy_class_string(self, idx):
+        return self._labels[self._learning_map_inv[idx]]
+ 
+    def to_original(self, label):
+        return SemanticKitti.map(label, self._learning_map_inv)
+ 
+    def to_xentropy(self, label):
+        return SemanticKitti.map(label, self._learning_map)
+ 
+    def to_color(self, label):
+        label = SemanticKitti.map(label, self._learning_map_inv)
+        return SemanticKitti.map(label, self._color_map)
