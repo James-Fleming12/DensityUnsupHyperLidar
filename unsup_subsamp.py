@@ -37,16 +37,16 @@ ITER_COLORS = {
     "post": ["#E8574C", "#9B59B6", "#1ABC9C"],
 }
 
-NUM_ITERS = 3
+NUM_ITERS = 10
 
-def multistep_dumbbell(all_histories, file_suffix=""):
+def multistep_dumbbell(all_histories, total_iters=None, file_suffix=""):
     """
-    all_histories: list of history dicts, one per iteration.
+    all_histories: list of history dicts.
     All iterations must share the same steps_labels.
     """
     labels = all_histories[0]["steps_labels"]
     y_pos = np.arange(len(labels))
-    n_iters = len(all_histories)
+    n_iters_plotted = len(all_histories)
 
     fig = plt.figure(figsize=(18, max(8, len(labels) * 0.8 + 3)))
     gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 1], wspace=0.35)
@@ -59,9 +59,11 @@ def multistep_dumbbell(all_histories, file_suffix=""):
 
         for it_idx, history in enumerate(all_histories):
             pairs = np.array(history[metric_key])
-            c_pre = ITER_COLORS["pre"][it_idx]
-            c_post = ITER_COLORS["post"][it_idx]
-            iter_label = f"Iter {it_idx + 1}"
+            c_pre = ITER_COLORS["pre"][it_idx % len(ITER_COLORS["pre"])]
+            c_post = ITER_COLORS["post"][it_idx % len(ITER_COLORS["post"])]
+
+            iter_num = history.get("iter_num", it_idx + 1)
+            iter_label = f"Iter {iter_num}"
 
             ax.hlines(y_pos, pairs[:, 0], pairs[:, 1], color=c_pre, alpha=0.35, linewidth=1.5, zorder=1)
 
@@ -72,7 +74,7 @@ def multistep_dumbbell(all_histories, file_suffix=""):
         ax.grid(axis="x", linestyle="--", alpha=0.35)
         ax.set_xlabel("Metric Value", fontsize=10)
         ax.spines[["top", "right"]].set_visible(False)
-        ax.legend(loc="lower right", fontsize=8, ncol=n_iters)
+        ax.legend(loc="lower right", fontsize=8, ncol=n_iters_plotted)
 
     draw_ax(ax1, "acc_pairs",  "Accuracy Gain per Section")
     draw_ax(ax2, "miou_pairs", "mIoU Gain per Section")
@@ -81,7 +83,13 @@ def multistep_dumbbell(all_histories, file_suffix=""):
     ax1.set_yticklabels(labels, fontsize=9)
     ax2.tick_params(labelleft=False)
 
-    plt.suptitle(f"Impact of Subsample Online Updates on Unseen Data  ({n_iters} iterations)", fontsize=16, fontweight="bold", y=1.01)
+    if total_iters and n_iters_plotted < total_iters:
+        shown_iters = [h.get("iter_num", i+1) for i, h in enumerate(all_histories)]
+        title_suffix = f" (Showing Iters {', '.join(map(str, shown_iters))} of {total_iters})"
+    else:
+        title_suffix = f" ({n_iters_plotted} iterations)"
+
+    plt.suptitle(f"Impact of Subsample Online Updates on Unseen Data{title_suffix}", fontsize=16, fontweight="bold", y=1.01)
     plt.tight_layout()
 
     out_path = f"subsample_online_dumbbell{file_suffix}.png"
@@ -148,9 +156,10 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
         print(f"{'='*60}")
 
         history = {
+            "iter_num": iteration + 1,
             "steps_labels": [],
-            "acc_pairs":    [],
-            "miou_pairs":   [],
+            "acc_pairs": [],
+            "miou_pairs": [],
         }
 
         section_idx = 0
@@ -236,7 +245,13 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
 
         all_histories.append(history)
 
-    multistep_dumbbell(all_histories)
+    if len(all_histories) >= 3:
+        plot_histories = [all_histories[0], all_histories[1], all_histories[-1]]
+    else:
+        plot_histories = all_histories
+
+    multistep_dumbbell(plot_histories, total_iters=NUM_ITERS)
+    
     return all_histories
 
 def _eval_on_batches(model, batches, device):
