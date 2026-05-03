@@ -359,7 +359,6 @@ class Parser:
         initial_curriculum: Starting curriculum phase (Waymo only, default 0).
     """
     def __init__(self,
-                 mode: str,
                  root: str,
                  train_sequences: list,
                  valid_sequences: list,
@@ -372,6 +371,7 @@ class Parser:
                  max_points: int,
                  batch_size: int,
                  workers: int,
+                 mode: str = "kitti",
                  gt: bool = True,
                  shuffle_train: bool = True,
                  initial_curriculum: int = 0):
