@@ -93,6 +93,3 @@ torch-hd>=5.8.4
 fire>=0.7.1
 pyquaternion>=0.9.9
 nuscenes-devkit
-
-tensorflow==2.12.0
-waymo-open-dataset-tf-2-12-0==1.6.7
