@@ -43,7 +43,6 @@ def _read_tag(tag: str, directory: str) -> dd.DataFrame:
     """Lazily read a Waymo parquet component — no compute() called here."""
     return dd.read_parquet(f"{directory}/{tag}/*.parquet")
 
-
 def _load_stats(parquet_dir: str) -> dict:
     """
     Load the lightweight stats table (weather / time-of-day) all at once.
@@ -69,7 +68,6 @@ def _load_stats(parquet_dir: str) -> dict:
     except Exception as e:
         print(f"Warning: Could not load 'stats', defaulting to sunny. ({e})")
     return stats_dict
-
 
 def _get_segment_names(parquet_dir: str) -> list:
     """
@@ -177,7 +175,6 @@ def _convert_segment(seg_df, scene_id: int, weather_tag: str, output_dir: str):
 
     with open(os.path.join(seq_dir, "calib.txt"), "w") as f:
         f.write("P0: 0 0 0 0 0 0 0 0 0 0 0 0\nTr: 1 0 0 0 0 1 0 0 0 0 1 0\n")
-
 
 class WaymoParquetConverter:
     def __init__(
