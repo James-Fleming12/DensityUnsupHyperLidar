@@ -137,12 +137,16 @@ def _convert_segment(seg_df, scene_id: int, weather_tag: str, output_dir: str):
             kitti_points[:, 3] = pts[:, 4]
             kitti_points.tofile(os.path.join(velo_dir, f"{frame_idx:06d}.bin"))
 
-            ri_shape = lidar.range_image_return1.shape.dims
-            ri_tensor = tf.reshape(tf.constant(lidar.range_image_return1.values), ri_shape)
-            mask = ri_tensor[..., 0] > 0
+            def _to_tf_tensor(ri):
+                if isinstance(ri, np.ndarray):
+                    return tf.constant(ri)
+                shape = ri.shape
+                dims = shape.dims if hasattr(shape, 'dims') else list(shape)
+                return tf.reshape(tf.constant(ri.values), dims)
 
-            seg_shape = lidar_seg.range_image_return1.shape.dims
-            seg_tensor = tf.reshape(tf.constant(lidar_seg.range_image_return1.values), seg_shape)
+            ri_tensor = _to_tf_tensor(lidar.range_image_return1)
+            mask = ri_tensor[..., 0] > 0
+            seg_tensor = _to_tf_tensor(lidar_seg.range_image_return1)
             seg_points = tf.boolean_mask(seg_tensor[..., 1], mask).numpy()
 
             skitti = np.vectorize(lambda x: WAYMO_TO_SKITTI_LABEL.get(int(x), 0))(seg_points).astype(np.uint32)(skitti & 0xFFFF).astype(np.uint32).tofile(os.path.join(label_dir, f"{frame_idx:06d}.label"))
