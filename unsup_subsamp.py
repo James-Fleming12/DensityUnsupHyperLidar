@@ -39,6 +39,9 @@ ITER_COLORS = {
 
 NUM_ITERS = 10
 
+RUN_THRESHOLD_EXPERIMENT = True
+TEST_THRESHOLDS = [[0.45, 0.80], [0.60, 0.80], [0.75, 0.80]]
+
 def multistep_dumbbell(all_histories, total_iters=None, file_suffix=""):
     """
     all_histories: list of history dicts.
@@ -136,7 +139,7 @@ def tta_image_loss(feat, mu_tr, sigma_tr, mu_te):
     loss = (0.5 * (mu_tr - mu_te) ** 2 / sigma_tr).sum()
     return loss
 
-def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
+def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100, thresholds=[0.60, 0.80]):
     """
     Supervised sections -> freeze backbone, fine-tune adaptors only (+ subcluster update).
     Unsupervised sections -> original inference_update calls only, no network gradient updates whatsoever.
@@ -232,7 +235,7 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
                     break
 
                 if proj_in.shape[1] > 0:
-                    model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0, thresholds=[0.60, 0.80])
+                    model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0, thresholds=thresholds)
 
             acc_post, miou_post = _eval_on_batches(model, supervised_batches, device)
             print(f"  Post-update | Acc: {acc_post:.4f}  mIoU: {miou_post:.4f}")
@@ -249,8 +252,10 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
         plot_histories = [all_histories[0], all_histories[1], all_histories[-1]]
     else:
         plot_histories = all_histories
-
-    multistep_dumbbell(plot_histories, total_iters=NUM_ITERS)
+    
+    suffix = f"_t{thresholds[0]}"
+    multistep_dumbbell(plot_histories, total_iters=NUM_ITERS, file_suffix=suffix)
+    # multistep_dumbbell(plot_histories, total_iters=NUM_ITERS)
     
     return all_histories
 
@@ -333,11 +338,25 @@ def main():
             
     loss_w = loss_w.to(device)
 
-    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
-    model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
-    model.to(device)
+    # model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+    # model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
+    # model.to(device)
 
-    _ = subsample_online_update(model, kittiloader, ARCH, loss_w)
+    thresholds_to_run = TEST_THRESHOLDS if RUN_THRESHOLD_EXPERIMENT else [[0.60, 0.80]]
+
+    for thresholds in thresholds_to_run:
+        print(f"\n{'#'*70}")
+        print(f"### RUNNING EXPERIMENT WITH THRESHOLDS: {thresholds}")
+        print(f"{'#'*70}\n")
+
+        model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+        model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
+        model.to(device)
+
+        if hasattr(model, 'classify'):
+            model.register_buffer('source_prototypes', model.classify.weight.data.clone())
+
+        _ = subsample_online_update(model, kittiloader, ARCH, loss_w, thresholds=thresholds)
 
 if __name__=="__main__":
     main()
