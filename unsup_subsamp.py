@@ -232,7 +232,7 @@ def subsample_online_update(model, dataloader, ARCH, loss_w, section_size=100):
                     break
 
                 if proj_in.shape[1] > 0:
-                    model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0)
+                    model.model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0, thresholds=[0.60, 0.80])
 
             acc_post, miou_post = _eval_on_batches(model, supervised_batches, device)
             print(f"  Post-update | Acc: {acc_post:.4f}  mIoU: {miou_post:.4f}")
