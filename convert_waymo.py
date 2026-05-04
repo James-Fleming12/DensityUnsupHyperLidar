@@ -84,7 +84,6 @@ def _get_segment_names(parquet_dir: str) -> list:
     )
     return list(names)
 
-
 def _load_segment_df(parquet_dir: str, segment_name: str):
     """
     Load and join all tables for a *single* segment.
@@ -134,7 +133,7 @@ def _convert_segment(seg_df, scene_id: int, weather_tag: str, output_dir: str):
             vehicle_pose = v2.VehiclePoseComponent.from_dict(row)
             lidar_seg = v2.LiDARSegmentationLabelComponent.from_dict(row)
 
-            pose_mat = np.array(vehicle_pose.transform).reshape(4, 4)
+            pose_mat = np.array(vehicle_pose.world_from_vehicle.transform).reshape(4, 4)
             if first_pose_inv is None:
                 first_pose_inv = np.linalg.inv(pose_mat)
             rel_pose = first_pose_inv @ pose_mat
