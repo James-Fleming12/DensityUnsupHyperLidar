@@ -14,7 +14,7 @@ from unsup_main import train_extractor, train_hdc, init_sub, test_hdc_model
 import matplotlib.patches as mpatches
 from matplotlib.gridspec import GridSpec
 
-from dataset.waymo.waymo_dataset import WaymoDataset
+from dataset.waymo_data import WaymoDataset
 import torch.utils.data as torchdata
 
 MODEL_DIR = "logs"
