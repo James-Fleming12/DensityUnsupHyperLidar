@@ -23,10 +23,75 @@ NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes t
 MAX_HDC_EPOCHS = 20
 FEATURE_EXTRACTOR_EPOCHS = 400
 
+SUPERVISED_FRACTION = 0.01
+
 HD_DIM = 10000
 
 HDC_SAVE_PATH = "logs/hdc.pth"
 HDC_SUB_PATH = "logs/hdc_sub.pth"
+
+def select_representative_sequences(ARCH, DATA, n, sequences=None):
+    """
+    Selects the n sequences from the training split that are most representative
+    of the full dataset, using class distribution similarity as the proxy for
+    representativeness.
+
+    Strategy: embed each sequence as a class-frequency histogram, then greedily
+    pick the subset whose *combined* histogram has the smallest KL divergence
+    from the full-dataset histogram.
+
+    Returns a list of n sequence identifiers.
+    """
+    from scipy.special import kl_div
+
+    all_seqs = sequences or DATA["split"]["train"]
+
+    print(f"  Computing class histograms for {len(all_seqs)} sequences...")
+    NUM_MAPPED_CLASSES = NUM_CLASSES
+
+    seq_histograms = {}
+    for seq in tqdm(all_seqs, desc="Scanning sequences"):
+        loader = get_loader(ARCH, DATA, [seq], shuffle=False).get_train_set()
+        counts = np.zeros(NUM_MAPPED_CLASSES, dtype=np.float64)
+        for (_, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in loader:
+            for cid in proj_labels.unique().tolist():
+                cid = int(cid)
+                if cid != 255 and cid < NUM_MAPPED_CLASSES:
+                    counts[cid] += (proj_labels == cid).sum().item()
+        total = counts.sum()
+        seq_histograms[seq] = counts / total if total > 0 else counts
+
+    all_counts = np.sum(list(seq_histograms.values()), axis=0)
+    all_total = all_counts.sum()
+    target_hist = all_counts / all_total if all_total > 0 else all_counts
+
+    EPS = 1e-10
+
+    def symmetric_kl(p, q):
+        p, q = p + EPS, q + EPS
+        return np.sum(kl_div(p, q) + kl_div(q, p))
+
+    selected  = []
+    remaining = list(all_seqs)
+    combined  = np.zeros(NUM_MAPPED_CLASSES, dtype=np.float64)
+
+    for step in range(n):
+        best_seq,  best_div = None, float('inf')
+        for seq in remaining:
+            candidate = combined + seq_histograms[seq]
+            total     = candidate.sum()
+            candidate_norm = candidate / total if total > 0 else candidate
+            div = symmetric_kl(candidate_norm, target_hist)
+            if div < best_div:
+                best_div, best_seq = div, seq
+
+        selected.append(best_seq)
+        remaining.remove(best_seq)
+        combined += seq_histograms[best_seq]
+        print(f"  Step {step+1}/{n}: selected seq '{best_seq}' (KL div: {best_div:.4f})")
+
+    print(f"  Selected {len(selected)} representative sequences: {selected}")
+    return selected
 
 def get_loader(ARCH, DATA, sequences, shuffle=True):
     return Parser(
@@ -46,14 +111,20 @@ def get_loader(ARCH, DATA, sequences, shuffle=True):
         shuffle_train=shuffle
     )
 
-def pretrain_pipeline(ARCH, DATA, base_count=10):
+def pretrain_pipeline(ARCH, DATA, base_count=10, representative=False):
     """
-    returns model : DensityModel, seen_classes : set of int (Mapped class IDs observed in the pretraining sequences)
+    representative: if True, selects the base_count sequences whose combined class distribution best matches the full dataset, rather than taking the first base_count sequences.
     """
-    print(f"--- Starting Pretraining on first {base_count} scenarios ---")
+    print(f"--- Starting Pretraining on {base_count} scenarios ({'representative' if representative else 'sequential'}) ---")
 
     PRE_DATA = copy.deepcopy(DATA)
-    PRE_DATA["split"]["train"] = DATA["split"]["train"][:base_count]
+
+    if representative:
+        print("Selecting representative sequences...")
+        selected_seqs = select_representative_sequences(ARCH, DATA, base_count)
+        PRE_DATA["split"]["train"] = selected_seqs
+    else:
+        PRE_DATA["split"]["train"] = DATA["split"]["train"][:base_count]
 
     print("Scanning pretraining sequences for class coverage...")
     seen_classes = collect_seen_classes(ARCH, PRE_DATA, PRE_DATA["split"]["train"])
@@ -78,7 +149,16 @@ def pretrain_pipeline(ARCH, DATA, base_count=10):
     torch.save(model.state_dict(), HDC_SUB_PATH)
     print(f"Pretraining complete. Model saved to {HDC_SUB_PATH}")
  
-    return model, seen_classes
+    val_loader = get_loader(ARCH, PRE_DATA, DATA["split"]["valid"], shuffle=False).get_valid_set()
+    acc, miou = test_hdc_model(model, val_loader)
+    sup_history = {
+        "steps_labels": [f"Scenarios 0-{base_count}"],
+        "acc_pairs": [(0.0, acc)],
+        "miou_pairs": [(0.0, miou)],
+        "novel_classes": [set()],
+    }
+
+    return model, seen_classes, sup_history, PRE_DATA["split"]["train"]
 
 def collect_seen_classes(ARCH, DATA, sequences, max_batches=None):
     loader = get_loader(ARCH, DATA, sequences, shuffle=False).get_train_set()
@@ -103,14 +183,20 @@ def class_ids_to_names(class_ids, DATA):
         names.append(name)
     return names
 
-def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=None):
+def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=None, supervised_seqs=None):
     """
     Performs incremental inference updates and tracks Pre vs Post performance.
     If seen_classes is provided, each chunk is scanned for novel class IDs
     not present during pretraining.
     """
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    remaining_seqs = DATA["split"]["train"][base_count:]
+
+    if supervised_seqs is not None:
+        supervised_set = set(supervised_seqs)
+        remaining_seqs = [s for s in DATA["split"]["train"] if s not in supervised_set]
+    else:
+        remaining_seqs = DATA["split"]["train"][base_count:]
+
     valid_seqs = DATA["split"]["valid"]
 
     model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
@@ -133,7 +219,7 @@ def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=
         if not chunk:
             break
 
-        current_range = f"{base_count + i}-{base_count + i + len(chunk)}"
+        current_range = f"{chunk[0]}-{chunk[-1]}" if len(chunk) > 1 else f"{chunk[0]}"
         history["steps_labels"].append(f"Scenarios {current_range}")
         print(f"\nProcessing Batch: {current_range}...")
 
@@ -164,7 +250,7 @@ def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=
 
         print(f"Batch {current_range} Jump: mIoU {miou_pre:.4f} -> {miou_post:.4f}")
 
-    save_multi_step_dumbbell_ug(history, DATA, file_suffix=f"_{base_count}")
+    return history
 
 def save_final_plot(history):
     plt.figure(figsize=(10, 6))
@@ -271,6 +357,88 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
     plt.close()
     print(f"Dumbbell plot saved to {out_path}")
 
+def plot_combined_performance(supervised_history, unsupervised_history, file_suffix=""):
+    """
+    Plots per-pixel accuracy and mIoU across both supervised and unsupervised
+    phases on a single graph, with a vertical divider between the two sections.
+    """
+    sup_labels = supervised_history["steps_labels"]
+    unsup_labels = unsupervised_history["steps_labels"]
+
+    sup_acc = [post for _, post in supervised_history["acc_pairs"]]
+    sup_miou = [post for _, post in supervised_history["miou_pairs"]]
+
+    unsup_acc = []
+    unsup_miou = []
+    unsup_x = []
+    n_sup = len(sup_labels)
+
+    for i, (pre_a, post_a) in enumerate(unsupervised_history["acc_pairs"]):
+        pre_m, post_m = unsupervised_history["miou_pairs"][i]
+        base_x = n_sup + i * 2
+        unsup_x.extend([base_x, base_x + 1])
+        unsup_acc.extend([pre_a, post_a])
+        unsup_miou.extend([pre_m, post_m])
+
+    sup_x = list(range(n_sup))
+
+    all_x = sup_x + unsup_x
+    all_acc = sup_acc + unsup_acc
+    all_miou = sup_miou + unsup_miou
+
+    sup_tick_labels  = [f"S{i+1}\n{l}" for i, l in enumerate(sup_labels)]
+    unsup_tick_labels = []
+    for i, l in enumerate(unsup_labels):
+        base_x = n_sup + i * 2
+        unsup_tick_labels.append((base_x, f"U{i+1}pre\n{l}"))
+        unsup_tick_labels.append((base_x + 1, f"U{i+1}post\n{l}"))
+
+    fig, ax = plt.subplots(figsize=(max(14, len(all_x) * 0.9 + 4), 6))
+
+    sup_end = n_sup - 0.5
+    ax.axvspan(-0.5, sup_end, alpha=0.08, color='steelblue', label='_sup_bg')
+    ax.axvspan(sup_end, max(all_x) + 0.5, alpha=0.08, color='darkorange', label='_unsup_bg')
+
+    ax.axvline(x=sup_end, color='black', linewidth=2, linestyle='--', zorder=5)
+    ax.text(sup_end - 0.1, ax.get_ylim()[1] if ax.get_ylim()[1] != 1.0 else 0.98, 'Supervised →\n← Unsupervised begins', ha='right', va='top', fontsize=9, color='black', bbox=dict(boxstyle='round,pad=0.3', facecolor='white', alpha=0.8))
+
+    ax.plot(sup_x,  sup_acc,  'o-',  color='steelblue',  linewidth=2, markersize=7, label='Accuracy (supervised)')
+    ax.plot(sup_x,  sup_miou, 's--', color='steelblue',  linewidth=2, markersize=7, alpha=0.65, label='mIoU (supervised)')
+
+    ax.plot(unsup_x, unsup_acc,  'o-',  color='darkorange', linewidth=2, markersize=7, label='Accuracy (unsupervised)')
+    ax.plot(unsup_x, unsup_miou, 's--', color='darkorange', linewidth=2, markersize=7, alpha=0.65, label='mIoU (unsupervised)')
+
+    for i in range(len(unsupervised_history["acc_pairs"])):
+        base_x = n_sup + i * 2
+        ax.axvspan(base_x - 0.5, base_x + 0.5, alpha=0.06, color='gray')
+        ax.annotate('pre',  xy=(base_x,     min(all_acc + all_miou) - 0.01), ha='center', va='top', fontsize=7, color='gray')
+        ax.annotate('post', xy=(base_x + 1, min(all_acc + all_miou) - 0.01), ha='center', va='top', fontsize=7, color='gray')
+
+    all_tick_x = sup_x + [x for x, _ in unsup_tick_labels]
+    all_tick_labels = sup_tick_labels + [l for _, l in unsup_tick_labels]
+
+    ax.set_xticks(all_tick_x)
+    ax.set_xticklabels(all_tick_labels, fontsize=7)
+    ax.set_xlim(-0.5, max(all_x) + 0.5)
+    ax.set_ylim(max(0, min(all_acc + all_miou) - 0.05), min(1, max(all_acc + all_miou) + 0.05))
+
+    ax.set_xlabel("Training Step", fontsize=11)
+    ax.set_ylabel("Metric Value", fontsize=11)
+    ax.set_title("Per-Pixel Accuracy & mIoU: Supervised → Unsupervised", fontsize=14, fontweight='bold')
+    ax.legend(loc='lower right', fontsize=9, framealpha=0.9)
+    ax.grid(axis='y', linestyle='--', alpha=0.4)
+    ax.spines[['top', 'right']].set_visible(False)
+
+    y_top = ax.get_ylim()[1]
+    ax.text((sup_end - 0.5) / 2, y_top, "SUPERVISED", ha='center', va='bottom', fontsize=11, fontweight='bold', color='steelblue', alpha=0.7)
+    ax.text((sup_end + max(all_x) + 0.5) / 2, y_top, "UNSUPERVISED", ha='center', va='bottom', fontsize=11, fontweight='bold', color='darkorange', alpha=0.7)
+
+    plt.tight_layout()
+    out_path = f"combined_performance{file_suffix}.png"
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Combined performance plot saved to {out_path}")
+
 def main():
     try:
         ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
@@ -283,12 +451,25 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
  
-    base_counts = [4, 6, 8, 10, 12]
-    inc_steps = [2]
+    # base_counts = [4, 6, 8, 10, 12]
+    # inc_steps = [2]
  
-    for base in base_counts:
-        model, seen_classes = pretrain_pipeline(ARCH, DATA, base_count=base)
-        incremental_update_test(ARCH, DATA, base_count=base, inc_step=inc_steps[0], seen_classes=seen_classes)
+    # for base in base_counts:
+    #     model, seen_classes = pretrain_pipeline(ARCH, DATA, base_count=base)
+    #     incremental_update_test(ARCH, DATA, base_count=base, inc_step=inc_steps[0], seen_classes=seen_classes)
+
+    all_seqs = DATA["split"]["train"]
+    n_supervised = max(1, int(len(all_seqs) * SUPERVISED_FRACTION))
+
+    print(f"Total training sequences : {len(all_seqs)}")
+    print(f"Supervised slice         : {n_supervised}  ({SUPERVISED_FRACTION*100:.1f} %)")
+    print(f"Unsupervised slice       : {len(all_seqs) - n_supervised}  ({(1 - SUPERVISED_FRACTION)*100:.1f} %)")
+
+    model, seen_classes, sup_history, supervised_seqs = pretrain_pipeline(ARCH, DATA, base_count=n_supervised, representative=True)
+
+    unsup_history = incremental_update_test(ARCH, DATA, base_count=n_supervised, inc_step=2, seen_classes=seen_classes, supervised_seqs=supervised_seqs)
+    
+    plot_combined_performance(sup_history, unsup_history, file_suffix=f"_{SUPERVISED_FRACTION}")
 
 if __name__=="__main__":
     main()
