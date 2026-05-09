@@ -30,7 +30,7 @@ def convert_dataset():
         nusc_dir=NU_DATA_DIR,
         nusc_skitti_dir=DATA_DIR,
         lidar_name='LIDAR_TOP',
-        nusc_version='v1.0'
+        nusc_version='v1.0-trainval'
     )
 
     converter.nuscenes_gt_to_semantickitti()
