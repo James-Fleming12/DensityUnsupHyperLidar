@@ -18,7 +18,6 @@ from dataset.waymo_data import WaymoDataset
 import torch.utils.data as torchdata
 
 MODEL_DIR = "logs"
-# NU_DATA_DIR = "/mnt/alpha/jmfleming/HyperLidar_dataset/nuscenes_all"
 DATA_DIR = "/mnt/bravo/jmfleming/waymo_skitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 13
@@ -32,6 +31,7 @@ HDC_SAVE_PATH = "logs/hdc.pth"
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
 ALL_CONDITIONS = ["sunny", "rain", "fog", "night"]
+ADVERSE_CONDITIONS = [c for c in ALL_CONDITIONS if c != "sunny"]
 
 CONDITION_COLORS = {
     "sunny": "#F5C518",
@@ -64,14 +64,7 @@ def get_loader(ARCH, DATA, sequences, shuffle=True, weather_filter=None):
         workers=ARCH["train"]["workers"],
         gt=True,
         shuffle_train=shuffle,
-        # Phase 2 = all conditions; weather_filter overrides this internally
-        # via WaymoDataset directly, so we use initial_curriculum=2 and rely
-        # on the filter kwarg passed through below.
-        # NOTE: Parser's curriculum phases don't expose per-condition filtering
-        # at the get_loader level, so we construct WaymoDataset directly for
-        # condition-split loaders (see get_condition_loaders below).
     )
-
 
 def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, conditions=None):
     """
@@ -79,10 +72,6 @@ def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, co
 
     Returns a dict:  { "sunny": DataLoader, "rain": DataLoader, ... }
     Only conditions that have at least one frame in `sequences` are included.
-
-    Args:
-        conditions : list of condition strings to build loaders for, or None
-                     to use ALL_CONDITIONS.
     """
     if conditions is None:
         conditions = ALL_CONDITIONS
@@ -117,19 +106,17 @@ def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, co
 
     return loaders
 
-def pretrain_pipeline(ARCH, DATA, base_count=10):
+def pretrain_pipeline(ARCH, DATA):
     """
-    Returns model : DensityModel,
-            seen_classes : set of int (xentropy class IDs observed in pretraining)
-
-    Pretraining uses sunny frames only so the base model has a clean
+    Pretraining uses ALL sunny frames in the dataset so the base model has a clean
     clear-weather foundation before incremental adverse-condition updates.
     """
-    print(f"--- Starting Pretraining on first {base_count} scenarios (sunny only) ---")
+    print(f"--- Starting Pretraining on ALL sunny scenarios ---")
 
     PRE_DATA = copy.deepcopy(DATA)
-    PRE_DATA["split"]["train"] = DATA["split"]["train"][:base_count]
-
+    # Provide a weather filter key in case internal parsers check it
+    PRE_DATA["weather_filter"] = ["sunny"]
+    
     print("Scanning pretraining sequences for class coverage (sunny frames)...")
     seen_classes = collect_seen_classes(
         ARCH, PRE_DATA, PRE_DATA["split"]["train"], conditions=["sunny"])
@@ -162,12 +149,9 @@ def pretrain_pipeline(ARCH, DATA, base_count=10):
 
     return model, seen_classes
 
-def collect_seen_classes(ARCH, DATA, sequences, max_batches=None,
-                         conditions=None):
+def collect_seen_classes(ARCH, DATA, sequences, max_batches=None, conditions=None):
     """
     Scan frames for observed xentropy class IDs.
-
-    conditions : list of weather tags to restrict scanning to, or None for all.
     """
     if conditions is not None:
         cond_loaders = get_condition_loaders(
@@ -197,9 +181,9 @@ def class_ids_to_names(class_ids, DATA):
         names.append(name)
     return names
 
-def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=None):
+def incremental_update_test(ARCH, DATA, seen_classes=None):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    remaining_seqs = DATA["split"]["train"][base_count:]
+    train_seqs = DATA["split"]["train"]
     valid_seqs = DATA["split"]["valid"]
 
     model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
@@ -223,70 +207,63 @@ def incremental_update_test(ARCH, DATA, base_count=10, inc_step=2, seen_classes=
         "novel_classes": [],
     }
 
-    print(f"--- Incremental Evaluation: {len(remaining_seqs)} scenarios, "
-          f"step={inc_step} ---")
+    print(f"--- Incremental Evaluation: Unsupervised Updates on Adverse Conditions ---")
+    
+    # Load all training frames for the adverse conditions
+    train_loaders = get_condition_loaders(
+        ARCH, DATA, train_seqs,
+        batch_size=1, shuffle=True,
+        conditions=ADVERSE_CONDITIONS)
 
-    for i in range(0, len(remaining_seqs), inc_step):
-        chunk = remaining_seqs[i: i + inc_step]
-        if not chunk:
-            break
+    if not train_loaders:
+        print("  No adverse condition frames found in the dataset — skipping.")
+        return
 
-        chunk_label  = f"Scenarios {base_count+i}–{base_count+i+len(chunk)}"
-        print(f"\n{'='*60}")
-        print(f"Chunk: {chunk_label}")
-
-        chunk_train_loaders = get_condition_loaders(
-            ARCH, DATA, chunk,
-            batch_size=1, shuffle=True,
-            conditions=ALL_CONDITIONS)
-
-        if not chunk_train_loaders:
-            print("  No frames in this chunk — skipping.")
+    # Iterate through each condition (e.g. rain -> fog -> night)
+    for cond in ADVERSE_CONDITIONS:
+        if cond not in train_loaders:
             continue
 
-        for cond in ALL_CONDITIONS:
-            if cond not in chunk_train_loaders:
-                continue
+        print(f"\n{'='*60}")
+        print(f"Unsupervised Update Phase: [{cond.upper()}]")
 
-            print(f"\n  Condition: [{cond.upper()}]")
+        step_label = f"Updates on {cond.capitalize()}"
 
-            step_label = f"{chunk_label} / {cond}"
+        novel_in_step = set()
+        if seen_classes is not None:
+            cond_classes = collect_seen_classes(
+                ARCH, DATA, train_seqs, conditions=[cond])
+            novel_in_step = cond_classes - seen_classes
+            if novel_in_step:
+                names = class_ids_to_names(novel_in_step, DATA)
+                print(f"    Novel classes: {names}")
+            else:
+                print("    No novel classes.")
 
-            novel_in_step = set()
-            if seen_classes is not None:
-                cond_classes = collect_seen_classes(
-                    ARCH, DATA, chunk, conditions=[cond])
-                novel_in_step = cond_classes - seen_classes
-                if novel_in_step:
-                    names = class_ids_to_names(novel_in_step, DATA)
-                    print(f"    Novel classes: {names}")
-                else:
-                    print("    No novel classes.")
+        val_loader_for_cond = val_loaders.get(cond)
+        if val_loader_for_cond is None:
+            print(f"    No '{cond}' val frames — using full val set.")
+            val_loader_for_cond = next(iter(val_loaders.values()))
 
-            val_loader_for_cond = val_loaders.get(cond)
-            if val_loader_for_cond is None:
-                print(f"    No '{cond}' val frames — using full val set.")
-                val_loader_for_cond = next(iter(val_loaders.values()))
+        acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
+        print(f"    Pre  — acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
-            acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
-            print(f"    Pre  — acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
+        model.train()
+        for _, (proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _) in \
+                enumerate(tqdm(train_loaders[cond], desc=f"    update [{cond}]", leave=False)):
+            if proj_in.shape[1] > 0:
+                model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0)
 
-            model.train()
-            for _, (proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _) in \
-                    enumerate(tqdm(chunk_train_loaders[cond], desc=f"    update [{cond}]", leave=False)):
-                if proj_in.shape[1] > 0:
-                    model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0)
+        acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
+        print(f"    Post — acc: {acc_post:.4f}  mIoU: {miou_post:.4f}  Δ mIoU: {miou_post - miou_pre:+.4f}")
 
-            acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
-            print(f"    Post — acc: {acc_post:.4f}  mIoU: {miou_post:.4f}  Δ mIoU: {miou_post - miou_pre:+.4f}")
+        history["steps_labels"].append(step_label)
+        history["conditions"].append(cond)
+        history["acc_pairs"].append((acc_pre,  acc_post))
+        history["miou_pairs"].append((miou_pre, miou_post))
+        history["novel_classes"].append(novel_in_step)
 
-            history["steps_labels"].append(step_label)
-            history["conditions"].append(cond)
-            history["acc_pairs"].append((acc_pre,  acc_post))
-            history["miou_pairs"].append((miou_pre, miou_post))
-            history["novel_classes"].append(novel_in_step)
-
-    save_multi_step_dumbbell_ug(history, DATA, file_suffix=f"_{base_count}")
+    save_multi_step_dumbbell_ug(history, DATA, file_suffix="_condition_split")
 
 def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
     labels = history["steps_labels"]
@@ -342,34 +319,35 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
         ax.spines[['top', 'right']].set_visible(False)
         ax.legend(loc='lower right', fontsize=9)
 
-    draw_ax(ax1, acc_pairs, "Accuracy Gain per Batch × Condition")
-    draw_ax(ax2, miou_pairs, "mIoU Gain per Batch × Condition")
+    if len(acc_pairs) > 0:
+        draw_ax(ax1, acc_pairs, "Accuracy Gain per Condition")
+        draw_ax(ax2, miou_pairs, "mIoU Gain per Condition")
 
-    ax1.set_yticks(y_pos)
-    tick_labels = ax1.set_yticklabels(labels, fontsize=8)
-    for tick, cond in zip(tick_labels, conditions):
-        tick.set_color(CONDITION_COLORS.get(cond, "black"))
+        ax1.set_yticks(y_pos)
+        tick_labels = ax1.set_yticklabels(labels, fontsize=8)
+        for tick, cond in zip(tick_labels, conditions):
+            tick.set_color(CONDITION_COLORS.get(cond, "black"))
 
-    ax2.tick_params(labelleft=False)
+        ax2.tick_params(labelleft=False)
 
-    cond_patches = [
-        mpatches.Patch(color=CONDITION_COLORS[c], label=c.capitalize())
-        for c in ALL_CONDITIONS
-        if c in conditions
-    ]
-    ax1.legend(
-        handles=cond_patches,
-        title="Condition", loc='upper left',
-        fontsize=8, title_fontsize=8,
-        bbox_to_anchor=(0, -0.06), ncol=len(cond_patches),
-        frameon=True, framealpha=0.9,
-    )
+        cond_patches = [
+            mpatches.Patch(color=CONDITION_COLORS[c], label=c.capitalize())
+            for c in ALL_CONDITIONS
+            if c in conditions
+        ]
+        ax1.legend(
+            handles=cond_patches,
+            title="Condition", loc='upper left',
+            fontsize=8, title_fontsize=8,
+            bbox_to_anchor=(0, -0.06), ncol=len(cond_patches),
+            frameon=True, framealpha=0.9,
+        )
 
-    if ax3 is not None:
+    if ax3 is not None and len(acc_pairs) > 0:
         ax3.set_xlim(0, 1)
         ax3.set_ylim(len(labels) - 0.5, -0.5)
         ax3.axis('off')
-        ax3.set_title("Novel Labels in Chunk", fontsize=13, fontweight='bold', pad=10)
+        ax3.set_title("Novel Labels Discovered", fontsize=13, fontweight='bold', pad=10)
 
         for yi, step_label in enumerate(labels):
             novel = novel_classes[yi]
@@ -396,7 +374,7 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
         ax3.legend(handles=[novel_patch, none_patch], loc='lower center', fontsize=8, bbox_to_anchor=(0.5, -0.06), frameon=True, framealpha=0.9)
 
     plt.suptitle(
-        "Per-Condition Impact of Incremental Inference Updates",
+        "Impact of Incremental Unsupervised Inference Updates",
         fontsize=16, fontweight='bold', y=1.01)
     plt.tight_layout()
 
@@ -409,7 +387,7 @@ def save_final_plot(history):
     plt.figure(figsize=(10, 6))
     plt.plot(history["steps"], history["miou"], 'r-s', label='mIoU')
     plt.plot(history["steps"], history["acc"],  'b-o', label='Accuracy')
-    plt.xlabel('Training Scenarios Seen')
+    plt.xlabel('Condition Update Step')
     plt.ylabel('Performance Metrics')
     plt.title('HDC Model Improvement via Incremental Inference Updates')
     plt.legend()
@@ -430,12 +408,9 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    base_counts = [4, 6, 8, 10, 12]
-    inc_steps   = [2]
+    model, seen_classes = pretrain_pipeline(ARCH, DATA)
 
-    for base in base_counts:
-        model, seen_classes = pretrain_pipeline(ARCH, DATA, base_count=base)
-        incremental_update_test(ARCH, DATA, base_count=base, inc_step=inc_steps[0], seen_classes=seen_classes)
+    incremental_update_test(ARCH, DATA, seen_classes=seen_classes)
 
 if __name__ == "__main__":
     main()
