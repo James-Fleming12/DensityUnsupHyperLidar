@@ -168,7 +168,9 @@ class KittiConverter:
                 lidar_pc = LidarPointCloud.from_file(os.path.join(self.nusc.dataroot, lidar_data['filename']))
                 ### convert lidar point cloud to semantickitti frame
                 lidar_pc.rotate(nu_to_kitti_lidar_inv.rotation_matrix)
-                lidar_pc.points.T.tofile(os.path.join(velo_folder, f'{token_idx:06}.bin'))   # (N, 4)
+
+                # fixed? old was lidar_pc.points.T.tofile(os.path.join(velo_folder, f'{token_idx:06}.bin'))
+                lidar_pc.points[:4, :].T.astype(np.float32).tofile(os.path.join(velo_folder, f'{token_idx:06}.bin'))
 
                 ################ 3. Load ego pose ################
                 ego_pose = self.nusc.get('ego_pose', lidar_data['ego_pose_token'])

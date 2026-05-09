@@ -30,15 +30,15 @@ def convert_dataset():
         nusc_dir=NU_DATA_DIR,
         nusc_skitti_dir=DATA_DIR,
         lidar_name='LIDAR_TOP',
-        nusc_version='v1.0-mini'
+        nusc_version='v1.0'
     )
 
     converter.nuscenes_gt_to_semantickitti()
 
     print("Conversion Complete: Output Saved to ")
 
-def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
-    trainer = Trainer(ARCH, DATA, DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
+def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS, data_dir=None):
+    trainer = Trainer(ARCH, DATA, data_dir if data_dir else DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
     trainer.train(epochs=epochs)
 
 def train_dglss(ARCH, DATA, dist_type="standard", epochs=FEATURE_EXTRACTOR_EPOCHS):
@@ -49,10 +49,10 @@ def DDFEtrain_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
     trainer = DDFETrainer(ARCH, DATA, DATA_DIR, LOG_DIR)
     trainer.train(epochs=epochs)
 
-def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS) -> DensityModel:
+def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, data_dir=None) -> DensityModel:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-    parser = Parser(root=DATA_DIR,
+    parser = Parser(root=data_dir if data_dir else DATA_DIR,
                         train_sequences=DATA["split"]["train"], # self.DATA["split"]["valid"] + self.DATA["split"]["train"] if finetune with valid
                         valid_sequences=DATA["split"]["valid"],
                         test_sequences=None,
@@ -75,8 +75,6 @@ def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS) -> DensityModel:
         if ign:
             x_cl = int(cl)
             ignore.append(x_cl)
-
-    evaluator = iouEval(NUM_CLASSES, device, ignore)
 
     trainer = DensityTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, MODEL_DIR, None)
 

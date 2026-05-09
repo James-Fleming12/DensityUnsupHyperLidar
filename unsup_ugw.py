@@ -18,10 +18,10 @@ from dataset.waymo_data import WaymoDataset
 import torch.utils.data as torchdata
 
 MODEL_DIR = "logs"
-NU_DATA_DIR = "/mnt/alpha/jmfleming/HyperLidar_dataset/nuscenes_all"
-DATA_DIR = "/mnt/alpha/jmfleming/waymo_skitti"
+# NU_DATA_DIR = "/mnt/alpha/jmfleming/HyperLidar_dataset/nuscenes_all"
+DATA_DIR = "/mnt/bravo/jmfleming/waymo_skitti"
 LOG_DIR = "logs"
-NUM_CLASSES = 17
+NUM_CLASSES = 13
 
 MAX_HDC_EPOCHS = 20
 FEATURE_EXTRACTOR_EPOCHS = 400
@@ -137,11 +137,11 @@ def pretrain_pipeline(ARCH, DATA, base_count=10):
 
     ARCH["train"]["batch_size"] = 16
     print("Training Feature Extractor (sunny only)...")
-    train_extractor(ARCH, PRE_DATA, epochs=150)
+    train_extractor(ARCH, PRE_DATA, epochs=150, data_dir=DATA_DIR)
 
     ARCH["train"]["batch_size"] = 2
     print("Training HDC Density Model (sunny only)...")
-    model = train_hdc(ARCH, PRE_DATA, epochs=30)
+    model = train_hdc(ARCH, PRE_DATA, epochs=30, data_dir=DATA_DIR)
 
     print("Initializing Subclusters...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -186,7 +186,6 @@ def collect_seen_classes(ARCH, DATA, sequences, max_batches=None,
             unique_ids = proj_labels.unique().tolist()
             seen.update(int(c) for c in unique_ids if int(c) != 255)
     return seen
-
 
 def class_ids_to_names(class_ids, DATA):
     inv_map = DATA.get("learning_map_inv", {})
@@ -406,7 +405,6 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
     plt.close()
     print(f"Dumbbell plot saved to {out_path}")
 
-
 def save_final_plot(history):
     plt.figure(figsize=(10, 6))
     plt.plot(history["steps"], history["miou"], 'r-s', label='mIoU')
@@ -427,7 +425,7 @@ def main():
         print(f"Error opening arch yaml file. {e}")
         quit()
     try:
-        DATA = yaml.safe_load(open("config/labels/nuscenes_new.yaml", 'r'))
+        DATA = yaml.safe_load(open("config/labels/waymo.yaml", 'r'))
     except Exception as e:
         print(f"Error opening data yaml file. {e}")
         quit()

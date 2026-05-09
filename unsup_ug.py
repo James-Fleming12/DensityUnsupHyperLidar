@@ -14,6 +14,8 @@ from unsup_main import train_extractor, train_hdc, init_sub, test_hdc_model
 import matplotlib.patches as mpatches
 from matplotlib.gridspec import GridSpec
 
+from unsup_main import convert_dataset
+
 MODEL_DIR = "logs"
 NU_DATA_DIR = "/mnt/alpha/jmfleming/HyperLidar_dataset/nuscenes_all"
 DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
@@ -450,6 +452,8 @@ def main():
     except Exception as e:
         print(f"Error opening data yaml file. {e}")
         quit()
+
+    convert_dataset() # temp thing to deal with badly done data
  
     # base_counts = [4, 6, 8, 10, 12]
     # inc_steps = [2]

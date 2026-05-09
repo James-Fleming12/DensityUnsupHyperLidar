@@ -11,6 +11,5 @@ Also important, for each of the main functions I had to hard code the sequences 
 
 The current code is setup for testing the model's performance in inference on the pretraining dataset, but it can be very quickly extended to test domain shift performance by changing the datasets in unsup_main.py and unsup_test.py. It is currently restricted to only working on NuScenes and KITTI, as those are the ones with interfaces in HyperLiDAR, but extending it to any other dataset is likely trivial.
 
-
-
-
+## Waymo Conversion:
+The `convert_waymo.py` and `requirements_waymo.txt` are just for converting the Waymo Open Dataset into the required KITTI-style format.
