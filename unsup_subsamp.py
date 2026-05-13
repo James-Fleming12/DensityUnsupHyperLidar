@@ -338,25 +338,11 @@ def main():
             
     loss_w = loss_w.to(device)
 
-    # model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
-    # model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
-    # model.to(device)
+    model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
+    model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
+    model.to(device)
 
-    thresholds_to_run = TEST_THRESHOLDS if RUN_THRESHOLD_EXPERIMENT else [[0.60, 0.80]]
-
-    for thresholds in thresholds_to_run:
-        print(f"\n{'#'*70}")
-        print(f"### RUNNING EXPERIMENT WITH THRESHOLDS: {thresholds}")
-        print(f"{'#'*70}\n")
-
-        model: DensityModel = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device)
-        model.load_state_dict(torch.load(HDC_SUB_PATH, weights_only=False))
-        model.to(device)
-
-        if hasattr(model, 'classify'):
-            model.register_buffer('source_prototypes', model.classify.weight.data.clone())
-
-        _ = subsample_online_update(model, kittiloader, ARCH, loss_w, thresholds=thresholds)
+    _ = subsample_online_update(model, kittiloader, ARCH, loss_w)
 
 if __name__=="__main__":
     main()
