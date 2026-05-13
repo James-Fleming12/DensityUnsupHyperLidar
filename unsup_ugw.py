@@ -124,11 +124,11 @@ def pretrain_pipeline(ARCH, DATA):
 
     ARCH["train"]["batch_size"] = 16
     print("Training Feature Extractor (sunny only)...")
-    train_extractor(ARCH, PRE_DATA, epochs=150, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
+    train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
     ARCH["train"]["batch_size"] = 2
     print("Training HDC Density Model (sunny only)...")
-    model = train_hdc(ARCH, PRE_DATA, epochs=30, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS)
+    model = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS)
 
     print("Initializing Subclusters...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
