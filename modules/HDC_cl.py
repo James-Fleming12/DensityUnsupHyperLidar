@@ -47,7 +47,7 @@ class PointPillarEncoder(nn.Module):
                'batch_size'      int
              OR a range image tensor (B, C, H, W) passed directly.
 
-    Output : (B, 128)  – one embedding vector per sample in the batch.
+    Output : (B, 128)  - one embedding vector per sample in the batch.
 
     The spatial BEV feature map (B, 128, H, W) is reduced to (B, 128) via
     adaptive average pooling so that DensityModel.encode() receives exactly
@@ -159,9 +159,9 @@ class RadarTensorEncoder(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
-        x : (B, 1, R, A)        – range-azimuth power map (already collapsed)
+        x : (B, 1, R, A)        - range-azimuth power map (already collapsed)
             OR
-            (B, 1, R, A, E, D)  – full 4-D tensor (collapsed here)
+            (B, 1, R, A, E, D)  - full 4-D tensor (collapsed here)
         Returns : (B, 128)
         """
         if x.dim() == 6:
@@ -271,35 +271,19 @@ class ClassificationDensityModel(nn.Module):
         self.classify_sample_cnt = torch.zeros((self.num_classes, 1)).to(device)
 
         self.subclusters = nn.Parameter(
-            torch.zeros(
-                self.num_classes * self.num_subclusters,
-                self.hd_dim,
-                device=self.device,
-            )
+            torch.zeros(self.num_classes * self.num_subclusters, self.hd_dim, device=self.device)
         )
         self.subclusters.data.fill_(0.0)
 
-        self.subcluster_to_class = torch.repeat_interleave(
-            torch.arange(self.num_classes, device=self.device),
-            self.num_subclusters,
-        )
+        self.subcluster_to_class = torch.repeat_interleave(torch.arange(self.num_classes, device=self.device), self.num_subclusters,)
 
-        # Mean-shift hyper-params (identical defaults)
         self.quantile = 0.4
-        self.mult     = 0.2
-        self.dedup    = 0.7
+        self.mult = 0.2
+        self.dedup = 0.7
 
         self.gauss_rp = gauss_rp
 
-        # EMA momentum buffer  (identical)
-        self.register_buffer(
-            "proto_momentum",
-            torch.zeros_like(self.classify.weight.data),
-        )
-
-    # ======================================================================
-    # encode  –  ONE HV PER SAMPLE  (key difference from original)
-    # ======================================================================
+        self.register_buffer("proto_momentum", torch.zeros_like(self.classify.weight.data))
 
     def encode(self, x, backbone_kwargs: Optional[dict] = None) -> torch.Tensor:
         """
@@ -320,11 +304,10 @@ class ClassificationDensityModel(nn.Module):
 
         with torch.amp.autocast("cuda", enabled=True):
             if isinstance(x, dict):
-                feat = self.backbone(x, **backbone_kwargs)   # (B, 128)
+                feat = self.backbone(x, **backbone_kwargs)
             else:
-                feat = self.backbone(x, **backbone_kwargs)   # (B, 128)
+                feat = self.backbone(x, **backbone_kwargs)
 
-        # feat : (B, 128)  — no spatial dims to flatten
         B = feat.shape[0]
         mask = torch.ones(self.hd_dim, device=self.device, dtype=torch.bool)
 
@@ -334,26 +317,16 @@ class ClassificationDensityModel(nn.Module):
             if feat.dtype != self.projection.weight.dtype:
                 self.projection = self.projection.to(feat.dtype).to(self.device)
             sample_hv[:, mask] = self.projection(feat)[:, mask]
-
         elif self.hd_encoder == "idlevel":
-            tmp_hv = functional.bind(
-                self.position.weight[:, mask],
-                self.value(feat)[:, :, mask],
-            )
+            tmp_hv = functional.bind(self.position.weight[:, mask], self.value(feat)[:, :, mask])
             sample_hv[:, mask] = functional.multiset(tmp_hv)
-
         elif self.hd_encoder == "nonlinear":
             sample_hv[:, mask] = self.nonlinear_projection(feat)[:, mask]
-
         else:
-            return feat   # identity path
+            return feat
 
         sample_hv[:, mask] = functional.hard_quantize(sample_hv[:, mask])
-        return sample_hv   # (B, hd_dim)
-
-    # ======================================================================
-    # forward
-    # ======================================================================
+        return sample_hv
 
     def forward(self, x, backbone_kwargs: Optional[dict] = None):
         """
@@ -362,27 +335,19 @@ class ClassificationDensityModel(nn.Module):
         logits   : (B, num_classes)
         enc_norm : (B, hd_dim)   — L2-normalised hypervectors
         """
-        enc = self.encode(x, backbone_kwargs)          # (B, hd_dim)
+        enc = self.encode(x, backbone_kwargs)
 
         if enc.dtype != self.classify.weight.dtype:
             self.classify = self.classify.to(enc.dtype)
 
         enc_norm = F.normalize(enc)
-        logits   = self.classify(enc_norm)             # (B, num_classes)
+        logits   = self.classify(enc_norm)
         return logits, enc_norm
-
-    # ======================================================================
-    # get_predictions  (unchanged)
-    # ======================================================================
 
     def get_predictions(self, enc: torch.Tensor) -> torch.Tensor:
         if enc.dtype != self.classify.weight.dtype:
             self.classify = self.classify.to(enc.dtype)
         return self.classify(F.normalize(enc))
-
-    # ======================================================================
-    # get_accuracy  –  per-sample top-1, no spatial reshape
-    # ======================================================================
 
     def get_accuracy(self, x, labels: torch.Tensor, backbone_kwargs: Optional[dict] = None):
         """
@@ -398,13 +363,13 @@ class ClassificationDensityModel(nn.Module):
         """
         self.eval()
         with torch.no_grad():
-            enc    = self.encode(x, backbone_kwargs)   # (B, hd_dim)
-            logits = self.get_predictions(enc)         # (B, num_classes)
-            preds  = logits.argmax(dim=1)              # (B,)
+            enc    = self.encode(x, backbone_kwargs)
+            logits = self.get_predictions(enc)
+            preds  = logits.argmax(dim=1)
 
         labels = labels.to(preds.device).flatten()
         correct = (preds == labels).sum().item()
-        total   = labels.numel()
+        total = labels.numel()
         accuracy = correct / total
 
         per_class: Dict[int, float] = {}
@@ -412,15 +377,11 @@ class ClassificationDensityModel(nn.Module):
             c = cls.item()
             if c == 255:
                 continue
-            mask      = labels == cls
+            mask = labels == cls
             cls_correct = (preds[mask] == cls).sum().item()
             per_class[c] = cls_correct / mask.sum().item()
 
         return accuracy, per_class
-
-    # ======================================================================
-    # inference_update  –  identical logic, background mask removed
-    # ======================================================================
 
     def inference_update(
         self,
@@ -434,24 +395,16 @@ class ClassificationDensityModel(nn.Module):
         backbone_kwargs: Optional[dict] = None,
     ) -> torch.Tensor:
         """
-        Unsupervised prototype update via EMA pull toward confident samples.
-
-        Identical to the original inference_update except:
-          - The background-pixel validity mask
-              valid_enc_mask = torch.any(enc != 0, dim=1)
-            is removed.  Every row of enc is a real sample, not a padded pixel.
-          - Returns predictions shaped (B,) instead of (num_pixels,).
-
-        All other logic — distance threshold, subcluster gating, FPS
-        subsampling, momentum EMA — is unchanged.
+        - The background-pixel validity mask valid_enc_mask = torch.any(enc != 0, dim=1) is removed. Every row of enc is a real sample, not a padded pixel.
+        - Returns predictions shaped (B,) instead of (num_pixels,).
         """
         if thresholds is None:
             thresholds = [0.45, 0.80]
 
         self.train()
         with torch.no_grad():
-            enc = self.encode(x, backbone_kwargs)      # (B, hd_dim)
-            B   = enc.shape[0]
+            enc = self.encode(x, backbone_kwargs)
+            B = enc.shape[0]
 
             enc_norm = F.normalize(enc)
             if enc_norm.dtype != self.classify.weight.dtype:
@@ -459,21 +412,21 @@ class ClassificationDensityModel(nn.Module):
 
             curr_chunk = B if chunk_size == -1 else chunk_size
 
-            all_preds        = []
+            all_preds = []
             all_update_masks = []
 
             if self.subcluster_type == "bipolar":
                 proto_binary = torch.sign(self.classify.weight)
 
             for i in range(0, B, curr_chunk):
-                chunk_norm   = enc_norm[i : i + curr_chunk]
+                chunk_norm = enc_norm[i : i + curr_chunk]
                 chunk_logits = self.classify(chunk_norm)
-                chunk_preds  = chunk_logits.argmax(dim=1)
+                chunk_preds = chunk_logits.argmax(dim=1)
                 all_preds.append(chunk_preds)
 
                 if self.subcluster_type == "bipolar":
                     chunk_enc_orig = enc[i : i + curr_chunk]
-                    enc_binary     = torch.sign(chunk_enc_orig)
+                    enc_binary = torch.sign(chunk_enc_orig)
                     selected_proto = proto_binary[chunk_preds]
                     sims = torch.sum(enc_binary * selected_proto, dim=1) / self.hd_dim
                 else:
@@ -483,8 +436,8 @@ class ClassificationDensityModel(nn.Module):
                 distances = (1.0 - sims) / 2.0
                 all_update_masks.append(distances > beta)
 
-            predictions = torch.cat(all_preds)           # (B,)
-            update_mask = torch.cat(all_update_masks)    # (B,)
+            predictions = torch.cat(all_preds)
+            update_mask = torch.cat(all_update_masks)
 
             if not torch.any(update_mask):
                 return predictions
@@ -495,55 +448,40 @@ class ClassificationDensityModel(nn.Module):
             for class_id in unique_classes:
                 c_id = class_id.item()
 
-                class_mask    = (predictions == c_id) & update_mask
+                class_mask = (predictions == c_id) & update_mask
                 class_indices = torch.nonzero(class_mask).squeeze(1)
 
                 if max_updates_per_class != -1 and len(class_indices) > max_updates_per_class:
-                    fps_idx       = self._farthest_point_sample(
-                        enc_norm[class_indices].cpu(), max_updates_per_class
-                    )
+                    fps_idx = self._farthest_point_sample(enc_norm[class_indices].cpu(), max_updates_per_class)
                     class_indices = class_indices[fps_idx.to(self.device)]
 
-                sample_encs = enc_norm[class_indices]   # (K, hd_dim)
+                sample_encs = enc_norm[class_indices]
 
                 if self.subcluster_type == "bipolar":
                     target_encs = torch.sign(enc[class_indices])
-                    sub_sims, _ = self.get_max_subcluster_similarity(
-                        target_encs, c_id, distance_sensitivity
-                    )
+                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
                 else:
-                    sub_sims, _ = self.get_max_subcluster_similarity(
-                        sample_encs, c_id, distance_sensitivity
-                    )
+                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
 
                 valid_mask = sub_sims > thresholds[0]
                 if not torch.any(valid_mask):
                     continue
 
                 sample_encs = sample_encs[valid_mask]
-                sub_sims    = sub_sims[valid_mask]
+                sub_sims = sub_sims[valid_mask]
 
-                weights            = sub_sims / sub_sims.sum()
-                weighted_pull      = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
-                effective_lr       = learning_rate * sub_sims.mean().item()
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
 
-                current_weight     = self.classify.weight[c_id]
-                self.proto_momentum[c_id] = (
-                    0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull
-                )
-                updated_weight = (
-                    (1.0 - effective_lr) * current_weight
-                    + effective_lr * self.proto_momentum[c_id]
-                )
-                self.classify.weight[c_id] = F.normalize(
-                    updated_weight.unsqueeze(0), dim=1
-                ).squeeze(0)
+                current_weight = self.classify.weight[c_id]
+
+                self.proto_momentum[c_id] = (0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull)
+                updated_weight = ((1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id])
+                
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
 
         return predictions
-
-    # ======================================================================
-    # Subcluster API  –  identical to original
-    # ======================================================================
 
     def get_max_subcluster_similarity(
         self,
@@ -551,38 +489,32 @@ class ClassificationDensityModel(nn.Module):
         class_id: int,
         distance_sensitivity: float = 1.0,
     ):
-        mask                = self.subcluster_to_class == class_id
+        mask = self.subcluster_to_class == class_id
         relevant_subclusters = self.subclusters[mask].float()
 
         if self.subcluster_type == "bipolar":
-            enc_binary   = torch.sign(enc).float()
-            hd_dim       = enc_binary.shape[1]
+            enc_binary = torch.sign(enc).float()
+            hd_dim = enc_binary.shape[1]
             dot_products = torch.matmul(enc_binary, relevant_subclusters.T)
-            base_sim     = (dot_products + hd_dim) / (2 * hd_dim)
+            base_sim = (dot_products + hd_dim) / (2 * hd_dim)
         elif self.subcluster_type == "continuous":
-            enc_norm  = F.normalize(enc.float(), dim=1)
-            sub_norm  = F.normalize(relevant_subclusters, dim=1)
-            cos_sim   = torch.matmul(enc_norm, sub_norm.T)
-            base_sim  = (cos_sim + 1) / 2
+            enc_norm = F.normalize(enc.float(), dim=1)
+            sub_norm = F.normalize(relevant_subclusters, dim=1)
+            cos_sim = torch.matmul(enc_norm, sub_norm.T)
+            base_sim = (cos_sim + 1) / 2
         else:
             raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
 
         if distance_sensitivity == 0.0:
-            scaled = torch.where(
-                base_sim > 0.5,
-                torch.tensor(1.0, device=enc.device),
-                base_sim * 2.0,
-            )
+            scaled = torch.where(base_sim > 0.5, torch.tensor(1.0, device=enc.device), base_sim * 2.0)
         elif distance_sensitivity == 1.0:
             scaled = base_sim
         else:
             scaled = base_sim ** distance_sensitivity
 
         max_sims, rel_idx = torch.max(scaled, dim=1)
-        abs_idx           = torch.nonzero(mask)[rel_idx, 0]
+        abs_idx = torch.nonzero(mask)[rel_idx, 0]
         return max_sims, abs_idx
-
-    # ------------------------------------------------------------------
 
     def init_subclusters(
         self,
@@ -604,19 +536,16 @@ class ClassificationDensityModel(nn.Module):
                       Defaults to self.encode(batch).
         """
         self.eval()
-        print(
-            f"Collecting embeddings for {self.num_classes} classes "
-            f"using '{sampling_strategy}' sampling"
-        )
+        print(f"Collecting embeddings for {self.num_classes} classes using '{sampling_strategy}' sampling")
         all_centers = []
         all_classes = []
         MAX_SAMPLES = max_samples_per_class * 2
 
         for class_id in range(self.num_classes):
             print(f"Processing class {class_id}...")
-            class_embs   = []
-            batch_tags   = []
-            total        = 0
+            class_embs = []
+            batch_tags = []
+            total = 0
 
             with torch.no_grad():
                 for batch_idx, batch in enumerate(dataloader):
@@ -630,7 +559,7 @@ class ClassificationDensityModel(nn.Module):
                         enc = self.encode(inputs)          # (B, hd_dim)
 
                     labels = labels.to(self.device).flatten()
-                    cmask  = labels == class_id
+                    cmask = labels == class_id
 
                     if torch.any(cmask):
                         cls_enc = enc[cmask].cpu().half()
@@ -652,7 +581,7 @@ class ClassificationDensityModel(nn.Module):
             batch_indices = torch.as_tensor(batch_tags[: len(class_emb_cpu)])
 
             if len(class_emb_cpu) > MAX_SAMPLES:
-                idx           = torch.randperm(len(class_emb_cpu))[:MAX_SAMPLES]
+                idx = torch.randperm(len(class_emb_cpu))[:MAX_SAMPLES]
                 class_emb_cpu = class_emb_cpu[idx]
                 batch_indices = batch_indices[idx]
 
@@ -666,10 +595,7 @@ class ClassificationDensityModel(nn.Module):
                 else:
                     raise ValueError(f"Unknown sampling_strategy: {sampling_strategy}")
                 class_emb_cpu = class_emb_cpu[idx]
-                print(
-                    f"  Sampled {len(class_emb_cpu)} from {len(batch_tags)} "
-                    f"using '{sampling_strategy}'"
-                )
+                print(f"  Sampled {len(class_emb_cpu)} from {len(batch_tags)} using '{sampling_strategy}'")
 
             class_emb_np = class_emb_cpu.numpy()
 
@@ -687,9 +613,7 @@ class ClassificationDensityModel(nn.Module):
             del class_emb_cpu, class_embs
             self._clear_memory()
 
-            centers = self._process_single_class(
-                class_emb_np, class_id, self.num_subclusters, bw
-            )
+            centers = self._process_single_class(class_emb_np, class_id, self.num_subclusters, bw)
             all_centers.extend(centers)
             all_classes.extend([class_id] * len(centers))
 
@@ -698,8 +622,6 @@ class ClassificationDensityModel(nn.Module):
 
         self._load_subclusters(all_centers, all_classes)
         print("Subcluster initialisation complete.")
-
-    # ------------------------------------------------------------------
 
     def update_subclusters(
         self,
@@ -714,8 +636,8 @@ class ClassificationDensityModel(nn.Module):
 
         Parameters
         ----------
-        enc    : (B, hd_dim)  – already encoded hypervectors
-        labels : (B,)         – integer class labels
+        enc    : (B, hd_dim)  - already encoded hypervectors
+        labels : (B,)         - integer class labels
 
         Everything else is identical to original update_subclusters.
         """
@@ -728,33 +650,26 @@ class ClassificationDensityModel(nn.Module):
                 if class_mask.sum() < min_samples:
                     continue
 
-                class_enc          = enc[class_mask].float()
-                sub_mask           = self.subcluster_to_class == class_id
+                class_enc = enc[class_mask].float()
+                sub_mask = self.subcluster_to_class == class_id
                 relevant_subclusters = self.subclusters[sub_mask]
-                sub_indices        = torch.nonzero(sub_mask).squeeze(1)
-                n_subs             = relevant_subclusters.shape[0]
+                sub_indices = torch.nonzero(sub_mask).squeeze(1)
+                n_subs = relevant_subclusters.shape[0]
 
                 if self.subcluster_type == "bipolar":
                     class_enc_bin = torch.sign(class_enc).to(self.subclusters.dtype)
-                    sims = (
-                        torch.matmul(class_enc_bin, relevant_subclusters.T) + self.hd_dim
-                    ) / (2 * self.hd_dim)
+                    sims = (torch.matmul(class_enc_bin, relevant_subclusters.T) + self.hd_dim) / (2 * self.hd_dim)
                 else:
-                    sims = torch.matmul(
-                        F.normalize(class_enc, dim=1),
-                        F.normalize(relevant_subclusters, dim=1).T,
-                    )
+                    sims = torch.matmul(F.normalize(class_enc, dim=1), F.normalize(relevant_subclusters, dim=1).T)
 
                 if method == "proximity_pull":
-                    assignments   = torch.argmax(sims, dim=1)
-                    asn_exp       = assignments.unsqueeze(1).expand(-1, class_enc.shape[1])
+                    assignments = torch.argmax(sims, dim=1)
+                    asn_exp = assignments.unsqueeze(1).expand(-1, class_enc.shape[1])
 
-                    sum_per_sub   = torch.zeros(
-                        n_subs, class_enc.shape[1], device=self.device, dtype=torch.float32
-                    )
+                    sum_per_sub = torch.zeros(n_subs, class_enc.shape[1], device=self.device, dtype=torch.float32)
                     sum_per_sub.scatter_add_(0, asn_exp, class_enc)
 
-                    counts        = torch.zeros(n_subs, device=self.device, dtype=torch.float32)
+                    counts = torch.zeros(n_subs, device=self.device, dtype=torch.float32)
                     counts.scatter_add_(0, assignments, torch.ones(assignments.shape[0], device=self.device))
 
                     valid = counts >= min_samples
@@ -763,10 +678,10 @@ class ClassificationDensityModel(nn.Module):
                     new_means = sum_per_sub[valid] / counts[valid].unsqueeze(1)
 
                 elif method == "soft_weighted":
-                    weights    = F.softmax(sims, dim=1)
-                    new_means  = torch.matmul(weights.T, class_enc)
+                    weights = F.softmax(sims, dim=1)
+                    new_means = torch.matmul(weights.T, class_enc)
                     weight_sums = weights.sum(dim=0)
-                    valid      = weight_sums >= (min_samples * 0.1)
+                    valid = weight_sums >= (min_samples * 0.1)
                     if not valid.any():
                         continue
                     new_means = new_means[valid] / weight_sums[valid].unsqueeze(1)
@@ -791,74 +706,58 @@ class ClassificationDensityModel(nn.Module):
                         print(f"  Mean shift failed for class {class_id}: {e}")
                         continue
 
-                    new_centers   = np.sign(new_centers)
-                    new_centers_t = F.normalize(
-                        torch.tensor(new_centers, dtype=torch.float32, device=self.device), dim=1
-                    )
+                    new_centers = np.sign(new_centers)
+                    new_centers_t = F.normalize(torch.tensor(new_centers, dtype=torch.float32, device=self.device), dim=1)
 
                     for nc in new_centers_t:
                         if self.subcluster_type == "bipolar":
                             nc_bin = torch.sign(nc).to(self.subclusters.dtype)
-                            s = (
-                                torch.matmul(nc_bin.unsqueeze(0), relevant_subclusters.T)
-                                + self.hd_dim
-                            ) / (2 * self.hd_dim)
+                            s = (torch.matmul(nc_bin.unsqueeze(0), relevant_subclusters.T) + self.hd_dim) / (2 * self.hd_dim)
                         else:
-                            s = torch.matmul(
-                                F.normalize(nc.unsqueeze(0), dim=1),
-                                F.normalize(relevant_subclusters, dim=1).T,
-                            )
+                            s = torch.matmul(F.normalize(nc.unsqueeze(0), dim=1), F.normalize(relevant_subclusters, dim=1).T)
 
-                        s         = s.squeeze(0)
-                        closest   = s.argmax().item()
-                        abs_idx   = sub_indices[closest].item()
-                        current   = self.subclusters.data[abs_idx].float()
-                        updated   = (1.0 - learning_rate) * current + learning_rate * nc.float()
+                        s = s.squeeze(0)
+                        closest = s.argmax().item()
+                        abs_idx = sub_indices[closest].item()
+                        current = self.subclusters.data[abs_idx].float()
+                        updated = (1.0 - learning_rate) * current + learning_rate * nc.float()
 
                         if self.subcluster_type == "bipolar":
-                            updated         = torch.sign(updated)
+                            updated = torch.sign(updated)
                             updated[updated == 0] = -1.0
 
-                        self.subclusters.data[abs_idx] = F.normalize(
-                            updated.unsqueeze(0), dim=1
-                        ).squeeze(0)
+                        self.subclusters.data[abs_idx] = F.normalize(updated.unsqueeze(0), dim=1).squeeze(0)
                         relevant_subclusters = self.subclusters[sub_mask]
 
-                    continue   # skip generic EMA update below
-
+                    continue
                 else:
                     raise ValueError(f"Unknown method: {method}")
 
-                # Generic EMA update (proximity_pull / soft_weighted)
                 if self.subcluster_type == "bipolar":
-                    new_means         = torch.sign(new_means)
+                    new_means = torch.sign(new_means)
                     new_means[new_means == 0] = -1.0
                 new_means = F.normalize(new_means, dim=1)
 
-                valid_abs    = sub_indices[valid]
-                current      = self.subclusters.data[valid_abs].float()
-                updated      = (1.0 - learning_rate) * current + learning_rate * new_means
+                valid_abs = sub_indices[valid]
+                current = self.subclusters.data[valid_abs].float()
+                updated = (1.0 - learning_rate) * current + learning_rate * new_means
 
                 if self.subcluster_type == "bipolar":
-                    updated           = torch.sign(updated)
+                    updated = torch.sign(updated)
                     updated[updated == 0] = -1.0
 
                 self.subclusters.data[valid_abs] = F.normalize(updated, dim=1)
 
-    # ======================================================================
-    # Private helpers  –  all identical to original
-    # ======================================================================
-
     def _stratified_sample(self, batch_indices: torch.Tensor, n_samples: int) -> torch.Tensor:
-        unique_batches     = torch.unique(batch_indices)
-        samples_per_batch  = n_samples // len(unique_batches)
-        remainder          = n_samples % len(unique_batches)
-        selected           = []
+        unique_batches = torch.unique(batch_indices)
+        samples_per_batch = n_samples // len(unique_batches)
+        remainder = n_samples % len(unique_batches)
+        selected = []
 
         for i, bid in enumerate(unique_batches):
-            positions  = torch.where(batch_indices == bid)[0]
-            n_take     = min(samples_per_batch + (1 if i < remainder else 0), len(positions))
-            perm       = torch.randperm(len(positions))[:n_take]
+            positions = torch.where(batch_indices == bid)[0]
+            n_take = min(samples_per_batch + (1 if i < remainder else 0), len(positions))
+            perm = torch.randperm(len(positions))[:n_take]
             selected.append(positions[perm])
 
         return torch.cat(selected)
@@ -868,14 +767,14 @@ class ClassificationDensityModel(nn.Module):
         if n <= n_samples:
             return torch.arange(n)
 
-        selected  = [torch.randint(0, n, (1,)).item()]
+        selected = [torch.randint(0, n, (1,)).item()]
         distances = torch.full((n,), float("inf"))
 
         for _ in range(n_samples - 1):
-            last      = embeddings[selected[-1]]
-            new_dist  = torch.sum((embeddings - last) ** 2, dim=1)
+            last = embeddings[selected[-1]]
+            new_dist = torch.sum((embeddings - last) ** 2, dim=1)
             distances = torch.minimum(distances, new_dist)
-            farthest  = torch.argmax(distances).item()
+            farthest = torch.argmax(distances).item()
             selected.append(farthest)
             distances[farthest] = 0
 
@@ -910,8 +809,8 @@ class ClassificationDensityModel(nn.Module):
             for c in centers:
                 subclusters.append(torch.tensor(c, dtype=torch.float32))
         else:
-            ct    = torch.tensor(centers, dtype=torch.float32)
-            idx   = self._farthest_point_sample(ct, num_sub)
+            ct = torch.tensor(centers, dtype=torch.float32)
+            idx = self._farthest_point_sample(ct, num_sub)
             for i in idx.tolist():
                 subclusters.append(torch.tensor(centers[i], dtype=torch.float32))
 
@@ -930,13 +829,9 @@ class ClassificationDensityModel(nn.Module):
             for i in range(0, total, batch):
                 end  = min(i + batch, total)
                 if self.subcluster_type == "bipolar":
-                    chunk = torch.stack(
-                        [self._make_bipolar(c.to(self.device)) for c in centers_list[i:end]]
-                    )
+                    chunk = torch.stack([self._make_bipolar(c.to(self.device)) for c in centers_list[i:end]])
                 elif self.subcluster_type == "continuous":
-                    chunk = torch.stack(
-                        [c.to(self.device) for c in centers_list[i:end]]
-                    )
+                    chunk = torch.stack([c.to(self.device) for c in centers_list[i:end]])
                     chunk = F.normalize(chunk, dim=1)
                 else:
                     raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
@@ -963,19 +858,16 @@ class DensityClassifier:
     Supervised HDC training + unsupervised inference-update loop for
     object / scene classification.
 
-    Mirrors the structure of DensityTrainer (segmentation) but targets
-    per-sample labels instead of per-pixel labels.
-
     Parameters
     ----------
     model          : ClassificationDensityModel
     num_classes    : int
     device         : torch.device
-    loss_weights   : (num_classes,) tensor  –  optional class weights for
+    loss_weights   : (num_classes,) tensor  -  optional class weights for
                      display / logging  (HDC training itself is weight-free)
-    ignore_classes : list[int]  –  classes excluded from IoU / accuracy eval
-    epochs         : int  –  number of retraining (refinement) epochs
-    bipolar_prototypes : bool  –  binarise prototype weights after each pass
+    ignore_classes : list[int]  -  classes excluded from IoU / accuracy eval
+    epochs         : int  -  number of retraining (refinement) epochs
+    bipolar_prototypes : bool  -  binarise prototype weights after each pass
     """
 
     def __init__(
@@ -1155,7 +1047,7 @@ class DensityClassifier:
 
         Handles three common formats:
           (inputs, labels)
-          (inputs, labels, ...)   – extra fields ignored
+          (inputs, labels, ...)   - extra fields ignored
           dict with keys 'inputs'/'data' and 'labels'/'targets'/'gt'
         """
         if isinstance(batch, (list, tuple)):
