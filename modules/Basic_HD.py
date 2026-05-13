@@ -657,9 +657,9 @@ class DensityTrainer():
                 self.is_wrong_list[i][actual_wrong_indices] = True
 
                 model.classify_weights.index_add_(0, proj_labels, samples_hv)
-                model.classify_weights.index_add_(0, proj_labels, samples_hv)
+                # model.classify_weights.index_add_(0, proj_labels, samples_hv)
                 model.classify_weights.index_add_(0, argmax, -samples_hv)
-                model.classify_weights.index_add_(0, argmax, -samples_hv)
+                # model.classify_weights.index_add_(0, argmax, -samples_hv)
 
                 if torch.cuda.is_available():
                     torch.cuda.synchronize()
