@@ -22,8 +22,8 @@ DATA_DIR = "/mnt/bravo/jmfleming/waymo_skitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 13
 
-MAX_HDC_EPOCHS = 20
-FEATURE_EXTRACTOR_EPOCHS = 400
+MAX_HDC_EPOCHS = 5
+FEATURE_EXTRACTOR_EPOCHS = 30
 
 HD_DIM = 10000
 
@@ -124,11 +124,11 @@ def pretrain_pipeline(ARCH, DATA):
 
     ARCH["train"]["batch_size"] = 16
     print("Training Feature Extractor (sunny only)...")
-    train_extractor(ARCH, PRE_DATA, epochs=150, data_dir=DATA_DIR)
+    train_extractor(ARCH, PRE_DATA, epochs=150, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
     ARCH["train"]["batch_size"] = 2
     print("Training HDC Density Model (sunny only)...")
-    model = train_hdc(ARCH, PRE_DATA, epochs=30, data_dir=DATA_DIR)
+    model = train_hdc(ARCH, PRE_DATA, epochs=30, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS)
 
     print("Initializing Subclusters...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
