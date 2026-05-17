@@ -732,3 +732,57 @@ class DensityTrainer():
         
         print('Class Jaccard: ', class_jaccard)
         return iou.avg
+
+    def reaccumulate_prototypes(self, train_loader):
+        """
+        Re-run the full HDC training pass from scratch
+        """
+        print("Reaccumulating HDC prototypes after MinEnt...")
+        self.model.eval()
+        self.mask = None
+
+        if self.gpu:
+            torch.cuda.empty_cache()
+
+        with torch.no_grad():
+            self.model.classify_weights.data.fill_(0.0)
+            self.model.classify.weight.data.fill_(0.0)
+
+            train_time = []
+            self.is_wrong_list = [None] * len(train_loader)
+
+            for i, (proj_in, proj_mask, proj_labels, unproj_labels, path_seq, path_name, p_x, p_y, proj_range, unproj_range, _, _, _, _, npoints) in enumerate(tqdm(train_loader, desc="Reaccumulating prototypes")):
+
+                if self.gpu:
+                    proj_in = proj_in.cuda()
+                    proj_mask = proj_mask.cuda()
+
+                start = time.time()
+                samples_hv, _, _ = self.model.encode(proj_in, self.mask)
+                samples_hv = samples_hv.to(self.model.classify_weights.dtype)
+
+                proj_labels = proj_labels.view(-1).to(self.device)
+
+                self.model.classify_weights.index_add_(0, proj_labels, samples_hv)
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
+                train_time.append(time.time() - start)
+
+                predictions = self.model.get_predictions(samples_hv)
+                argmax = predictions.argmax(dim=1)
+                self.is_wrong_list[i] = proj_labels != argmax
+
+            if self.bipolar_prototypes:
+                with torch.no_grad():
+                    self.model.classify_weights.data = torch.sign(self.model.classify_weights.data)
+                    zero_mask = self.model.classify_weights.data == 0
+                    if torch.any(zero_mask):
+                        print(f"Warning: Found {zero_mask.sum().item()} zeros after sign(), replacing with -1")
+                        self.model.classify_weights.data[zero_mask] = -1.0
+                    self.model.classify.weight.data = self.model.classify_weights.data.clone()
+            else:
+                self.model.classify.weight[:] = F.normalize(self.model.classify_weights)
+
+        print("sum of is_wrong_list: ", sum([x.sum().item() for x in self.is_wrong_list if x is not None]))
+        print("Mean HDC training time:{}\t std:{}".format(np.mean(train_time), np.std(train_time)))
+        print("Prototype reaccumulation complete.")

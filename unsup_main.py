@@ -49,7 +49,7 @@ def DDFEtrain_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS):
     trainer = DDFETrainer(ARCH, DATA, DATA_DIR, LOG_DIR)
     trainer.train(epochs=epochs)
 
-def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, data_dir=None) -> DensityModel:
+def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, data_dir=None, return_extractor=False) -> DensityModel:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     parser = Parser(root=data_dir if data_dir else DATA_DIR,
@@ -85,6 +85,8 @@ def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, data_dir=None) -> DensityModel:
 
     model: DensityModel = trainer.model
     torch.save(model, HDC_SAVE_PATH)
+
+    if return_extractor: return model, trainer
 
     return model
 

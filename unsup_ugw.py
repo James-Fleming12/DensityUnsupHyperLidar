@@ -106,31 +106,47 @@ def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, co
 
     return loaders
 
+def run_ent_minimization(model, target_loader, epochs=3, lr=1e-5):
+    """
+    Entropy minimization on unlabelled target-domain frames.
+    Only updates self.net — HDC weights are untouched.
+    Call reaccumulate_prototypes() on the source loader afterward.
+    """
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    optimizer = torch.optim.Adam(model.net.parameters(), lr=lr)
+
+    print(f"--- MinEnt: {epochs} epoch(s) on target data ---")
+    for epoch in range(epochs):
+        total_entropy = 0.0
+        for proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in \
+                tqdm(target_loader, desc=f"MinEnt epoch {epoch+1}"):
+            proj_in = proj_in.to(device)
+            ent = model.entropy_minimization_step(proj_in, optimizer)
+            total_entropy += ent
+        print(f"  Epoch {epoch+1}  mean entropy: {total_entropy / len(target_loader):.4f}")
+
+    model.net.eval()
+
 def pretrain_pipeline(ARCH, DATA):
-    """
-    Pretraining uses ALL sunny frames in the dataset so the base model has a clean
-    clear-weather foundation before incremental adverse-condition updates.
-    """
     print(f"--- Starting Pretraining on ALL sunny scenarios ---")
 
     PRE_DATA = copy.deepcopy(DATA)
     # Provide a weather filter key in case internal parsers check it
     PRE_DATA["weather_filter"] = ["sunny"]
-    
+
     print("Scanning pretraining sequences for class coverage (sunny frames)...")
     seen_classes = collect_seen_classes(
         ARCH, PRE_DATA, PRE_DATA["split"]["train"], conditions=["sunny"])
     print(f"  Pretraining covers {len(seen_classes)} classes: {sorted(seen_classes)}")
 
-    ARCH["train"]["batch_size"] = 16
+    ARCH["train"]["batch_size"] = 24
     print("Training Feature Extractor (sunny only)...")
     train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
-    ARCH["train"]["batch_size"] = 2
+    ARCH["train"]["batch_size"] = 4
     print("Training HDC Density Model (sunny only)...")
-    model = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS)
+    model, trainer = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS)
 
-    print("Initializing Subclusters...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     sunny_loaders = get_condition_loaders(
@@ -139,10 +155,33 @@ def pretrain_pipeline(ARCH, DATA):
         shuffle=True,
         conditions=["sunny"])
 
-    if "sunny" in sunny_loaders:
-        model.init_subclusters(sunny_loaders["sunny"])
-    else:
+    if "sunny" not in sunny_loaders:
         raise RuntimeError("No sunny frames found in pretraining sequences.")
+
+    adverse_loaders = get_condition_loaders(ARCH, DATA, DATA["split"]["train"], batch_size=ARCH["train"]["batch_size"], shuffle=True, conditions=ADVERSE_CONDITIONS)
+
+    if not adverse_loaders:
+        print("  Warning: no adverse frames found, skipping MinEnt.")
+    else:
+        target_dataset = torch.utils.data.ConcatDataset(
+            [loader.dataset for loader in adverse_loaders.values()])
+        target_loader = torch.utils.data.DataLoader(
+            target_dataset,
+            batch_size=ARCH["train"]["batch_size"],
+            shuffle=True,
+            num_workers=ARCH["train"]["workers"],
+            drop_last=True)
+
+        run_ent_minimization(model, target_loader, epochs=3, lr=1e-5)
+
+        trainer.reaccumulate_prototypes(sunny_loaders["sunny"])
+
+        print("Re-running retrain epochs after MinEnt...")
+        for epoch in range(1, MAX_HDC_EPOCHS + 1):
+            trainer.retrain(sunny_loaders["sunny"], model, epoch, trainer.logger)
+
+    print("Initializing Subclusters...")
+    model.init_subclusters(sunny_loaders["sunny"])
 
     torch.save(model.state_dict(), HDC_SUB_PATH)
     print(f"Pretraining complete. Model saved to {HDC_SUB_PATH}")

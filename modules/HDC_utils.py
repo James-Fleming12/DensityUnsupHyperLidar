@@ -6,6 +6,7 @@ import copy
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from tqdm import tqdm
 
 from faster_mean_shift.mean_shift_cosine_gpu import estimate_bandwidth_binary, mean_shift_binary
 
@@ -944,6 +945,42 @@ class DensityModel(nn.Module):
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
 
             return full_predictions
+        
+    def entropy_minimization_step(self, x, optimizer, temperature=1.0):
+        """
+        One gradient step of entropy minimization on unlabelled target batch x for self.net
+
+        temperature: float  softens logits before entropy (>1 = softer)
+        """
+        self.net.train()
+        self.classify.eval()  # HDC head stays frozen
+
+        with torch.amp.autocast('cuda', enabled=True):
+            feat = self.net(x, only_feat=True)          # (B, 128, H, W)
+
+        feat = feat.permute(0, 2, 3, 1).reshape(-1, 128).float()
+        sample_hv = torch.zeros(feat.shape[0], self.hd_dim,
+                                device=self.device, dtype=feat.dtype)
+
+        if self.hd_encoder == 'rp':
+            if feat.dtype != self.projection.weight.dtype:
+                self.projection = self.projection.to(feat.dtype).to(self.device)
+            sample_hv = self.projection(feat)
+        elif self.hd_encoder == 'nonlinear':
+            sample_hv = self.nonlinear_projection(feat)
+        else:
+            sample_hv = feat
+
+        logits = F.linear(F.normalize(sample_hv), self.classify.weight.detach()) / temperature
+
+        probs = torch.softmax(logits, dim=1)
+        entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1).mean()
+
+        optimizer.zero_grad()
+        entropy.backward()
+        optimizer.step()
+
+        return entropy.item()
 
     def get_accuracy(self, x, labels):
         self.eval()
