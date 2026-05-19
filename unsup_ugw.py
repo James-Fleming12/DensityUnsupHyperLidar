@@ -134,18 +134,18 @@ def pretrain_pipeline(ARCH, DATA):
     # Provide a weather filter key in case internal parsers check it
     PRE_DATA["weather_filter"] = ["sunny"]
 
-    print("Scanning pretraining sequences for class coverage (sunny frames)...")
-    seen_classes = collect_seen_classes(
-        ARCH, PRE_DATA, PRE_DATA["split"]["train"], conditions=["sunny"])
-    print(f"  Pretraining covers {len(seen_classes)} classes: {sorted(seen_classes)}")
+    # print("Scanning pretraining sequences for class coverage (sunny frames)...")
+    # seen_classes = collect_seen_classes(
+    #     ARCH, PRE_DATA, PRE_DATA["split"]["train"], conditions=["sunny"])
+    # print(f"  Pretraining covers {len(seen_classes)} classes: {sorted(seen_classes)}")
 
-    ARCH["train"]["batch_size"] = 24
-    print("Training Feature Extractor (sunny only)...")
-    train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
+    # ARCH["train"]["batch_size"] = 24
+    # print("Training Feature Extractor (sunny only)...")
+    # train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
     ARCH["train"]["batch_size"] = 4
     print("Training HDC Density Model (sunny only)...")
-    model, trainer = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS)
+    model, trainer = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS, return_extractor=True)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
