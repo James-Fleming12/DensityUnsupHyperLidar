@@ -953,14 +953,13 @@ class DensityModel(nn.Module):
         temperature: float  softens logits before entropy (>1 = softer)
         """
         self.net.train()
-        self.classify.eval()  # HDC head stays frozen
+        self.classify.eval()
 
         with torch.amp.autocast('cuda', enabled=True):
-            feat = self.net(x, only_feat=True)          # (B, 128, H, W)
+            feat = self.net(x, only_feat=True)
 
         feat = feat.permute(0, 2, 3, 1).reshape(-1, 128).float()
-        sample_hv = torch.zeros(feat.shape[0], self.hd_dim,
-                                device=self.device, dtype=feat.dtype)
+        sample_hv = torch.zeros(feat.shape[0], self.hd_dim, device=self.device, dtype=feat.dtype)
 
         if self.hd_encoder == 'rp':
             if feat.dtype != self.projection.weight.dtype:
@@ -970,6 +969,9 @@ class DensityModel(nn.Module):
             sample_hv = self.nonlinear_projection(feat)
         else:
             sample_hv = feat
+
+        if self.classify.weight.dtype != sample_hv.dtype:
+            self.classify = self.classify.to(sample_hv.dtype)
 
         logits = F.linear(F.normalize(sample_hv), self.classify.weight.detach()) / temperature
 
