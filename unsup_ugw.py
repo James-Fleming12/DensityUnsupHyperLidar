@@ -134,10 +134,6 @@ def pretrain_pipeline(ARCH, DATA):
     # Provide a weather filter key in case internal parsers check it
     PRE_DATA["weather_filter"] = ["sunny"]
 
-    print("Scanning pretraining sequences for class coverage (sunny frames)...")
-    seen_classes = collect_seen_classes(ARCH, PRE_DATA, PRE_DATA["split"]["train"], conditions=["sunny"])
-    print(f"  Pretraining covers {len(seen_classes)} classes: {sorted(seen_classes)}")
-
     ARCH["train"]["batch_size"] = 24
     print("Training Feature Extractor (sunny only)...")
     train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
@@ -185,41 +181,9 @@ def pretrain_pipeline(ARCH, DATA):
     torch.save(model.state_dict(), HDC_SUB_PATH)
     print(f"Pretraining complete. Model saved to {HDC_SUB_PATH}")
 
-    return model, seen_classes
+    return model
 
-def collect_seen_classes(ARCH, DATA, sequences, max_batches=None, conditions=None):
-    """
-    Scan frames for observed xentropy class IDs.
-    """
-    if conditions is not None:
-        cond_loaders = get_condition_loaders(
-            ARCH, DATA, sequences, batch_size=1, shuffle=False,
-            conditions=conditions)
-        loaders = list(cond_loaders.values())
-    else:
-        loaders = [get_loader(ARCH, DATA, sequences, shuffle=False).get_train_set()]
-
-    seen = set()
-    for loader in loaders:
-        for batch_idx, (_, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) \
-                in enumerate(loader):
-            if max_batches is not None and batch_idx >= max_batches:
-                break
-            unique_ids = proj_labels.unique().tolist()
-            seen.update(int(c) for c in unique_ids if int(c) != 255)
-    return seen
-
-def class_ids_to_names(class_ids, DATA):
-    inv_map = DATA.get("learning_map_inv", {})
-    labels = DATA.get("labels", {})
-    names = []
-    for cid in sorted(class_ids):
-        raw_id = inv_map.get(cid, None)
-        name = labels.get(raw_id, f"Class {cid}") if raw_id is not None else f"Class {cid}"
-        names.append(name)
-    return names
-
-def incremental_update_test(ARCH, DATA, seen_classes=None):
+def incremental_update_test(ARCH, DATA):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_seqs = DATA["split"]["train"]
     valid_seqs = DATA["split"]["valid"]
@@ -242,7 +206,6 @@ def incremental_update_test(ARCH, DATA, seen_classes=None):
         "conditions": [],
         "acc_pairs": [],
         "miou_pairs": [],
-        "novel_classes": [],
     }
 
     print(f"--- Incremental Evaluation: Unsupervised Updates on Adverse Conditions ---")
@@ -267,17 +230,6 @@ def incremental_update_test(ARCH, DATA, seen_classes=None):
 
         step_label = f"Updates on {cond.capitalize()}"
 
-        novel_in_step = set()
-        if seen_classes is not None:
-            cond_classes = collect_seen_classes(
-                ARCH, DATA, train_seqs, conditions=[cond])
-            novel_in_step = cond_classes - seen_classes
-            if novel_in_step:
-                names = class_ids_to_names(novel_in_step, DATA)
-                print(f"    Novel classes: {names}")
-            else:
-                print("    No novel classes.")
-
         val_loader_for_cond = val_loaders.get(cond)
         if val_loader_for_cond is None:
             print(f"    No '{cond}' val frames — using full val set.")
@@ -299,7 +251,6 @@ def incremental_update_test(ARCH, DATA, seen_classes=None):
         history["conditions"].append(cond)
         history["acc_pairs"].append((acc_pre,  acc_post))
         history["miou_pairs"].append((miou_pre, miou_post))
-        history["novel_classes"].append(novel_in_step)
 
     save_multi_step_dumbbell_ug(history, DATA, file_suffix="_condition_split")
 
@@ -308,37 +259,18 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
     conditions = history["conditions"]
     acc_pairs = np.array(history["acc_pairs"])
     miou_pairs = np.array(history["miou_pairs"])
-    novel_classes = history.get("novel_classes", [set() for _ in labels])
 
-    while len(novel_classes) < len(labels):
-        novel_classes.append(set())
-
-    show_table = DATA is not None
-
-    if show_table:
-        fig = plt.figure(figsize=(26, max(8, len(labels) * 0.85 + 3)))
-        gs  = GridSpec(1, 3, figure=fig, width_ratios=[5, 5, 4], wspace=0.4)
-        ax1 = fig.add_subplot(gs[0])
-        ax2 = fig.add_subplot(gs[1], sharey=ax1)
-        ax3 = fig.add_subplot(gs[2])
-    else:
-        fig = plt.figure(figsize=(18, max(8, len(labels) * 0.85 + 3)))
-        gs  = GridSpec(1, 2, figure=fig, width_ratios=[1, 1], wspace=0.35)
-        ax1 = fig.add_subplot(gs[0])
-        ax2 = fig.add_subplot(gs[1], sharey=ax1)
-        ax3 = None
+    fig = plt.figure(figsize=(18, max(8, len(labels) * 0.85 + 3)))
+    gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 1], wspace=0.35)
+    ax1 = fig.add_subplot(gs[0])
+    ax2 = fig.add_subplot(gs[1], sharey=ax1)
 
     y_pos = np.arange(len(labels))
 
     COLOR_PRE = '#4C9BE8'
     COLOR_POST = '#E8574C'
-    COLOR_NOVEL_ROW = '#FFF3CD'
-    COLOR_NONE_ROW = '#F4F4F4'
 
     def row_bg(yi):
-        has_novel = len(novel_classes[yi]) > 0
-        if has_novel:
-            return COLOR_NOVEL_ROW
         cond = conditions[yi] if yi < len(conditions) else "sunny"
         base = CONDITION_COLORS.get(cond, DEFAULT_COLOR)
         return base + "33"
@@ -381,39 +313,7 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
             frameon=True, framealpha=0.9,
         )
 
-    if ax3 is not None and len(acc_pairs) > 0:
-        ax3.set_xlim(0, 1)
-        ax3.set_ylim(len(labels) - 0.5, -0.5)
-        ax3.axis('off')
-        ax3.set_title("Novel Labels Discovered", fontsize=13, fontweight='bold', pad=10)
-
-        for yi, step_label in enumerate(labels):
-            novel = novel_classes[yi]
-            has_novel = len(novel) > 0
-            row_color = COLOR_NOVEL_ROW if has_novel else COLOR_NONE_ROW
-            ax3.axhspan(yi - 0.45, yi + 0.45, color=row_color, alpha=0.7, zorder=0)
-
-            if has_novel:
-                names     = class_ids_to_names(novel, DATA)
-                cell_text = ", ".join(names)
-                if len(cell_text) > 38:
-                    cell_text = cell_text[:35] + "..."
-                text_color = '#7B4F00'
-                marker     = "⚑ "
-            else:
-                cell_text  = "—"
-                text_color = '#888888'
-                marker     = ""
-
-            ax3.text(0.05, yi, marker + cell_text, va='center', ha='left', fontsize=8, color=text_color)
-
-        novel_patch = mpatches.Patch(color=COLOR_NOVEL_ROW, alpha=0.7, label='Contains novel labels')
-        none_patch  = mpatches.Patch(color=COLOR_NONE_ROW,  alpha=0.7, label='No novel labels')
-        ax3.legend(handles=[novel_patch, none_patch], loc='lower center', fontsize=8, bbox_to_anchor=(0.5, -0.06), frameon=True, framealpha=0.9)
-
-    plt.suptitle(
-        "Impact of Incremental Unsupervised Inference Updates",
-        fontsize=16, fontweight='bold', y=1.01)
+    plt.suptitle("Impact of Incremental Unsupervised Inference Updates", fontsize=16, fontweight='bold', y=1.01)
     plt.tight_layout()
 
     out_path = f"incremental_dumbbell_results{file_suffix}.png"
@@ -446,9 +346,8 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    model, seen_classes = pretrain_pipeline(ARCH, DATA)
-
-    incremental_update_test(ARCH, DATA, seen_classes=seen_classes)
+    model = pretrain_pipeline(ARCH, DATA)
+    incremental_update_test(ARCH, DATA)
 
 if __name__ == "__main__":
     main()

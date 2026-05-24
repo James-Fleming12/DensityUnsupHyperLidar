@@ -145,17 +145,6 @@ def run_ent_minimization(model: DensityModel, target_loader, epochs: int = 3, lr
 
     model.net.eval()
 
-def collect_seen_classes(loaders: Dict[str, torchdata.DataLoader]) -> Set[int]:
-    """Scan DataLoaders and return the set of class IDs present in the labels."""
-    seen: Set[int] = set()
-    for loader in loaders.values():
-        for _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _, _ in loader:
-            if proj_labels is None:
-                continue
-            unique_ids = proj_labels.flatten().unique().tolist()
-            seen.update(int(c) for c in unique_ids if int(c) != 255)
-    return seen
-
 def test_model(model: DensityModel, loader, device: torch.device):
     """
     Evaluate accuracy over a condition DataLoader.
@@ -244,10 +233,6 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
         workers=WORKERS,
     )
 
-    print("Scanning pretraining sequences for class coverage (daytime frames)...")
-    seen_classes = collect_seen_classes(get_condition_loaders(split="train", conditions=[NORMAL_CONDITION], batch_size=1, shuffle=False))
-    print(f"  Pretraining covers {len(seen_classes)} classes: {sorted(seen_classes)}")
-
     trainer = DensityTrainer(
         ARCH=_make_arch(),
         DATA=_make_data_cfg(parser),
@@ -318,9 +303,9 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
     torch.save(model.state_dict(), HDC_SUB_PATH)
     print(f"Pretraining complete. Model saved to {HDC_SUB_PATH}")
 
-    return model, seen_classes
+    return model
 
-def incremental_update_test(device: torch.device, seen_classes: Optional[Set[int]] = None):
+def incremental_update_test(device: torch.device):
     model = build_model(NUM_CLASSES, device, SUBCLUSTER_TYPE)
     model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
     model.to(device)
@@ -353,7 +338,6 @@ def incremental_update_test(device: torch.device, seen_classes: Optional[Set[int
         "steps_labels": [],
         "conditions": [],
         "acc_pairs": [],
-        "novel_classes": [],
     }
 
     print(f"--- Incremental Evaluation: Unsupervised Updates on Adverse Conditions ---")
@@ -366,16 +350,6 @@ def incremental_update_test(device: torch.device, seen_classes: Optional[Set[int
         print(f"Unsupervised Update Phase: [{cond.upper()}]")
 
         step_label = f"Updates on {cond.capitalize()}"
-
-        novel_in_step: Set[int] = set()
-        if seen_classes is not None:
-            cond_classes = collect_seen_classes({cond: train_loaders[cond]})
-            novel_in_step = cond_classes - seen_classes
-            if novel_in_step:
-                print(f"    Novel classes: {sorted(novel_in_step)}")
-            else:
-                print("    No novel classes.")
-
         val_loader = val_loaders.get(cond) or next(iter(val_loaders.values()))
 
         acc_pre, _ = test_model(model, val_loader, device)
@@ -397,10 +371,6 @@ def incremental_update_test(device: torch.device, seen_classes: Optional[Set[int
         history["steps_labels"].append(step_label)
         history["conditions"].append(cond)
         history["acc_pairs"].append((acc_pre, acc_post))
-        history["novel_classes"].append(novel_in_step)
-
-        if seen_classes is not None:
-            seen_classes = seen_classes | collect_seen_classes({cond: train_loaders[cond]})
 
     save_dumbbell_plot(history, file_suffix="_aimotive_condition_split")
 
@@ -408,10 +378,6 @@ def save_dumbbell_plot(history: dict, file_suffix: str = ""):
     labels = history["steps_labels"]
     conditions = history["conditions"]
     acc_pairs = np.array(history["acc_pairs"])
-    novel_classes = history.get("novel_classes", [set() for _ in labels])
-
-    while len(novel_classes) < len(labels):
-        novel_classes.append(set())
 
     if len(acc_pairs) == 0:
         print("No data to plot.")
@@ -419,7 +385,6 @@ def save_dumbbell_plot(history: dict, file_suffix: str = ""):
 
     COLOR_PRE = "#4C9BE8"
     COLOR_POST = "#E8574C"
-    COLOR_NOVEL = "#FFF3CD"
 
     fig = plt.figure(figsize=(18, max(6, len(labels) * 0.85 + 3)))
     gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 1], wspace=0.35)
@@ -427,10 +392,8 @@ def save_dumbbell_plot(history: dict, file_suffix: str = ""):
     ax2 = fig.add_subplot(gs[1])
 
     y_pos = np.arange(len(labels))
-
+    
     def row_bg(yi):
-        if len(novel_classes[yi]) > 0:
-            return COLOR_NOVEL
         cond = conditions[yi] if yi < len(conditions) else NORMAL_CONDITION
         return CONDITION_COLORS.get(cond, DEFAULT_COLOR) + "33"
 
@@ -482,10 +445,9 @@ def main():
     print(f"Dataset root: {DATA_DIR}")
     print(f"MinEnt: {'enabled' if USE_MENT else 'disabled'}")
 
-    model, seen_classes = pretrain_pipeline(device, use_ment=USE_MENT)
-    print(f"Seen classes after pretraining: {sorted(seen_classes)}")
+    model = pretrain_pipeline(device, use_ment=USE_MENT)
 
-    incremental_update_test(device, seen_classes=seen_classes)
+    incremental_update_test(device)
 
 if __name__ == "__main__":
     main()
