@@ -49,8 +49,7 @@ CONDITION_COLORS = {
 }
 DEFAULT_COLOR = "#AAAAAA"
 
-def build_model(num_classes: int, device: torch.device, ARCH: dict,
-                subcluster_type: str = "continuous") -> DensityModel:
+def build_model(num_classes, device, ARCH, subcluster_type="continuous"):
     model = DensityModel(
         ARCH=ARCH,
         modeldir=MODEL_DIR,
@@ -62,24 +61,15 @@ def build_model(num_classes: int, device: torch.device, ARCH: dict,
         subcluster_type=subcluster_type,
     )
 
-    backbone = PointPillarEncoder(in_channels=4, bev_shape=(512, 512))
+    class _PointPillarEncoder4D(PointPillarEncoder):
+        def forward(self, batch, only_feat=False):
+            return super().forward(batch).unsqueeze(-1).unsqueeze(-1)
 
-    class _WrappedBackbone(torch.nn.Module):
-        def __init__(self, enc):
-            super().__init__()
-            self.enc = enc
+    backbone = _PointPillarEncoder4D(in_channels=4, bev_shape=(512, 512)).to(device)
+    ckpt = torch.load(os.path.join(MODEL_DIR, "SENet_valid_best"), map_location=device)
+    backbone.load_state_dict(ckpt["state_dict"], strict=True)
 
-        def forward(self, x, only_feat=False):
-            feat = self.enc(x)
-            return feat.unsqueeze(-1).unsqueeze(-1)
-
-    wrapped = _WrappedBackbone(backbone).to(device)
-
-    ckpt_path = os.path.join(MODEL_DIR, "SENet_valid_best")
-    ckpt = torch.load(ckpt_path, map_location=device)
-    wrapped.load_state_dict(ckpt["state_dict"], strict=True)
-
-    model.net = wrapped
+    model.net = backbone
     model.net.eval()
     return model.to(device)
 
@@ -183,73 +173,20 @@ def test_model(model: DensityModel, loader, device: torch.device):
     print(f"  accuracy: {acc:.4f}  ({correct}/{total})")
     return acc, per_class
 
-def _make_arch() -> dict:
-    """Minimal ARCH dict consumed by DensityTrainer.__init__."""
-    return {
-        "train": {
-            "pipeline": "_aimotive",
-            "aux_loss": False,
-            "act": "SiLU",
-            "batch_size": BATCH_SIZE,
-            "workers": WORKERS,
-            "epsilon_w": 0.001,
-        },
-        "post": {"KNN": {"use": False, "params": {}}},
-        "dataset": {
-            "sensor": {
-                "img_prop": {"width": 512, "height": 64},
-                "fov_up": 3.0,
-                "fov_down": -25.0
-            },
-            "max_points": 35000
-        },
-    }
-
-def _make_data_cfg(n: int) -> dict:
-    return {
-        "split": {"train": [], "valid": []},
-        "labels": {i: name for name, i in CLASS_MAP.items()},
-        "color_map": {i: [128, 128, 128] for i in range(n)},
-        "learning_map": {i: i for i in range(n)},
-        "learning_map_inv": {i: i for i in range(n)},
-        "learning_ignore": {i: False for i in range(n)},
-        "content": {i: 1.0 / n for i in range(n)},
-    }
-
 def _parser_collate_concat(batch):
     return _parser_collate(batch)
 
-def train_feature_extractor(model_arch: dict, train_loader, device: torch.device, epochs: int = 10):
-    """
-    Trains a PointPillarEncoder feature extractor and saves it to
-    MODEL_DIR/SENet_valid_best in the state_dict format DensityModel expects.
-    """
-    print(f"\n--- Training Feature Extractor for {epochs} Epochs ---")
-
-    backbone = PointPillarEncoder(in_channels=4, bev_shape=(512, 512))
-
-    class _WrappedBackbone(torch.nn.Module):
-        def __init__(self, enc):
-            super().__init__()
-            self.enc = enc
-
-        def forward(self, x):
-            return self.enc(x).unsqueeze(-1).unsqueeze(-1)
-
-    net = _WrappedBackbone(backbone).to(device)
-    net.train()
+def train_feature_extractor(model_arch, train_loader, device, epochs=10):
+    backbone = PointPillarEncoder(in_channels=4, bev_shape=(512, 512)).to(device)
+    backbone.train()
 
     head = torch.nn.Linear(128, NUM_CLASSES).to(device)
-    optimizer = torch.optim.Adam(list(net.parameters()) + list(head.parameters()), lr=1e-3)
+    optimizer = torch.optim.Adam(list(backbone.parameters()) + list(head.parameters()), lr=1e-3)
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
 
     best_loss = float("inf")
-
     for epoch in range(epochs):
-        total_loss = 0.0
-        correct = 0
-        total = 0
-
+        total_loss, correct, total = 0.0, 0, 0
         for proj_in, _, proj_labels, *_ in tqdm(train_loader, desc=f"FE Epoch {epoch+1}"):
             if isinstance(proj_in, dict):
                 proj_in = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
@@ -257,12 +194,12 @@ def train_feature_extractor(model_arch: dict, train_loader, device: torch.device
                 proj_in = proj_in.to(device)
 
             proj_labels = proj_labels.to(device).flatten()
-
             optimizer.zero_grad()
-            feat = net(proj_in).squeeze(-1).squeeze(-1)
-            logits = head(feat)
 
+            feat = backbone(proj_in)
+            logits = head(feat)
             loss = criterion(logits, proj_labels)
+
             if not torch.isnan(loss):
                 loss.backward()
                 optimizer.step()
@@ -270,21 +207,19 @@ def train_feature_extractor(model_arch: dict, train_loader, device: torch.device
 
             valid_mask = proj_labels != -1
             if valid_mask.any():
-                preds = logits.argmax(dim=1)
-                correct += (preds[valid_mask] == proj_labels[valid_mask]).sum().item()
+                correct += (logits.argmax(1)[valid_mask] == proj_labels[valid_mask]).sum().item()
                 total += valid_mask.sum().item()
 
         epoch_loss = total_loss / len(train_loader)
-        epoch_acc  = correct / total if total > 0 else 0.0
-        print(f"  FE Epoch {epoch+1} | Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}")
+        print(f"  FE Epoch {epoch+1} | Loss: {epoch_loss:.4f} | Acc: {correct/total if total else 0:.4f}")
 
         if epoch_loss < best_loss:
             best_loss = epoch_loss
             os.makedirs(MODEL_DIR, exist_ok=True)
-            torch.save({"state_dict": net.state_dict()}, os.path.join(MODEL_DIR, "SENet_valid_best"))
+            torch.save({"state_dict": backbone.state_dict()}, os.path.join(MODEL_DIR, "SENet_valid_best"))
             print(f"  Saved best checkpoint (loss {best_loss:.4f})")
 
-    net.eval()
+    backbone.eval()
     print("Feature extractor training complete.\n")
 
 def pretrain_pipeline(device: torch.device, ARCH: dict, use_ment: bool = True):
