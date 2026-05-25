@@ -134,11 +134,11 @@ def pretrain_pipeline(ARCH, DATA):
     # Provide a weather filter key in case internal parsers check it
     PRE_DATA["weather_filter"] = ["sunny"]
 
-    ARCH["train"]["batch_size"] = 24
+    ARCH["train"]["batch_size"] = 16
     print("Training Feature Extractor (sunny only)...")
     train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
-    ARCH["train"]["batch_size"] = 4
+    ARCH["train"]["batch_size"] = 2
     print("Training HDC Density Model (sunny only)...")
     model, trainer = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS, return_extractor=True)
 
