@@ -5,6 +5,9 @@ import numpy as np
 import torch
 import laspy
 from torch.utils.data import Dataset
+from tqdm import tqdm
+
+from modules.HDC_utils import DensityModel
 
 CLASS_MAP = {
     "car": 0,
@@ -178,3 +181,120 @@ def _parser_collate(batch):
     proj_labels = torch.cat(batched_labels, dim=0)
 
     return proj_in, None, proj_labels, None, None, None, None, None, None, None, None, None, None, None, None
+
+class AiMotiveDensityTrainer:
+    """
+    Minimal stand-in for DensityTrainer that works with aiMotive DataLoaders.
+    Avoids the KITTI Parser entirely while reusing the HDC train/retrain logic.
+    """
+    def __init__(self, model: DensityModel, num_classes: int, device: torch.device, bipolar_prototypes: bool = False):
+        self.model = model
+        self.num_classes = num_classes
+        self.device = device
+        self.gpu = device.type == "cuda"
+        self.bipolar_prototypes = bipolar_prototypes
+        self.is_wrong_list = []
+        self.mask = None
+        self.logger = None
+
+    def reaccumulate_prototypes(self, train_loader):
+        """Re-accumulate HDC class prototypes from scratch."""
+        import torch.nn.functional as F
+        print("Reaccumulating HDC prototypes...")
+        self.model.eval()
+        self.is_wrong_list = [None] * len(train_loader)
+
+        if self.gpu:
+            torch.cuda.empty_cache()
+
+        with torch.no_grad():
+            self.model.classify_weights.data.fill_(0.0)
+            self.model.classify.weight.data.fill_(0.0)
+
+            for i, (proj_in, _, proj_labels, *_) in enumerate(
+                    tqdm(train_loader, desc="Reaccumulating prototypes")):
+                if isinstance(proj_in, dict):
+                    proj_in = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
+                else:
+                    proj_in = proj_in.to(self.device)
+
+                proj_labels = proj_labels.to(self.device).flatten()
+
+                samples_hv, _, _ = self.model.encode(proj_in, self.mask)
+                samples_hv = samples_hv.to(self.model.classify_weights.dtype)
+
+                valid = proj_labels >= 0
+                if valid.any():
+                    self.model.classify_weights.index_add_(
+                        0, proj_labels[valid], samples_hv[valid])
+
+                predictions = self.model.get_predictions(samples_hv)
+                argmax = predictions.argmax(dim=1)
+                self.is_wrong_list[i] = proj_labels != argmax
+
+            if self.bipolar_prototypes:
+                self.model.classify_weights.data = torch.sign(self.model.classify_weights.data)
+                zero_mask = self.model.classify_weights.data == 0
+                if zero_mask.any():
+                    self.model.classify_weights.data[zero_mask] = -1.0
+                self.model.classify.weight.data = self.model.classify_weights.data.clone()
+            else:
+                self.model.classify.weight[:] = F.normalize(self.model.classify_weights)
+
+        print("Prototype reaccumulation complete.")
+
+    def retrain(self, train_loader, model, epoch, logger):
+        """One epoch of HDC retraining (mistake-driven weight correction)."""
+        import torch.nn.functional as F
+        total_miss = 0
+
+        if len(self.is_wrong_list) != len(train_loader):
+            self.is_wrong_list = [None] * len(train_loader)
+
+        if self.gpu:
+            torch.cuda.empty_cache()
+
+        with torch.no_grad():
+            if self.bipolar_prototypes:
+                model.classify_weights.data = torch.sign(model.classify_weights.data)
+                zero_mask = model.classify_weights.data == 0
+                if zero_mask.any():
+                    model.classify_weights.data[zero_mask] = -1.0
+                model.classify.weight.data = model.classify_weights.data.clone()
+            else:
+                model.classify.weight[:] = F.normalize(model.classify_weights)
+
+            for i, (proj_in, _, proj_labels, *_) in enumerate(
+                    tqdm(train_loader, desc=f"Retraining epoch {epoch}")):
+                if isinstance(proj_in, dict):
+                    proj_in = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v
+                               for k, v in proj_in.items()}
+                else:
+                    proj_in = proj_in.to(self.device)
+
+                proj_labels = proj_labels.to(self.device).flatten()
+
+                samples_hv, _, _ = self.model.encode(proj_in, self.mask)
+                samples_hv = samples_hv.to(model.classify_weights.dtype)
+
+                predictions = self.model.get_predictions(samples_hv)
+                argmax = predictions.argmax(dim=1)
+
+                is_wrong = proj_labels != argmax
+                valid = proj_labels >= 0
+                is_wrong = is_wrong & valid
+
+                if is_wrong.sum().item() == 0:
+                    continue
+
+                total_miss += is_wrong.sum().item()
+                wrong_labels = proj_labels[is_wrong]
+                wrong_preds = argmax[is_wrong]
+                wrong_hvs = samples_hv[is_wrong].to(model.classify_weights.dtype)
+
+                model.classify_weights.index_add_(0, wrong_labels,  wrong_hvs)
+                model.classify_weights.index_add_(0, wrong_preds,  -wrong_hvs)
+
+                self.is_wrong_list[i] = is_wrong
+
+        print(f"  Retrain epoch {epoch} — total misses: {total_miss}")

@@ -12,6 +12,7 @@ from matplotlib.gridspec import GridSpec
 from tqdm import tqdm
 
 from dataset.ai_motive import (
+    AiMotiveDensityTrainer,
     AiMotiveDataset,
     CLASS_MAP,
     ALL_CONDITIONS,
@@ -277,30 +278,6 @@ def train_feature_extractor(model: DensityModel, train_loader, device: torch.dev
 def pretrain_pipeline(device: torch.device, use_ment: bool = True):
     print(f"--- Pretraining on '{NORMAL_CONDITION}' frames (use_ment={use_ment}) ---")
 
-    trainer = DensityTrainer(
-        ARCH=_make_arch(),
-        DATA=_make_data_cfg(NUM_CLASSES),
-        datadir=DATA_DIR,
-        logdir=LOG_DIR,
-        modeldir=MODEL_DIR,
-        logger=None,
-        bipolar_prototypes=False,
-        bipolar_subclusters=(SUBCLUSTER_TYPE == "bipolar"),
-    )
-
-    model = build_model(NUM_CLASSES, device, SUBCLUSTER_TYPE)
-    trainer.model = model
-
-    train_feature_extractor(model, daytime_loaders[NORMAL_CONDITION], device, epochs=10)
-
-    print("Training HDC Density Model (daytime only)...")
-    trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
-    for epoch in range(1, MAX_HDC_EPOCHS + 1):
-        trainer.retrain(daytime_loaders[NORMAL_CONDITION], model, epoch, trainer.logger)
-        
-    torch.save(model.state_dict(), HDC_SAVE_PATH)
-    print(f"HDC checkpoint saved to {HDC_SAVE_PATH}")
-
     daytime_loaders = get_condition_loaders(
         split="train",
         conditions=[NORMAL_CONDITION],
@@ -311,6 +288,19 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
 
     if NORMAL_CONDITION not in daytime_loaders:
         raise RuntimeError("No daytime training frames found.")
+
+    model = build_model(NUM_CLASSES, device, SUBCLUSTER_TYPE)
+    trainer = AiMotiveDensityTrainer(model, NUM_CLASSES, device)
+
+    train_feature_extractor(model, daytime_loaders[NORMAL_CONDITION], device, epochs=10)
+
+    print("Training HDC Density Model (daytime only)...")
+    trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
+    for epoch in range(1, MAX_HDC_EPOCHS + 1):
+        trainer.retrain(daytime_loaders[NORMAL_CONDITION], model, epoch, trainer.logger)
+
+    torch.save(model.state_dict(), HDC_SAVE_PATH)
+    print(f"HDC checkpoint saved to {HDC_SAVE_PATH}")
 
     if use_ment:
         adverse_loaders = get_condition_loaders(
@@ -324,9 +314,7 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
         if not adverse_loaders:
             print("  Warning: no adverse frames found, skipping MinEnt.")
         else:
-            target_dataset = torchdata.ConcatDataset(
-                [loader.dataset for loader in adverse_loaders.values()]
-            )
+            target_dataset = torchdata.ConcatDataset([loader.dataset for loader in adverse_loaders.values()])
             target_loader = torchdata.DataLoader(
                 target_dataset,
                 batch_size=BATCH_SIZE,
@@ -337,7 +325,6 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
             )
 
             run_ent_minimization(model, target_loader, epochs=3, lr=1e-5)
-
             trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
 
             print("Re-running retrain epochs after MinEnt...")
