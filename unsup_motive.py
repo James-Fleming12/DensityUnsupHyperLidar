@@ -13,7 +13,6 @@ from tqdm import tqdm
 
 from dataset.ai_motive import (
     AiMotiveDataset,
-    AiMotiveParser,
     CLASS_MAP,
     ALL_CONDITIONS,
     NORMAL_CONDITION,
@@ -27,7 +26,7 @@ from modules.HDC_utils import DensityModel
 from modules.Basic_HD import DensityTrainer
 from unsup_main import train_hdc, test_hdc_model
 
-DATA_DIR = "/path/to/aimotive"
+DATA_DIR = "/mnt/bravo/jmfleming/ai_motive"
 MODEL_DIR = "logs"
 LOG_DIR = "logs"
 HDC_SAVE_PATH = "logs/aimotive_hdc.pth"
@@ -208,8 +207,7 @@ def _make_arch() -> dict:
     }
 
 
-def _make_data_cfg(parser: AiMotiveParser) -> dict:
-    n = parser.num_classes
+def _make_data_cfg(n: int) -> dict:
     return {
         "split": {"train": [], "valid": []},
         "labels": {i: name for name, i in CLASS_MAP.items()},
@@ -226,16 +224,9 @@ def _parser_collate_concat(batch):
 def pretrain_pipeline(device: torch.device, use_ment: bool = True):
     print(f"--- Pretraining on '{NORMAL_CONDITION}' frames (use_ment={use_ment}) ---")
 
-    parser = AiMotiveParser(
-        root=DATA_DIR,
-        conditions=[NORMAL_CONDITION],
-        batch_size=BATCH_SIZE,
-        workers=WORKERS,
-    )
-
     trainer = DensityTrainer(
         ARCH=_make_arch(),
-        DATA=_make_data_cfg(parser),
+        DATA=_make_data_cfg(NUM_CLASSES),
         datadir=DATA_DIR,
         logdir=LOG_DIR,
         modeldir=MODEL_DIR,
@@ -243,6 +234,7 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
         bipolar_prototypes=False,
         bipolar_subclusters=(SUBCLUSTER_TYPE == "bipolar"),
     )
+
     model = build_model(NUM_CLASSES, device, SUBCLUSTER_TYPE)
     trainer.model = model
 
