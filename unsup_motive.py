@@ -37,8 +37,10 @@ HDC_SUB_PATH = "logs/aimotive_hdc_sub.pth"
 BATCH_SIZE = 4
 WORKERS = 4
 SUBCLUSTER_TYPE = "continuous"
-MAX_HDC_EPOCHS = 5
 USE_MENT = False
+
+FEATURE_EXTRACTOR_EPOCHS = 30
+MAX_HDC_EPOCHS = 5
 
 CONDITION_COLORS = {
     "daytime": "#F5C518",
@@ -49,29 +51,9 @@ DEFAULT_COLOR = "#AAAAAA"
 
 def build_model(num_classes: int, device: torch.device, ARCH: dict,
                 subcluster_type: str = "continuous") -> DensityModel:
-    """
-    Build a DensityModel with a PointPillarEncoder backbone.
-    ARCH is passed through so DensityModel.__init__ can build self.net
-    before we replace it with the PointPillar wrapper.
-    """
-    arch_override = {
-        **ARCH,
-        "train": {
-            **ARCH.get("train", {}),
-            "pipeline": "_aimotive",
-            "aux_loss": False,
-            "act": "SiLU",
-            "batch_size": BATCH_SIZE,
-            "workers": WORKERS,
-            "epsilon_w": 0.001,
-        },
-        "post": {"KNN": {"use": False, "params": {}}},
-        "dataset": {**ARCH.get("dataset", {}), "max_points": 35000},
-    }
-
     model = DensityModel(
-        ARCH=arch_override,
-        modeldir="", # empty string → DensityModel skips checkpoint loading
+        ARCH=ARCH,
+        modeldir=MODEL_DIR,
         hd_encoder="rp",
         num_levels=0,
         randomness=0.0,
@@ -91,7 +73,13 @@ def build_model(num_classes: int, device: torch.device, ARCH: dict,
             feat = self.enc(x)
             return feat.unsqueeze(-1).unsqueeze(-1)
 
-    model.net = _WrappedBackbone(backbone).to(device)
+    wrapped = _WrappedBackbone(backbone).to(device)
+
+    ckpt_path = os.path.join(MODEL_DIR, "SENet_valid_best")
+    ckpt = torch.load(ckpt_path, map_location=device)
+    wrapped.load_state_dict(ckpt["state_dict"], strict=True)
+
+    model.net = wrapped
     model.net.eval()
     return model.to(device)
 
@@ -231,36 +219,50 @@ def _make_data_cfg(n: int) -> dict:
 def _parser_collate_concat(batch):
     return _parser_collate(batch)
 
-def train_feature_extractor(model: DensityModel, train_loader, device: torch.device, epochs: int = 10):
+def train_feature_extractor(model_arch: dict, train_loader, device: torch.device, epochs: int = 10):
+    """
+    Trains a PointPillarEncoder feature extractor and saves it to
+    MODEL_DIR/SENet_valid_best in the state_dict format DensityModel expects.
+    """
     print(f"\n--- Training Feature Extractor for {epochs} Epochs ---")
-    model.net.train()
+
+    backbone = PointPillarEncoder(in_channels=4, bev_shape=(512, 512))
+
+    class _WrappedBackbone(torch.nn.Module):
+        def __init__(self, enc):
+            super().__init__()
+            self.enc = enc
+
+        def forward(self, x):
+            return self.enc(x).unsqueeze(-1).unsqueeze(-1)
+
+    net = _WrappedBackbone(backbone).to(device)
+    net.train()
 
     head = torch.nn.Linear(128, NUM_CLASSES).to(device)
-
-    optimizer = torch.optim.Adam(list(model.net.parameters()) + list(head.parameters()), lr=1e-3)
-
+    optimizer = torch.optim.Adam(list(net.parameters()) + list(head.parameters()), lr=1e-3)
     criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
-    
+
+    best_loss = float("inf")
+
     for epoch in range(epochs):
         total_loss = 0.0
         correct = 0
         total = 0
-        
+
         for proj_in, _, proj_labels, *_ in tqdm(train_loader, desc=f"FE Epoch {epoch+1}"):
             if isinstance(proj_in, dict):
                 proj_in = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
             else:
                 proj_in = proj_in.to(device)
-                
+
             proj_labels = proj_labels.to(device).flatten()
-            
+
             optimizer.zero_grad()
-
-            feat = model.net(proj_in).squeeze(-1).squeeze(-1) 
+            feat = net(proj_in).squeeze(-1).squeeze(-1)
             logits = head(feat)
-            
-            loss = criterion(logits, proj_labels)
 
+            loss = criterion(logits, proj_labels)
             if not torch.isnan(loss):
                 loss.backward()
                 optimizer.step()
@@ -271,12 +273,19 @@ def train_feature_extractor(model: DensityModel, train_loader, device: torch.dev
                 preds = logits.argmax(dim=1)
                 correct += (preds[valid_mask] == proj_labels[valid_mask]).sum().item()
                 total += valid_mask.sum().item()
-            
-        epoch_acc = (correct / total) if total > 0 else 0.0
-        print(f"  FE Epoch {epoch+1} | Loss: {total_loss/len(train_loader):.4f} | Acc: {epoch_acc:.4f}")
-        
-    model.net.eval()
-    print("Feature Extractor training complete.\n")
+
+        epoch_loss = total_loss / len(train_loader)
+        epoch_acc  = correct / total if total > 0 else 0.0
+        print(f"  FE Epoch {epoch+1} | Loss: {epoch_loss:.4f} | Acc: {epoch_acc:.4f}")
+
+        if epoch_loss < best_loss:
+            best_loss = epoch_loss
+            os.makedirs(MODEL_DIR, exist_ok=True)
+            torch.save({"state_dict": net.state_dict()}, os.path.join(MODEL_DIR, "SENet_valid_best"))
+            print(f"  Saved best checkpoint (loss {best_loss:.4f})")
+
+    net.eval()
+    print("Feature extractor training complete.\n")
 
 def pretrain_pipeline(device: torch.device, ARCH: dict, use_ment: bool = True):
     print(f"--- Pretraining on '{NORMAL_CONDITION}' frames (use_ment={use_ment}) ---")
@@ -292,10 +301,10 @@ def pretrain_pipeline(device: torch.device, ARCH: dict, use_ment: bool = True):
     if NORMAL_CONDITION not in daytime_loaders:
         raise RuntimeError("No daytime training frames found.")
 
-    model = build_model(NUM_CLASSES, device, ARCH, SUBCLUSTER_TYPE)   # ← pass ARCH
-    trainer = AiMotiveDensityTrainer(model, NUM_CLASSES, device)
+    train_feature_extractor(ARCH, daytime_loaders[NORMAL_CONDITION], device, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
-    train_feature_extractor(model, daytime_loaders[NORMAL_CONDITION], device, epochs=10)
+    model = build_model(NUM_CLASSES, device, ARCH, SUBCLUSTER_TYPE)
+    trainer = AiMotiveDensityTrainer(model, NUM_CLASSES, device)
 
     print("Training HDC Density Model (daytime only)...")
     trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
@@ -486,14 +495,9 @@ def main():
     print(f"MinEnt: {'enabled' if USE_MENT else 'disabled'}")
 
     try:
-        ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
+        ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", "r"))
     except Exception as e:
-        print(f"Error opening arch yaml file: {e}")
-        quit()
-    try:
-        DATA = yaml.safe_load(open("config/labels/waymo.yaml", 'r'))
-    except Exception as e:
-        print(f"Error opening data yaml file: {e}")
+        print(f"Error opening arch yaml: {e}")
         quit()
 
     model = pretrain_pipeline(device, ARCH, use_ment=USE_MENT)
