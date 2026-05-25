@@ -30,7 +30,7 @@ CLASS_MAP = {
     "barrier": 4,
     "misc": 4
 }
-NUM_CLASSES = len(CLASS_MAP)
+NUM_CLASSES = len(set(CLASS_MAP.values()))
 
 ALL_CONDITIONS = ["highway", "urban", "night", "rain"]
 NORMAL_CONDITION = "highway"
@@ -99,9 +99,11 @@ class AiMotiveDataset(Dataset):
                     labels.append(CLASS_MAP[cls_name])
 
         if len(labels) == 0:
-            labels = [-1]
+            scene_label = -1
+        else:
+            scene_label = int(np.bincount(labels).argmax())
             
-        return points, np.array(labels, dtype=np.int64)
+        return points, scene_label
 
 def voxelize(points):
     """
@@ -151,7 +153,7 @@ def _parser_collate(batch):
     batched_voxel_coords = []
     batched_labels = []
     
-    for batch_idx, (points, labels) in enumerate(batch):
+    for batch_idx, (points, scene_label) in enumerate(batch):
         v_feats, v_coords = voxelize(points)
 
         v_feats_tensor = torch.tensor(v_feats, dtype=torch.float32)
@@ -162,7 +164,7 @@ def _parser_collate(batch):
         
         batched_voxel_features.append(v_feats_tensor)
         batched_voxel_coords.append(coords_with_batch)
-        batched_labels.append(torch.tensor(labels, dtype=torch.long))
+        batched_labels.append(torch.tensor([scene_label], dtype=torch.long))
 
     final_voxel_features = torch.cat(batched_voxel_features, dim=0)
     final_voxel_coords = torch.cat(batched_voxel_coords, dim=0)

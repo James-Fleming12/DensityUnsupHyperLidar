@@ -203,9 +203,15 @@ def _make_arch() -> dict:
             "epsilon_w": 0.001,
         },
         "post": {"KNN": {"use": False, "params": {}}},
-        "dataset": {"sensor": {}, "max_points": 35000},
+        "dataset": {
+            "sensor": {
+                "img_prop": {"width": 512, "height": 64},
+                "fov_up": 3.0,
+                "fov_down": -25.0
+            },
+            "max_points": 35000
+        },
     }
-
 
 def _make_data_cfg(n: int) -> dict:
     return {
@@ -220,6 +226,53 @@ def _make_data_cfg(n: int) -> dict:
 
 def _parser_collate_concat(batch):
     return _parser_collate(batch)
+
+def train_feature_extractor(model: DensityModel, train_loader, device: torch.device, epochs: int = 10):
+    print(f"\n--- Training Feature Extractor for {epochs} Epochs ---")
+    model.net.train()
+
+    head = torch.nn.Linear(128, NUM_CLASSES).to(device)
+
+    optimizer = torch.optim.Adam(list(model.net.parameters()) + list(head.parameters()), lr=1e-3)
+
+    criterion = torch.nn.CrossEntropyLoss(ignore_index=-1)
+    
+    for epoch in range(epochs):
+        total_loss = 0.0
+        correct = 0
+        total = 0
+        
+        for proj_in, _, proj_labels, *_ in tqdm(train_loader, desc=f"FE Epoch {epoch+1}"):
+            if isinstance(proj_in, dict):
+                proj_in = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
+            else:
+                proj_in = proj_in.to(device)
+                
+            proj_labels = proj_labels.to(device).flatten()
+            
+            optimizer.zero_grad()
+
+            feat = model.net(proj_in).squeeze(-1).squeeze(-1) 
+            logits = head(feat)
+            
+            loss = criterion(logits, proj_labels)
+
+            if not torch.isnan(loss):
+                loss.backward()
+                optimizer.step()
+                total_loss += loss.item()
+
+            valid_mask = proj_labels != -1
+            if valid_mask.any():
+                preds = logits.argmax(dim=1)
+                correct += (preds[valid_mask] == proj_labels[valid_mask]).sum().item()
+                total += valid_mask.sum().item()
+            
+        epoch_acc = (correct / total) if total > 0 else 0.0
+        print(f"  FE Epoch {epoch+1} | Loss: {total_loss/len(train_loader):.4f} | Acc: {epoch_acc:.4f}")
+        
+    model.net.eval()
+    print("Feature Extractor training complete.\n")
 
 def pretrain_pipeline(device: torch.device, use_ment: bool = True):
     print(f"--- Pretraining on '{NORMAL_CONDITION}' frames (use_ment={use_ment}) ---")
@@ -238,8 +291,13 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
     model = build_model(NUM_CLASSES, device, SUBCLUSTER_TYPE)
     trainer.model = model
 
+    train_feature_extractor(model, daytime_loaders[NORMAL_CONDITION], device, epochs=10)
+
     print("Training HDC Density Model (daytime only)...")
-    trainer.start()
+    trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
+    for epoch in range(1, MAX_HDC_EPOCHS + 1):
+        trainer.retrain(daytime_loaders[NORMAL_CONDITION], model, epoch, trainer.logger)
+        
     torch.save(model.state_dict(), HDC_SAVE_PATH)
     print(f"HDC checkpoint saved to {HDC_SAVE_PATH}")
 
