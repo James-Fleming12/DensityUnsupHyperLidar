@@ -10,6 +10,7 @@ import torch
 import torch.utils.data as torchdata
 from matplotlib.gridspec import GridSpec
 from tqdm import tqdm
+import yaml
 
 from dataset.ai_motive import (
     AiMotiveDensityTrainer,
@@ -46,14 +47,39 @@ CONDITION_COLORS = {
 }
 DEFAULT_COLOR = "#AAAAAA"
 
-def build_model(num_classes: int, device: torch.device, subcluster_type: str = "continuous") -> DensityModel:
+def build_model(num_classes: int, device: torch.device, ARCH: dict,
+                subcluster_type: str = "continuous") -> DensityModel:
     """
     Build a DensityModel with a PointPillarEncoder backbone.
-
-    PointPillarEncoder produces (B, 128) embeddings. We wrap it to output
-    (B, 128, 1, 1) so DensityModel.encode()'s permute+reshape gives
-    (B*1*1, 128) = (B, 128) — one HV per sample.
+    ARCH is passed through so DensityModel.__init__ can build self.net
+    before we replace it with the PointPillar wrapper.
     """
+    arch_override = {
+        **ARCH,
+        "train": {
+            **ARCH.get("train", {}),
+            "pipeline": "_aimotive",
+            "aux_loss": False,
+            "act": "SiLU",
+            "batch_size": BATCH_SIZE,
+            "workers": WORKERS,
+            "epsilon_w": 0.001,
+        },
+        "post": {"KNN": {"use": False, "params": {}}},
+        "dataset": {**ARCH.get("dataset", {}), "max_points": 35000},
+    }
+
+    model = DensityModel(
+        ARCH=arch_override,
+        modeldir="", # empty string → DensityModel skips checkpoint loading
+        hd_encoder="rp",
+        num_levels=0,
+        randomness=0.0,
+        num_classes=num_classes,
+        device=device,
+        subcluster_type=subcluster_type,
+    )
+
     backbone = PointPillarEncoder(in_channels=4, bev_shape=(512, 512))
 
     class _WrappedBackbone(torch.nn.Module):
@@ -65,29 +91,6 @@ def build_model(num_classes: int, device: torch.device, subcluster_type: str = "
             feat = self.enc(x)
             return feat.unsqueeze(-1).unsqueeze(-1)
 
-    ARCH = {
-        "train": {
-            "pipeline": "_aimotive",
-            "aux_loss": False,
-            "act": "SiLU",
-            "batch_size": BATCH_SIZE,
-            "workers": WORKERS,
-            "epsilon_w": 0.001,
-        },
-        "post": {"KNN": {"use": False, "params": {}}},
-        "dataset": {"sensor": {}, "max_points": 35000},
-    }
-
-    model = DensityModel(
-        ARCH=ARCH,
-        modeldir=MODEL_DIR,
-        hd_encoder="rp",
-        num_levels=0,
-        randomness=0.0,
-        num_classes=num_classes,
-        device=device,
-        subcluster_type=subcluster_type,
-    )
     model.net = _WrappedBackbone(backbone).to(device)
     model.net.eval()
     return model.to(device)
@@ -275,7 +278,7 @@ def train_feature_extractor(model: DensityModel, train_loader, device: torch.dev
     model.net.eval()
     print("Feature Extractor training complete.\n")
 
-def pretrain_pipeline(device: torch.device, use_ment: bool = True):
+def pretrain_pipeline(device: torch.device, ARCH: dict, use_ment: bool = True):
     print(f"--- Pretraining on '{NORMAL_CONDITION}' frames (use_ment={use_ment}) ---")
 
     daytime_loaders = get_condition_loaders(
@@ -289,7 +292,7 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
     if NORMAL_CONDITION not in daytime_loaders:
         raise RuntimeError("No daytime training frames found.")
 
-    model = build_model(NUM_CLASSES, device, SUBCLUSTER_TYPE)
+    model = build_model(NUM_CLASSES, device, ARCH, SUBCLUSTER_TYPE)   # ← pass ARCH
     trainer = AiMotiveDensityTrainer(model, NUM_CLASSES, device)
 
     train_feature_extractor(model, daytime_loaders[NORMAL_CONDITION], device, epochs=10)
@@ -342,8 +345,8 @@ def pretrain_pipeline(device: torch.device, use_ment: bool = True):
 
     return model
 
-def incremental_update_test(device: torch.device):
-    model = build_model(NUM_CLASSES, device, SUBCLUSTER_TYPE)
+def incremental_update_test(device: torch.device, ARCH: dict):
+    model = build_model(NUM_CLASSES, device, ARCH, SUBCLUSTER_TYPE)
     model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
     model.to(device)
 
@@ -482,9 +485,19 @@ def main():
     print(f"Dataset root: {DATA_DIR}")
     print(f"MinEnt: {'enabled' if USE_MENT else 'disabled'}")
 
-    model = pretrain_pipeline(device, use_ment=USE_MENT)
+    try:
+        ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
+    except Exception as e:
+        print(f"Error opening arch yaml file: {e}")
+        quit()
+    try:
+        DATA = yaml.safe_load(open("config/labels/waymo.yaml", 'r'))
+    except Exception as e:
+        print(f"Error opening data yaml file: {e}")
+        quit()
 
-    incremental_update_test(device)
+    model = pretrain_pipeline(device, ARCH, use_ment=USE_MENT)
+    incremental_update_test(device, ARCH)
 
 if __name__ == "__main__":
     main()
