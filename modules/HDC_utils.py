@@ -296,14 +296,27 @@ class DensityModel(nn.Module):
                     convert_relu_to_softplus(self.net, nn.Hardswish())
                 elif self.ARCH["train"]["act"] == "SiLU":
                     convert_relu_to_softplus(self.net, nn.SiLU())
-        w_dict = torch.load(modeldir + "/SENet_valid_best",
-                            map_location=lambda storage, loc: storage)
-        self.net.load_state_dict(w_dict['state_dict'], strict=True)
-        self.net.eval()
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-            self.gpu = True
-            self.net.cuda()
+            
+            if self.ARCH["train"]["pipeline"] == "pointpillar":
+                from modules.HDC_cl import PointPillarEncoder
 
+                class _PointPillarEncoder4D(PointPillarEncoder):
+                    def forward(self, batch, only_feat=False):
+                        return super().forward(batch).unsqueeze(-1).unsqueeze(-1)
+
+                self.net = _PointPillarEncoder4D(
+                    in_channels=self.ARCH["train"].get("pointpillar_in_channels", 4),
+                    bev_shape=tuple(self.ARCH["train"].get("pointpillar_bev_shape", [512, 512])),
+                )
+
+        if self.ARCH["train"]["pipeline"] != "pointpillar":
+            w_dict = torch.load(modeldir + "/SENet_valid_best",
+                                map_location=lambda storage, loc: storage)
+            self.net.load_state_dict(w_dict['state_dict'], strict=True)
+            self.net.eval()
+            if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+                self.gpu = True
+                self.net.cuda()
         self.hd_encoder = hd_encoder
         if self.hd_encoder == 'rp':  # Random projection encoding
             torch_rng_state = torch.get_rng_state()

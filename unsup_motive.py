@@ -50,6 +50,8 @@ CONDITION_COLORS = {
 DEFAULT_COLOR = "#AAAAAA"
 
 def build_model(num_classes, device, ARCH, subcluster_type="continuous"):
+    ARCH["train"]["pipeline"] = "pointpillar"
+
     model = DensityModel(
         ARCH=ARCH,
         modeldir=MODEL_DIR,
@@ -61,15 +63,12 @@ def build_model(num_classes, device, ARCH, subcluster_type="continuous"):
         subcluster_type=subcluster_type,
     )
 
-    class _PointPillarEncoder4D(PointPillarEncoder):
-        def forward(self, batch, only_feat=False):
-            return super().forward(batch).unsqueeze(-1).unsqueeze(-1)
+    ckpt_path = os.path.join(MODEL_DIR, "aimotive_feature_extractor.pth")
+    if os.path.exists(ckpt_path):
+        ckpt = torch.load(ckpt_path, map_location=device)
+        model.net.load_state_dict(ckpt["state_dict"], strict=True)
+        print(f"  Loaded feature extractor from {ckpt_path}")
 
-    backbone = _PointPillarEncoder4D(in_channels=4, bev_shape=(512, 512)).to(device)
-    ckpt = torch.load(os.path.join(MODEL_DIR, "SENet_valid_best"), map_location=device)
-    backbone.load_state_dict(ckpt["state_dict"], strict=True)
-
-    model.net = backbone
     model.net.eval()
     return model.to(device)
 
@@ -216,7 +215,7 @@ def train_feature_extractor(model_arch, train_loader, device, epochs=10):
         if epoch_loss < best_loss:
             best_loss = epoch_loss
             os.makedirs(MODEL_DIR, exist_ok=True)
-            torch.save({"state_dict": backbone.state_dict()}, os.path.join(MODEL_DIR, "SENet_valid_best"))
+            torch.save({"state_dict": backbone.state_dict()}, os.path.join(MODEL_DIR, "aimotive_feature_extractor.pth"))
             print(f"  Saved best checkpoint (loss {best_loss:.4f})")
 
     backbone.eval()
