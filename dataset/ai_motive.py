@@ -292,6 +292,14 @@ class AiMotiveDensityTrainer:
                 wrong_preds = argmax[is_wrong]
                 wrong_hvs = samples_hv[is_wrong].to(model.classify_weights.dtype)
 
+                valid_pred_mask = (wrong_preds >= 0) & (wrong_preds < self.num_classes)
+                wrong_labels = wrong_labels[valid_pred_mask]
+                wrong_preds = wrong_preds[valid_pred_mask]
+                wrong_hvs = wrong_hvs[valid_pred_mask]
+
+                if len(wrong_labels) == 0:
+                    continue
+
                 model.classify_weights.index_add_(0, wrong_labels,  wrong_hvs)
                 model.classify_weights.index_add_(0, wrong_preds,  -wrong_hvs)
 

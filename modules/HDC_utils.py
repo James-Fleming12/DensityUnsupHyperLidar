@@ -624,9 +624,24 @@ class DensityModel(nn.Module):
             
             with torch.no_grad():
                 for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(dataloader):
-                    proj_in = proj_in.to(self.device)
+                    
+                    if isinstance(proj_in, dict): 
+                        # for AI Motive
+                        proj_in = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
+                    else:
+                        proj_in = proj_in.to(self.device)
+                    
                     proj_labels = proj_labels.to(self.device).flatten()
+
+                    valid_label_mask = proj_labels >= 0
+                    if not valid_label_mask.any():
+                        del proj_in, proj_labels
+                        self._clear_memory()
+                        continue
+                    proj_labels = proj_labels[valid_label_mask]
                     enc, _, _ = self.encode(proj_in)
+                    enc = enc[valid_label_mask]
+
                     class_mask = proj_labels == class_id
                     
                     if torch.any(class_mask):
@@ -652,8 +667,6 @@ class DensityModel(nn.Module):
                 class_emb_cpu = class_emb_cpu[indices]
             
             batch_indices = torch.as_tensor(batch_indices[:len(class_emb_cpu)])
-            
-            class_emb_cpu = torch.cat(class_embeddings, dim=0)
             batch_indices = batch_indices.detach().clone()
 
             if len(class_emb_cpu) > max_samples_per_class:
