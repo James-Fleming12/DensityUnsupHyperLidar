@@ -5,6 +5,8 @@ from typing import Dict, List, Optional, Set
 
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
 import numpy as np
 import torch
 import torch.utils.data as torchdata
@@ -39,15 +41,17 @@ WORKERS = 4
 SUBCLUSTER_TYPE = "continuous"
 USE_MENT = False
 
-FEATURE_EXTRACTOR_EPOCHS = 30
-MAX_HDC_EPOCHS = 5
+FEATURE_EXTRACTOR_EPOCHS = 50
+MAX_HDC_EPOCHS = 8
 
 CONDITION_COLORS = {
-    "daytime": "#F5C518",
-    "night":   "#7B4EA0",
-    "rainy":   "#4C9BE8",
+    "highway": "#F5C518",
+    "night":"#7B4EA0",
+    "rain":"#4C9BE8",
+    "urban":"#88B04B",
 }
 DEFAULT_COLOR = "#AAAAAA"
+SOURCE_DOMAIN = "highway"
 
 def build_model(num_classes, device, ARCH, subcluster_type="continuous"):
     ARCH["train"]["pipeline"] = "pointpillar"
@@ -355,72 +359,145 @@ def incremental_update_test(device: torch.device, ARCH: dict):
         history["conditions"].append(cond)
         history["acc_pairs"].append((acc_pre, acc_post))
 
-    save_dumbbell_plot(history, file_suffix="_aimotive_condition_split")
+    save_domain_adaptation_plot(history, file_suffix="_aimotive_condition_split")
 
-def save_dumbbell_plot(history: dict, file_suffix: str = ""):
-    labels = history["steps_labels"]
+def save_domain_adaptation_plot(history: dict, file_suffix: str = ""):
+    labels     = history["steps_labels"]
     conditions = history["conditions"]
-    acc_pairs = np.array(history["acc_pairs"])
+    acc_pairs  = np.array(history["acc_pairs"])
 
     if len(acc_pairs) == 0:
         print("No data to plot.")
         return
 
-    COLOR_PRE = "#4C9BE8"
-    COLOR_POST = "#E8574C"
+    n = len(labels)
+    deltas = acc_pairs[:, 1] - acc_pairs[:, 0]
 
-    fig = plt.figure(figsize=(18, max(6, len(labels) * 0.85 + 3)))
-    gs = GridSpec(1, 2, figure=fig, width_ratios=[1, 1], wspace=0.35)
-    ax1 = fig.add_subplot(gs[0])
-    ax2 = fig.add_subplot(gs[1])
+    fig = plt.figure(figsize=(20, max(7, n * 1.6 + 4)), facecolor="#0F1117")
+    fig.patch.set_facecolor("#0F1117")
 
-    y_pos = np.arange(len(labels))
-    
-    def row_bg(yi):
-        cond = conditions[yi] if yi < len(conditions) else NORMAL_CONDITION
-        return CONDITION_COLORS.get(cond, DEFAULT_COLOR) + "33"
+    gs = GridSpec(2, 2, figure=fig, width_ratios=[1.6, 1], height_ratios=[1, 0.18], wspace=0.28, hspace=0.12,)
+    ax_dot = fig.add_subplot(gs[0, 0])
+    ax_delta = fig.add_subplot(gs[0, 1])
+    ax_leg = fig.add_subplot(gs[1, :])
 
-    for yi in range(len(acc_pairs)):
-        ax1.axhspan(yi - 0.45, yi + 0.45, color=row_bg(yi), zorder=0, alpha=0.8)
-    ax1.hlines(y_pos, acc_pairs[:, 0], acc_pairs[:, 1], color="#AAAAAA", alpha=0.6, linewidth=2, zorder=1)
-    ax1.scatter(acc_pairs[:, 0], y_pos, color=COLOR_PRE,  s=130, label="Pre-Update",  zorder=3, edgecolors="white", linewidths=0.8)
-    ax1.scatter(acc_pairs[:, 1], y_pos, color=COLOR_POST, s=130, label="Post-Update", zorder=3, edgecolors="white", linewidths=0.8)
-    ax1.set_title("Accuracy Gain per Condition", fontsize=13, fontweight="bold", pad=10)
-    ax1.set_yticks(y_pos)
-    tick_labels = ax1.set_yticklabels(labels, fontsize=8)
-    for tick, cond in zip(tick_labels, conditions):
-        tick.set_color(CONDITION_COLORS.get(cond, "black"))
-    ax1.grid(axis="x", linestyle="--", alpha=0.35)
-    ax1.set_xlabel("Accuracy", fontsize=10)
-    ax1.spines[["top", "right"]].set_visible(False)
+    for ax in (ax_dot, ax_delta, ax_leg):
+        ax.set_facecolor("#0F1117")
+        for spine in ax.spines.values():
+            spine.set_visible(False)
 
-    cond_patches = [mpatches.Patch(color=CONDITION_COLORS.get(c, DEFAULT_COLOR), label=c.capitalize()) for c in dict.fromkeys(conditions)]
-    ax1.legend(
-        handles=cond_patches,
-        title="Condition", loc="upper left",
-        fontsize=8, title_fontsize=8,
-        bbox_to_anchor=(0, -0.06), ncol=len(cond_patches),
-        frameon=True, framealpha=0.9,
+    y_pos = np.arange(n)
+
+    C_PRE = "#52A8FF"
+    C_POST = "#FF6B6B"
+    C_GRID = "#2A2D3A"
+    C_TEXT = "#E0E4F0"
+    C_SUBTEXT = "#8890A8"
+
+    for yi in range(n):
+        cond  = conditions[yi]
+        color = CONDITION_COLORS.get(cond, DEFAULT_COLOR)
+
+        ax_dot.axhspan(yi - 0.42, yi + 0.42, color=color, alpha=0.06, zorder=0)
+        ax_dot.text(1.01, yi, cond.upper(), transform=ax_dot.get_yaxis_transform(), fontsize=7, color=color, alpha=0.7, va="center", ha="left", fontfamily="monospace")
+
+    ax_dot.hlines(y_pos, acc_pairs[:, 0], acc_pairs[:, 1], color=C_SUBTEXT, alpha=0.5, linewidth=1.5, zorder=1, linestyle="--")
+    ax_dot.scatter(acc_pairs[:, 0], y_pos, color=C_PRE, s=160, zorder=4, edgecolors="#0F1117", linewidths=1.2, label="Before adaptation")
+    ax_dot.scatter(acc_pairs[:, 1], y_pos, color=C_POST, s=160, zorder=4, edgecolors="#0F1117", linewidths=1.2, label="After adaptation")
+
+    for yi, (pre, post) in enumerate(acc_pairs):
+        ax_dot.text(pre - 0.003, yi + 0.22, f"{pre:.3f}", fontsize=7.5, color=C_PRE,  ha="right", va="bottom")
+        ax_dot.text(post + 0.003, yi + 0.22, f"{post:.3f}", fontsize=7.5, color=C_POST, ha="left",  va="bottom")
+
+    ax_dot.set_yticks(y_pos)
+    ax_dot.set_yticklabels(labels, fontsize=9, color=C_TEXT)
+    ax_dot.tick_params(axis="x", colors=C_SUBTEXT, labelsize=8)
+    ax_dot.tick_params(axis="y", length=0)
+    ax_dot.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.2f}"))
+    ax_dot.grid(axis="x", color=C_GRID, linewidth=0.8, zorder=0)
+    ax_dot.set_xlim(
+        min(acc_pairs.min() - 0.04, 0.50),
+        max(acc_pairs.max() + 0.04, 1.00),
+    )
+    ax_dot.set_xlabel("Classification accuracy on target domain", fontsize=9, color=C_SUBTEXT, labelpad=8)
+    ax_dot.set_title(
+        f"Domain Shift: {SOURCE_DOMAIN.capitalize()} → Adverse Conditions\n"
+        "Unsupervised Inference-Time Adaptation",
+        fontsize=12, color=C_TEXT, fontweight="bold", pad=12, loc="left",
     )
 
-    deltas = acc_pairs[:, 1] - acc_pairs[:, 0]
-    bar_colors = [COLOR_POST if d >= 0 else COLOR_PRE for d in deltas]
-    ax2.barh(y_pos, deltas, color=bar_colors, alpha=0.8)
-    ax2.axvline(0, color="black", linewidth=0.8, linestyle="--")
-    ax2.set_title("Δ Accuracy per Condition", fontsize=13, fontweight="bold", pad=10)
-    ax2.set_yticks(y_pos)
-    ax2.set_yticklabels(labels, fontsize=8)
-    ax2.grid(axis="x", linestyle="--", alpha=0.35)
-    ax2.set_xlabel("Δ Accuracy", fontsize=10)
-    ax2.spines[["top", "right"]].set_visible(False)
+    src_acc = acc_pairs[:, 0].mean()
+    ax_dot.axvline(src_acc, color=C_PRE, linewidth=0.8, linestyle=":", alpha=0.4, zorder=2)
+    ax_dot.text(src_acc + 0.002, -0.55, f"avg pre-adapt\n{src_acc:.3f}", fontsize=6.5, color=C_PRE, alpha=0.6, va="top", ha="left")
 
-    plt.suptitle("Impact of Incremental Unsupervised Inference Updates — aiMotive", fontsize=15, fontweight="bold", y=1.01,)
+    bar_colors = [C_POST if d >= 0 else C_PRE for d in deltas]
+    bars = ax_delta.barh(y_pos, deltas, color=bar_colors,
+                         alpha=0.75, height=0.55, zorder=2)
+
+    for bar, d in zip(bars, deltas):
+        if d < 0:
+            bar.set_hatch("///")
+            bar.set_edgecolor(C_PRE)
+            bar.set_linewidth(0.5)
+
+    ax_delta.axvline(0, color=C_TEXT, linewidth=0.8, zorder=3)
+
+    for yi, d in enumerate(deltas):
+        sign = "+" if d >= 0 else ""
+        color = C_POST if d >= 0 else C_PRE
+        offset = 0.0003 if d >= 0 else -0.0003
+        ha = "left" if d >= 0 else "right"
+        ax_delta.text(d + offset, yi, f"{sign}{d:.4f}", fontsize=8, color=color, va="center", ha=ha)
+
+    ax_delta.set_yticks(y_pos)
+    ax_delta.set_yticklabels([""] * n)
+    ax_delta.tick_params(axis="x", colors=C_SUBTEXT, labelsize=8)
+    ax_delta.tick_params(axis="y", length=0)
+    ax_delta.grid(axis="x", color=C_GRID, linewidth=0.8, zorder=0)
+    ax_delta.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:+.3f}"))
+    ax_delta.set_xlabel("Δ Accuracy after adaptation", fontsize=9, color=C_SUBTEXT, labelpad=8)
+    ax_delta.set_title("Accuracy Change", fontsize=11, color=C_TEXT, fontweight="bold", pad=12, loc="left")
+
+    ax_leg.axis("off")
+
+    legend_elements = [
+        Line2D([0], [0], marker="o", color="none", markerfacecolor=C_PRE, markersize=9, markeredgecolor="#0F1117", label=f"Before adaptation  (trained on {SOURCE_DOMAIN})"),
+        Line2D([0], [0], marker="o", color="none", markerfacecolor=C_POST, markersize=9, markeredgecolor="#0F1117", label="After unsupervised inference-time adaptation"),
+    ]
+    cond_patches = [
+        mpatches.Patch(
+            facecolor=CONDITION_COLORS.get(c, DEFAULT_COLOR),
+            alpha=0.5,
+            label=f"Target: {c}",
+        )
+        for c in dict.fromkeys(conditions)
+    ]
+
+    ax_leg.legend(
+        handles=legend_elements + cond_patches,
+        loc="center",
+        ncol=len(legend_elements) + len(cond_patches),
+        fontsize=8.5,
+        frameon=False,
+        labelcolor=C_TEXT,
+    )
+
+    note = (
+        "Note: all conditions share scene-level class 0 (car) as the dominant label.\n"
+        "Accuracy reflects domain robustness, not class diversity."
+    )
+    fig.text(0.5, -0.01, note,
+             ha="center", va="top", fontsize=7.5,
+             color=C_SUBTEXT, style="italic")
+
+    fig.suptitle("HDC Model — Unsupervised Domain Adaptation  |  aiMotive LiDAR", fontsize=14, fontweight="bold", color=C_TEXT, y=1.02,)
+
     plt.tight_layout()
-
-    out = f"incremental_dumbbell_results{file_suffix}.png"
-    plt.savefig(out, dpi=300, bbox_inches="tight")
+    out = f"domain_adaptation_results{file_suffix}.png"
+    plt.savefig(out, dpi=300, bbox_inches="tight",
+                facecolor=fig.get_facecolor())
     plt.close()
-    print(f"Dumbbell plot saved to {out}")
+    print(f"Domain adaptation plot saved to {out}")
 
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
