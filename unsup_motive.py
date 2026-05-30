@@ -46,10 +46,10 @@ MAX_HDC_EPOCHS = 8
 UNSUP_EPOCHS = 5
 
 CONDITION_COLORS = {
-    "highway": "#F5C518",
-    "night":"#7B4EA0",
-    "rain":"#4C9BE8",
-    "urban":"#88B04B",
+    "highway":"#F5C518",
+    "urban": "#E8572A",
+    "night": "#7B4EA0",
+    "rain": "#4C9BE8",
 }
 DEFAULT_COLOR = "#AAAAAA"
 SOURCE_DOMAIN = "highway"

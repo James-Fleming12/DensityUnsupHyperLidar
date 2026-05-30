@@ -11,33 +11,34 @@ from modules.HDC_utils import DensityModel
 
 CLASS_MAP = {
     "car": 0,
-    "van": 0,
-    "pickup": 0,
-    "size_vehicle_m": 0,
+    "van": 1,
+    "pickup": 2,
+    "size_vehicle_m": 3,
 
-    "truck": 1,
-    "bus": 1,
-    "truck/bus": 1,
-    "train": 1,
-    "trailer": 1,
-    "size_vehicle_xl": 1,
+    "truck": 4,
+    "bus": 5,
+    "truck/bus": 4, # ambiguous, map to truck
+    "trailer": 6,
+    "train": 7,
+    "size_vehicle_xl": 4,# ambiguous, map to truck
 
-    "motorcycle": 2,
-    "bicycle": 2,
-    "bike": 2,
+    "motorcycle": 8,
+    "bicycle": 9,
+    "bike": 9, # same as bicycle
 
-    "pedestrian": 3,
-    "person": 3,
+    "pedestrian": 10,
+    "person": 10,
 
-    "traffic_cone": 4,
-    "barrier": 4,
-    "misc": 4
+    "traffic_cone": 11,
+    "barrier": 12,
+    "misc": 13,
 }
+NUM_CLASSES = 14
 NUM_CLASSES = len(set(CLASS_MAP.values()))
 
 ALL_CONDITIONS = ["highway", "urban", "night", "rain"]
 NORMAL_CONDITION = "highway"
-ADVERSE_CONDITIONS = ["night", "rain"]
+ADVERSE_CONDITIONS = ["urban", "night", "rain"]
 
 PC_RANGE = [-50.0, -50.0, -3.0, 50.0, 50.0, 1.0]
 BEV_SHAPE = (512, 512)
