@@ -329,31 +329,28 @@ def incremental_update_test(device: torch.device, ARCH: dict):
         "epoch_accs": [],
     }
 
-    print(f"--- Incremental Evaluation: {UNSUP_EPOCHS} unsupervised epochs per condition ---")
+    print(f"--- Incremental Evaluation: {UNSUP_EPOCHS} unsupervised epochs, interleaved ---")
 
-    for cond in ADVERSE_CONDITIONS:
-        if cond not in train_loaders:
-            continue
-
-        print(f"\n{'='*60}")
-        print(f"Unsupervised Update Phase: [{cond.upper()}]")
-
+    active_conds = [c for c in ADVERSE_CONDITIONS if c in train_loaders]
+    for cond in active_conds:
         val_loader = val_loaders.get(cond) or next(iter(val_loaders.values()))
-
         acc_pre, _ = test_model(model, val_loader, device)
-        print(f"    Epoch 0 (pre) — acc: {acc_pre:.4f}")
+        print(f"  [{cond}] Epoch 0 (pre) — acc: {acc_pre:.4f}")
+        history["steps_labels"].append(f"Updates on {cond.capitalize()}")
+        history["conditions"].append(cond)
+        history["acc_pairs"].append([acc_pre, acc_pre])
+        history["epoch_accs"].append([acc_pre])
 
-        epoch_accs = [acc_pre]
-
-        for ep in range(1, UNSUP_EPOCHS + 1):
+    for ep in range(1, UNSUP_EPOCHS + 1):
+        print(f"\n--- Epoch {ep}/{UNSUP_EPOCHS} ---")
+        for ci, cond in enumerate(active_conds):
             model.train()
             total_updates = 0
-            for proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in tqdm(train_loaders[cond], desc=f"    epoch {ep}/{UNSUP_EPOCHS} [{cond}]", leave=False):
+            for proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in tqdm(train_loaders[cond], desc=f"  ep {ep} [{cond}]", leave=False):
                 if isinstance(proj_in, dict):
                     proj_in = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
                 else:
                     proj_in = proj_in.to(device)
-
                 preds = model.inference_update(
                     proj_in,
                     learning_rate=0.01,
@@ -363,17 +360,17 @@ def incremental_update_test(device: torch.device, ARCH: dict):
                 )
                 total_updates += (preds > 0).sum().item()
 
+            val_loader = val_loaders.get(cond) or next(iter(val_loaders.values()))
             acc_ep, _ = test_model(model, val_loader, device)
-            epoch_accs.append(acc_ep)
-            print(f"    Epoch {ep} — acc: {acc_ep:.4f}  Δ: {acc_ep - acc_pre:+.4f}  updates: {total_updates}")
+            acc_pre = history["epoch_accs"][ci][0]
+            history["epoch_accs"][ci].append(acc_ep)
+            history["acc_pairs"][ci][1] = acc_ep
+            print(f"  [{cond}] Epoch {ep} — acc: {acc_ep:.4f}  Δ from pre: {acc_ep - acc_pre:+.4f}  updates: {total_updates}")
 
-        acc_post = epoch_accs[-1]
-        print(f"    Final Δ acc: {acc_post - acc_pre:+.4f}")
+    history["acc_pairs"] = [tuple(p) for p in history["acc_pairs"]]
 
-        history["steps_labels"].append(f"Updates on {cond.capitalize()}")
-        history["conditions"].append(cond)
-        history["acc_pairs"].append((acc_pre, acc_post))
-        history["epoch_accs"].append(epoch_accs)
+    for cond, pair in zip(active_conds, history["acc_pairs"]):
+        print(f"\n  [{cond}] Final — pre: {pair[0]:.4f}  post: {pair[1]:.4f}  Δ: {pair[1] - pair[0]:+.4f}")
 
     save_domain_adaptation_plot(history, file_suffix="_aimotive_condition_split")
 
