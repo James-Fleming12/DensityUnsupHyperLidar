@@ -43,6 +43,7 @@ USE_MENT = False
 
 FEATURE_EXTRACTOR_EPOCHS = 50
 MAX_HDC_EPOCHS = 8
+UNSUP_EPOCHS = 5
 
 CONDITION_COLORS = {
     "highway": "#F5C518",
@@ -325,9 +326,10 @@ def incremental_update_test(device: torch.device, ARCH: dict):
         "steps_labels": [],
         "conditions": [],
         "acc_pairs": [],
+        "epoch_accs": [],
     }
 
-    print(f"--- Incremental Evaluation: Unsupervised Updates on Adverse Conditions ---")
+    print(f"--- Incremental Evaluation: {UNSUP_EPOCHS} unsupervised epochs per condition ---")
 
     for cond in ADVERSE_CONDITIONS:
         if cond not in train_loaders:
@@ -336,35 +338,50 @@ def incremental_update_test(device: torch.device, ARCH: dict):
         print(f"\n{'='*60}")
         print(f"Unsupervised Update Phase: [{cond.upper()}]")
 
-        step_label = f"Updates on {cond.capitalize()}"
         val_loader = val_loaders.get(cond) or next(iter(val_loaders.values()))
 
         acc_pre, _ = test_model(model, val_loader, device)
-        print(f"    Pre  — acc: {acc_pre:.4f}")
+        print(f"    Epoch 0 (pre) — acc: {acc_pre:.4f}")
 
-        model.train()
-        for proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in \
-                tqdm(train_loaders[cond], desc=f"    update [{cond}]", leave=False):
-            if isinstance(proj_in, dict):
-                proj_in = {k: v.to(device) if isinstance(v, torch.Tensor) else v
-                           for k, v in proj_in.items()}
-            else:
-                proj_in = proj_in.to(device)
-            model.inference_update(proj_in, learning_rate=0.001, distance_sensitivity=3.0)
+        epoch_accs = [acc_pre]
 
-        acc_post, _ = test_model(model, val_loader, device)
-        print(f"    Post — acc: {acc_post:.4f}  Δ acc: {acc_post - acc_pre:+.4f}")
+        for ep in range(1, UNSUP_EPOCHS + 1):
+            model.train()
+            total_updates = 0
+            for proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in tqdm(train_loaders[cond], desc=f"    epoch {ep}/{UNSUP_EPOCHS} [{cond}]", leave=False):
+                if isinstance(proj_in, dict):
+                    proj_in = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
+                else:
+                    proj_in = proj_in.to(device)
 
-        history["steps_labels"].append(step_label)
+                preds = model.inference_update(
+                    proj_in,
+                    learning_rate=0.01,
+                    distance_sensitivity=1.0,
+                    thresholds=[0.2, 0.80],
+                    beta=0.1,
+                )
+                total_updates += (preds > 0).sum().item()
+
+            acc_ep, _ = test_model(model, val_loader, device)
+            epoch_accs.append(acc_ep)
+            print(f"    Epoch {ep} — acc: {acc_ep:.4f}  Δ: {acc_ep - acc_pre:+.4f}  updates: {total_updates}")
+
+        acc_post = epoch_accs[-1]
+        print(f"    Final Δ acc: {acc_post - acc_pre:+.4f}")
+
+        history["steps_labels"].append(f"Updates on {cond.capitalize()}")
         history["conditions"].append(cond)
         history["acc_pairs"].append((acc_pre, acc_post))
+        history["epoch_accs"].append(epoch_accs)
 
     save_domain_adaptation_plot(history, file_suffix="_aimotive_condition_split")
 
 def save_domain_adaptation_plot(history: dict, file_suffix: str = ""):
-    labels     = history["steps_labels"]
+    labels = history["steps_labels"]
     conditions = history["conditions"]
-    acc_pairs  = np.array(history["acc_pairs"])
+    acc_pairs = np.array(history["acc_pairs"])
+    epoch_accs = history.get("epoch_accs", [])
 
     if len(acc_pairs) == 0:
         print("No data to plot.")
@@ -372,41 +389,69 @@ def save_domain_adaptation_plot(history: dict, file_suffix: str = ""):
 
     n = len(labels)
     deltas = acc_pairs[:, 1] - acc_pairs[:, 0]
+    has_trajectory = len(epoch_accs) > 0
 
-    fig = plt.figure(figsize=(20, max(7, n * 1.6 + 4)), facecolor="#0F1117")
-    fig.patch.set_facecolor("#0F1117")
+    fig = plt.figure(figsize=(22, max(8, n * 1.6 + 5)), facecolor="white")
+    fig.patch.set_facecolor("white")
 
-    gs = GridSpec(2, 2, figure=fig, width_ratios=[1.6, 1], height_ratios=[1, 0.18], wspace=0.28, hspace=0.12,)
-    ax_dot = fig.add_subplot(gs[0, 0])
-    ax_delta = fig.add_subplot(gs[0, 1])
-    ax_leg = fig.add_subplot(gs[1, :])
+    if has_trajectory:
+        gs = GridSpec(
+            2, 3,
+            figure=fig,
+            width_ratios=[1.4, 0.8, 1.0],
+            height_ratios=[1, 0.15],
+            wspace=0.30,
+            hspace=0.12,
+        )
+        ax_dot = fig.add_subplot(gs[0, 0])
+        ax_delta = fig.add_subplot(gs[0, 1])
+        ax_traj = fig.add_subplot(gs[0, 2])
+        ax_leg = fig.add_subplot(gs[1, :])
+    else:
+        gs = GridSpec(
+            2, 2,
+            figure=fig,
+            width_ratios=[1.6, 1],
+            height_ratios=[1, 0.15],
+            wspace=0.28,
+            hspace=0.12,
+        )
+        ax_dot = fig.add_subplot(gs[0, 0])
+        ax_delta = fig.add_subplot(gs[0, 1])
+        ax_traj = None
+        ax_leg = fig.add_subplot(gs[1, :])
 
-    for ax in (ax_dot, ax_delta, ax_leg):
-        ax.set_facecolor("#0F1117")
+    C_PRE = "#2171B5"
+    C_POST = "#CB181D"
+    C_GRID = "#E8E8E8"
+    C_TEXT = "#1A1A1A"
+    C_SUBTEXT= "#555555"
+
+    axes_to_style = [ax_dot, ax_delta, ax_leg]
+    if ax_traj:
+        axes_to_style.append(ax_traj)
+    for ax in axes_to_style:
+        ax.set_facecolor("white")
         for spine in ax.spines.values():
-            spine.set_visible(False)
+            spine.set_color("#CCCCCC")
+            spine.set_linewidth(0.8)
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
 
     y_pos = np.arange(n)
-
-    C_PRE = "#52A8FF"
-    C_POST = "#FF6B6B"
-    C_GRID = "#2A2D3A"
-    C_TEXT = "#E0E4F0"
-    C_SUBTEXT = "#8890A8"
 
     for yi in range(n):
         cond  = conditions[yi]
         color = CONDITION_COLORS.get(cond, DEFAULT_COLOR)
+        ax_dot.axhspan(yi - 0.42, yi + 0.42, color=color, alpha=0.08, zorder=0)
+        ax_dot.text(1.01, yi, cond.upper(), transform=ax_dot.get_yaxis_transform(), fontsize=7, color=color, alpha=0.8, va="center", ha="left", fontfamily="monospace")
 
-        ax_dot.axhspan(yi - 0.42, yi + 0.42, color=color, alpha=0.06, zorder=0)
-        ax_dot.text(1.01, yi, cond.upper(), transform=ax_dot.get_yaxis_transform(), fontsize=7, color=color, alpha=0.7, va="center", ha="left", fontfamily="monospace")
-
-    ax_dot.hlines(y_pos, acc_pairs[:, 0], acc_pairs[:, 1], color=C_SUBTEXT, alpha=0.5, linewidth=1.5, zorder=1, linestyle="--")
-    ax_dot.scatter(acc_pairs[:, 0], y_pos, color=C_PRE, s=160, zorder=4, edgecolors="#0F1117", linewidths=1.2, label="Before adaptation")
-    ax_dot.scatter(acc_pairs[:, 1], y_pos, color=C_POST, s=160, zorder=4, edgecolors="#0F1117", linewidths=1.2, label="After adaptation")
+    ax_dot.hlines(y_pos, acc_pairs[:, 0], acc_pairs[:, 1], color="#AAAAAA", alpha=0.7, linewidth=1.5, zorder=1, linestyle="--")
+    ax_dot.scatter(acc_pairs[:, 0], y_pos, color=C_PRE,  s=160, zorder=4, edgecolors="white", linewidths=1.2)
+    ax_dot.scatter(acc_pairs[:, 1], y_pos, color=C_POST, s=160, zorder=4, edgecolors="white", linewidths=1.2)
 
     for yi, (pre, post) in enumerate(acc_pairs):
-        ax_dot.text(pre - 0.003, yi + 0.22, f"{pre:.3f}", fontsize=7.5, color=C_PRE,  ha="right", va="bottom")
+        ax_dot.text(pre  - 0.003, yi + 0.22, f"{pre:.3f}", fontsize=7.5, color=C_PRE,  ha="right", va="bottom")
         ax_dot.text(post + 0.003, yi + 0.22, f"{post:.3f}", fontsize=7.5, color=C_POST, ha="left",  va="bottom")
 
     ax_dot.set_yticks(y_pos)
@@ -425,30 +470,24 @@ def save_domain_adaptation_plot(history: dict, file_suffix: str = ""):
         "Unsupervised Inference-Time Adaptation",
         fontsize=12, color=C_TEXT, fontweight="bold", pad=12, loc="left",
     )
-
     src_acc = acc_pairs[:, 0].mean()
-    ax_dot.axvline(src_acc, color=C_PRE, linewidth=0.8, linestyle=":", alpha=0.4, zorder=2)
-    ax_dot.text(src_acc + 0.002, -0.55, f"avg pre-adapt\n{src_acc:.3f}", fontsize=6.5, color=C_PRE, alpha=0.6, va="top", ha="left")
+    ax_dot.axvline(src_acc, color=C_PRE, linewidth=0.8, linestyle=":", alpha=0.5, zorder=2)
+    ax_dot.text(src_acc + 0.002, -0.55, f"avg pre\n{src_acc:.3f}", fontsize=6.5, color=C_PRE, alpha=0.7, va="top", ha="left")
 
     bar_colors = [C_POST if d >= 0 else C_PRE for d in deltas]
-    bars = ax_delta.barh(y_pos, deltas, color=bar_colors,
-                         alpha=0.75, height=0.55, zorder=2)
-
+    bars = ax_delta.barh(y_pos, deltas, color=bar_colors, alpha=0.75, height=0.55, zorder=2)
     for bar, d in zip(bars, deltas):
         if d < 0:
             bar.set_hatch("///")
             bar.set_edgecolor(C_PRE)
             bar.set_linewidth(0.5)
-
     ax_delta.axvline(0, color=C_TEXT, linewidth=0.8, zorder=3)
-
     for yi, d in enumerate(deltas):
         sign = "+" if d >= 0 else ""
         color = C_POST if d >= 0 else C_PRE
-        offset = 0.0003 if d >= 0 else -0.0003
-        ha = "left" if d >= 0 else "right"
-        ax_delta.text(d + offset, yi, f"{sign}{d:.4f}", fontsize=8, color=color, va="center", ha=ha)
-
+        offset = max(abs(deltas).max() * 0.02, 0.0002)
+        offset = offset if d >= 0 else -offset
+        ax_delta.text(d + offset, yi, f"{sign}{d:.4f}", fontsize=8, color=color, va="center", ha="left" if d >= 0 else "right")
     ax_delta.set_yticks(y_pos)
     ax_delta.set_yticklabels([""] * n)
     ax_delta.tick_params(axis="x", colors=C_SUBTEXT, labelsize=8)
@@ -458,44 +497,56 @@ def save_domain_adaptation_plot(history: dict, file_suffix: str = ""):
     ax_delta.set_xlabel("Δ Accuracy after adaptation", fontsize=9, color=C_SUBTEXT, labelpad=8)
     ax_delta.set_title("Accuracy Change", fontsize=11, color=C_TEXT, fontweight="bold", pad=12, loc="left")
 
+    if ax_traj and epoch_accs:
+        for ea, cond in zip(epoch_accs, conditions):
+            color = CONDITION_COLORS.get(cond, DEFAULT_COLOR)
+            epochs_x = np.arange(len(ea))
+            ax_traj.plot(epochs_x, ea, color=color, linewidth=2,
+                         marker="o", markersize=5,
+                         markerfacecolor=color, markeredgecolor="white",
+                         label=cond.capitalize(), zorder=3)
+            ax_traj.fill_between(epochs_x, ea[0], ea, color=color, alpha=0.08)
+            ax_traj.annotate(
+                f"{ea[-1]:.3f}",
+                xy=(epochs_x[-1], ea[-1]),
+                xytext=(4, 0), textcoords="offset points",
+                fontsize=7, color=color, va="center",
+            )
+
+        ax_traj.tick_params(colors=C_SUBTEXT, labelsize=8)
+        ax_traj.set_xlabel("Unsupervised epoch", fontsize=9, color=C_SUBTEXT, labelpad=8)
+        ax_traj.set_ylabel("Accuracy", fontsize=9, color=C_SUBTEXT, labelpad=8)
+        ax_traj.set_title("Adaptation Trajectory", fontsize=11, color=C_TEXT, fontweight="bold", pad=12, loc="left")
+        ax_traj.grid(color=C_GRID, linewidth=0.8, zorder=0)
+        ax_traj.set_xticks(np.arange(len(epoch_accs[0])))
+        ax_traj.xaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"Ep {int(v)}"))
+        ax_traj.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:.3f}"))
+        ax_traj.legend(fontsize=8, frameon=False, labelcolor=C_TEXT, loc="best")
+
     ax_leg.axis("off")
-
     legend_elements = [
-        Line2D([0], [0], marker="o", color="none", markerfacecolor=C_PRE, markersize=9, markeredgecolor="#0F1117", label=f"Before adaptation  (trained on {SOURCE_DOMAIN})"),
-        Line2D([0], [0], marker="o", color="none", markerfacecolor=C_POST, markersize=9, markeredgecolor="#0F1117", label="After unsupervised inference-time adaptation"),
+        Line2D([0], [0], marker="o", color="none", markerfacecolor=C_PRE, markersize=9, markeredgecolor="white", label=f"Before adaptation (trained on {SOURCE_DOMAIN})"),
+        Line2D([0], [0], marker="o", color="none", markerfacecolor=C_POST, markersize=9, markeredgecolor="white", label="After unsupervised inference-time adaptation"),
     ]
-    cond_patches = [
-        mpatches.Patch(
-            facecolor=CONDITION_COLORS.get(c, DEFAULT_COLOR),
-            alpha=0.5,
-            label=f"Target: {c}",
-        )
-        for c in dict.fromkeys(conditions)
-    ]
-
+    cond_patches = [mpatches.Patch(facecolor=CONDITION_COLORS.get(c, DEFAULT_COLOR), alpha=0.6, label=f"Target: {c}") for c in dict.fromkeys(conditions)]
     ax_leg.legend(
         handles=legend_elements + cond_patches,
         loc="center",
         ncol=len(legend_elements) + len(cond_patches),
-        fontsize=8.5,
-        frameon=False,
-        labelcolor=C_TEXT,
+        fontsize=8.5, frameon=False, labelcolor=C_TEXT,
     )
 
     note = (
-        "Note: all conditions share scene-level class 0 (car) as the dominant label.\n"
+        "Note: all conditions share scene-level class 0 (car) as the dominant label. "
         "Accuracy reflects domain robustness, not class diversity."
     )
-    fig.text(0.5, -0.01, note,
-             ha="center", va="top", fontsize=7.5,
-             color=C_SUBTEXT, style="italic")
+    fig.text(0.5, -0.01, note, ha="center", va="top", fontsize=7.5, color=C_SUBTEXT, style="italic")
 
     fig.suptitle("HDC Model — Unsupervised Domain Adaptation  |  aiMotive LiDAR", fontsize=14, fontweight="bold", color=C_TEXT, y=1.02,)
 
     plt.tight_layout()
     out = f"domain_adaptation_results{file_suffix}.png"
-    plt.savefig(out, dpi=300, bbox_inches="tight",
-                facecolor=fig.get_facecolor())
+    plt.savefig(out, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close()
     print(f"Domain adaptation plot saved to {out}")
 
