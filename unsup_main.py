@@ -37,9 +37,12 @@ def convert_dataset():
 
     print("Conversion Complete: Output Saved to ")
 
-def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS, data_dir=None):
+def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS, data_dir=None, return_trainer=False):
     trainer = Trainer(ARCH, DATA, data_dir if data_dir else DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
     trainer.train(epochs=epochs)
+
+    if return_trainer:
+        return trainer
 
 def train_dglss(ARCH, DATA, dist_type="standard", epochs=FEATURE_EXTRACTOR_EPOCHS):
     trainer = DGLSSTrainer(ARCH, DATA, DATA_DIR, LOG_DIR, dist_type=dist_type) # saves in "/logs/SENet_..."

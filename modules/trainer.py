@@ -1335,3 +1335,46 @@ class Trainer():
                 self.info["valid_classes/" + class_func(i)] = jacc
 
         return acc.avg, iou.avg, losses.avg, rand_imgs
+    
+    def run_target_entropy_minimization(self, target_loader, epochs=1, lr=1e-5):
+        """
+        Runs Entropy Minimization on unlabelled target domain data directly 
+        at the feature extractor level.
+        """
+        optimizer = optim.AdamW(self.model.parameters(), lr=lr, weight_decay=self.ARCH["train"]["w_decay"])
+        scaler = torch.amp.GradScaler('cuda')
+
+        self.model.train()
+
+        for epoch in range(epochs):
+            print(f"--- CNN Target MinEnt Epoch {epoch+1}/{epochs} ---")
+            total_entropy = 0.0
+
+            for _, (in_vol, _, _, _, _, _, _, _, _, _, _, _, _, _, _) in tqdm(enumerate(target_loader), total=len(target_loader)):
+                
+                if not self.multi_gpu and self.gpu:
+                    in_vol = in_vol.cuda()
+                
+                optimizer.zero_grad()
+
+                with torch.amp.autocast('cuda'):
+                    model_output = self.model(in_vol)
+
+                    if self.ARCH["train"]["aux_loss"]:
+                        output, aux_list, _ = model_output
+                    else:
+                        output, _ = model_output
+
+                    probs = output.clamp(min=1e-8)
+
+                    entropy_map = -(probs * torch.log(probs)).sum(dim=1)
+    
+                    loss_ent = entropy_map.mean()
+
+                scaler.scale(loss_ent).backward()
+                scaler.step(optimizer)
+                scaler.update()
+
+                total_entropy += loss_ent.item()
+
+            print(f"  Epoch {epoch+1} Mean target entropy: {total_entropy / len(target_loader):.4f}")

@@ -106,29 +106,41 @@ def get_condition_loaders(split: str, conditions: List[str], batch_size: int = B
         print(f"  [get_condition_loaders] '{cond}' — {len(ds)} frames")
     return loaders
 
-def run_ent_minimization(model: DensityModel, target_loader, epochs: int = 3, lr: float = 1e-5):
-    """
-    Entropy minimization on unlabelled target-domain frames.
-    Only updates model.net — HDC classify weights are untouched.
-    Call trainer.reaccumulate_prototypes() on the source loader afterward.
-    """
-    device = next(model.parameters()).device
-    optimizer = torch.optim.Adam(model.net.parameters(), lr=lr)
+def run_entropy_minimization(backbone, head, target_loader, device, epochs: int = 3, lr: float = 1e-5):
+    print(f"--- CNN Target MinEnt: {epochs} epoch(s) on target data ---")
+    optimizer = torch.optim.Adam(list(backbone.parameters()) + list(head.parameters()), lr=lr)
+    scaler = torch.amp.GradScaler('cuda')
 
-    print(f"--- MinEnt: {epochs} epoch(s) on target data ---")
+    backbone.train()
+    head.train()
+
     for epoch in range(epochs):
         total_entropy = 0.0
-        for proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in \
-                tqdm(target_loader, desc=f"MinEnt epoch {epoch + 1}"):
+        for proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _ in tqdm(target_loader, desc=f"MinEnt epoch {epoch + 1}"):
             if isinstance(proj_in, dict):
                 proj_in = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
             else:
                 proj_in = proj_in.to(device)
-            ent = model.entropy_minimization_step(proj_in, optimizer)
-            total_entropy += ent
-        print(f"  Epoch {epoch + 1}  mean entropy: {total_entropy / len(target_loader):.4f}")
 
-    model.net.eval()
+            optimizer.zero_grad()
+            with torch.amp.autocast('cuda'):
+                feat = backbone(proj_in)
+                logits = head(feat)
+
+                probs = torch.softmax(logits, dim=1)
+
+                entropy = -(probs * torch.log(probs + 1e-8)).sum(dim=1).mean()
+
+            scaler.scale(entropy).backward()
+            scaler.step(optimizer)
+            scaler.update()
+
+            total_entropy += entropy.item()
+            
+        print(f"  Epoch {epoch + 1}  mean target entropy: {total_entropy / len(target_loader):.4f}")
+
+    backbone.eval()
+    head.eval()
 
 def test_model(model: DensityModel, loader, device: torch.device):
     """
@@ -224,7 +236,10 @@ def train_feature_extractor(model_arch, train_loader, device, epochs=10):
             print(f"  Saved best checkpoint (loss {best_loss:.4f})")
 
     backbone.eval()
+    head.eval()
     print("Feature extractor training complete.\n")
+
+    return backbone, head
 
 def pretrain_pipeline(device: torch.device, ARCH: dict, use_ment: bool = True):
     print(f"--- Pretraining on '{NORMAL_CONDITION}' frames (use_ment={use_ment}) ---")
@@ -240,18 +255,7 @@ def pretrain_pipeline(device: torch.device, ARCH: dict, use_ment: bool = True):
     if NORMAL_CONDITION not in daytime_loaders:
         raise RuntimeError("No daytime training frames found.")
 
-    train_feature_extractor(ARCH, daytime_loaders[NORMAL_CONDITION], device, epochs=FEATURE_EXTRACTOR_EPOCHS)
-
-    model = build_model(NUM_CLASSES, device, ARCH, SUBCLUSTER_TYPE)
-    trainer = AiMotiveDensityTrainer(model, NUM_CLASSES, device)
-
-    print("Training HDC Density Model (daytime only)...")
-    trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
-    for epoch in range(1, MAX_HDC_EPOCHS + 1):
-        trainer.retrain(daytime_loaders[NORMAL_CONDITION], model, epoch, trainer.logger)
-
-    torch.save(model.state_dict(), HDC_SAVE_PATH)
-    print(f"HDC checkpoint saved to {HDC_SAVE_PATH}")
+    backbone, head = train_feature_extractor(ARCH, daytime_loaders[NORMAL_CONDITION], device, epochs=FEATURE_EXTRACTOR_EPOCHS)
 
     if use_ment:
         adverse_loaders = get_condition_loaders(
@@ -275,14 +279,23 @@ def pretrain_pipeline(device: torch.device, ARCH: dict, use_ment: bool = True):
                 drop_last=True,
             )
 
-            run_ent_minimization(model, target_loader, epochs=3, lr=1e-5)
-            trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
-
-            print("Re-running retrain epochs after MinEnt...")
-            for epoch in range(1, MAX_HDC_EPOCHS + 1):
-                trainer.retrain(daytime_loaders[NORMAL_CONDITION], model, epoch, trainer.logger)
+            run_entropy_minimization(backbone, head, target_loader, device, epochs=3, lr=1e-5)
+    
+            torch.save({"state_dict": backbone.state_dict()}, os.path.join(MODEL_DIR, "aimotive_feature_extractor.pth"))
+            print("  Saved adapted feature extractor weights.")
     else:
-        print("MinEnt disabled — skipping to subcluster initialisation.")
+        print("MinEnt disabled — skipping adaptation step.")
+
+    model = build_model(NUM_CLASSES, device, ARCH, SUBCLUSTER_TYPE)
+    trainer = AiMotiveDensityTrainer(model, NUM_CLASSES, device)
+
+    print("Training HDC Density Model (daytime only)...")
+    trainer.reaccumulate_prototypes(daytime_loaders[NORMAL_CONDITION])
+    for epoch in range(1, MAX_HDC_EPOCHS + 1):
+        trainer.retrain(daytime_loaders[NORMAL_CONDITION], model, epoch, trainer.logger)
+
+    torch.save(model.state_dict(), HDC_SAVE_PATH)
+    print(f"HDC checkpoint saved to {HDC_SAVE_PATH}")
 
     print("Initializing Subclusters...")
     model.init_subclusters(daytime_loaders[NORMAL_CONDITION])
