@@ -114,9 +114,9 @@ def pretrain_pipeline(ARCH, DATA):
     # Provide a weather filter key in case internal parsers check it
     PRE_DATA["weather_filter"] = ["sunny"]
 
-    ARCH["train"]["batch_size"] = 16
+    ARCH["train"]["batch_size"] = 24
     print("Training Feature Extractor (sunny only)...")
-    trainer = train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS)
+    trainer = train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS, return_trainer=True)
 
     adverse_loaders = get_condition_loaders(ARCH, DATA, DATA["split"]["train"], batch_size=ARCH["train"]["batch_size"], shuffle=True, conditions=ADVERSE_CONDITIONS)
     
@@ -136,7 +136,7 @@ def pretrain_pipeline(ARCH, DATA):
         torch.save(state, checkpoint_path)
         print(f"Saved adapted feature extractor weights to {checkpoint_path}")
 
-    ARCH["train"]["batch_size"] = 4
+    ARCH["train"]["batch_size"] = 6
     
     print("Training HDC Density Model (sunny only)...")
     model, hdc_trainer = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS, return_extractor=True)
