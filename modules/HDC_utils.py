@@ -972,6 +972,82 @@ class DensityModel(nn.Module):
 
             return full_predictions
         
+    def inference_update_with_subcluster_pull(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, subcluster_lr=0.005, thresholds=(0.45, 0.80)):
+        """Temp Function for testing. Like inference_update, but also pulls the nearest subcluster toward high-confidence samples."""
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(enc.shape[0], device=self.device, dtype=torch.long)
+
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+
+            chunk_logits = self.classify(enc_norm)
+            predictions = torch.argmax(chunk_logits, dim=1)
+
+            if self.subcluster_type == 'bipolar':
+                proto_binary = torch.sign(self.classify.weight)
+                enc_binary = torch.sign(active_enc)
+                selected_proto = proto_binary[predictions]
+                sims = torch.sum(enc_binary * selected_proto, dim=1) / self.hd_dim
+            else:
+                selected_proto = F.normalize(self.classify.weight[predictions])
+                sims = torch.sum(enc_norm * selected_proto, dim=1)
+
+            distances = (1.0 - sims) / 2.0
+            update_mask = distances > beta
+
+            unique_classes = torch.unique(predictions[update_mask])
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (predictions == c_id) & update_mask
+                sample_encs = enc_norm[class_mask]
+
+                if self.subcluster_type == 'bipolar':
+                    target_encs = torch.sign(active_enc[class_mask])
+                    sub_sims, sub_indices = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                else:
+                    sub_sims, sub_indices = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+                sub_indices = sub_indices[valid_mask]
+
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                eff_lr = learning_rate * sub_sims.mean().item()
+                current_w = self.classify.weight[c_id]
+                self.proto_momentum[c_id] = (0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull)
+                updated_w = (1.0 - eff_lr) * current_w + eff_lr * self.proto_momentum[c_id]
+                self.classify.weight[c_id] = F.normalize(updated_w.unsqueeze(0), dim=1).squeeze(0)
+
+                unique_subs, inv_idx = torch.unique(sub_indices, return_inverse=True)
+                for i, abs_idx in enumerate(unique_subs.tolist()):
+                    member_mask = inv_idx == i
+                    member_encs = sample_encs[member_mask]
+                    member_sims = sub_sims[member_mask]
+                    w = member_sims / member_sims.sum()
+                    pull_vec = (member_encs * w.unsqueeze(1)).sum(dim=0)
+                    current_sub = self.subclusters.data[abs_idx].float()
+                    updated_sub = (1.0 - subcluster_lr) * current_sub + subcluster_lr * pull_vec
+                    if self.subcluster_type == 'bipolar':
+                        updated_sub = torch.sign(updated_sub)
+                        updated_sub[updated_sub == 0] = -1.0
+                    self.subclusters.data[abs_idx] = F.normalize(
+                        updated_sub.unsqueeze(0), dim=1).squeeze(0)
+
+            full_predictions = torch.zeros(enc.shape[0], device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = predictions
+            return full_predictions
+        
     def entropy_minimization_step(self, x, optimizer, temperature=1.0):
         """
         One gradient step of entropy minimization on unlabelled target batch x for self.net

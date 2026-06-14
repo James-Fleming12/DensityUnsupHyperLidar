@@ -31,23 +31,43 @@ HD_DIM = 10000
 HDC_SAVE_PATH = "logs/hdc.pth"
 HDC_SUB_PATH = "logs/hdc_sub.pth"
 
-ALL_CONDITIONS = ["sunny", "rain", "fog", "night"]
+ALL_CONDITIONS = ["sunny", "rain", "night"]
 ADVERSE_CONDITIONS = [c for c in ALL_CONDITIONS if c != "sunny"]
 
 CONDITION_COLORS = {
     "sunny": "#F5C518",
     "rain":  "#4C9BE8",
-    "fog":   "#A0A0A0",
     "night": "#7B4EA0",
 }
 DEFAULT_COLOR = "#AAAAAA"
 
+ABLATION_CONFIGS = [
+    {
+        "name": "Baseline",
+        "online_subclusters": False,
+        "thresholds": [0.45, 0.80],
+    },
+    {
+        "name": "Online subclusters",
+        "online_subclusters": True,
+        "thresholds": [0.45, 0.80],
+    },
+    {
+        "name": "High-conf (0.65)",
+        "online_subclusters": False,
+        "thresholds": [0.65, 0.90],
+    },
+    {
+        "name": "High-conf (0.75)",
+        "online_subclusters": False,
+        "thresholds": [0.75, 0.95],
+    },
+]
+
 def get_loader(ARCH, DATA, sequences, shuffle=True, weather_filter=None):
     """
     Return a Parser initialised in Waymo mode for the given sequences.
-
     weather_filter : list of condition strings to include, or None for all.
-                     e.g. ["sunny"], ["rain", "fog"], None
     """
     return Parser(
         mode="waymo",
@@ -111,7 +131,6 @@ def pretrain_pipeline(ARCH, DATA):
     print(f"--- Starting Pretraining on ALL sunny scenarios ---")
 
     PRE_DATA = copy.deepcopy(DATA)
-    # Provide a weather filter key in case internal parsers check it
     PRE_DATA["weather_filter"] = ["sunny"]
 
     ARCH["train"]["batch_size"] = 24
@@ -122,12 +141,7 @@ def pretrain_pipeline(ARCH, DATA):
     
     if adverse_loaders:
         target_dataset = torch.utils.data.ConcatDataset([loader.dataset for loader in adverse_loaders.values()])
-        target_loader = torch.utils.data.DataLoader(
-            target_dataset,
-            batch_size=ARCH["train"]["batch_size"],
-            shuffle=True,
-            num_workers=ARCH["train"]["workers"],
-            drop_last=True)
+        target_loader = torch.utils.data.DataLoader(target_dataset, batch_size=ARCH["train"]["batch_size"], shuffle=True, num_workers=ARCH["train"]["workers"], drop_last=True)
 
         trainer.run_target_entropy_minimization(target_loader, epochs=3, lr=1e-5)
 
@@ -141,11 +155,7 @@ def pretrain_pipeline(ARCH, DATA):
     print("Training HDC Density Model (sunny only)...")
     model, hdc_trainer = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS, return_extractor=True)
 
-    sunny_loaders = get_condition_loaders(
-        ARCH, PRE_DATA, PRE_DATA["split"]["train"],
-        batch_size=ARCH["train"]["batch_size"],
-        shuffle=True,
-        conditions=["sunny"])
+    sunny_loaders = get_condition_loaders(ARCH, PRE_DATA, PRE_DATA["split"]["train"], batch_size=ARCH["train"]["batch_size"], shuffle=True, conditions=["sunny"])
 
     if "sunny" not in sunny_loaders:
         raise RuntimeError("No sunny frames found in pretraining sequences.")
@@ -163,10 +173,6 @@ def incremental_update_test(ARCH, DATA):
     train_seqs = DATA["split"]["train"]
     valid_seqs = DATA["split"]["valid"]
 
-    model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-    model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
-    model.to(device)
-
     print("Building per-condition validation loaders...")
     val_loaders = get_condition_loaders(
         ARCH, DATA, valid_seqs,
@@ -176,59 +182,71 @@ def incremental_update_test(ARCH, DATA):
     if not val_loaders:
         raise RuntimeError("No validation frames found for any condition.")
 
-    history = {
-        "steps_labels": [],
-        "conditions": [],
-        "acc_pairs": [],
-        "miou_pairs": [],
-    }
-
-    print(f"--- Incremental Evaluation: Unsupervised Updates on Adverse Conditions ---")
-    
-    # Load all training frames for the adverse conditions
     train_loaders = get_condition_loaders(
         ARCH, DATA, train_seqs,
         batch_size=1, shuffle=True,
         conditions=ADVERSE_CONDITIONS)
 
-    if not train_loaders:
-        print("  No adverse condition frames found in the dataset — skipping.")
-        return
+    sunny_baseline = None
+    if "sunny" in val_loaders:
+        acc_s, miou_s = test_hdc_model(_fresh_model(ARCH, device), val_loaders["sunny"])
+        sunny_baseline = {"acc": acc_s, "miou": miou_s}
+        print(f"Sunny baseline — acc: {acc_s:.4f}  mIoU: {miou_s:.4f}")
 
-    for cond in ADVERSE_CONDITIONS:
-        if cond not in train_loaders:
-            continue
+    ablation_histories = []
 
+    for cfg in ABLATION_CONFIGS:
         print(f"\n{'='*60}")
-        print(f"Unsupervised Update Phase: [{cond.upper()}]")
+        print(f"Ablation: {cfg['name']}")
 
-        step_label = f"Updates on {cond.capitalize()}"
+        history = {
+            "name": cfg["name"],
+            "steps_labels": [],
+            "conditions": [],
+            "acc_pairs": [],
+            "miou_pairs": [],
+        }
 
-        val_loader_for_cond = val_loaders.get(cond)
-        if val_loader_for_cond is None:
-            print(f"    No '{cond}' val frames — using full val set.")
-            val_loader_for_cond = next(iter(val_loaders.values()))
+        model = _fresh_model(ARCH, device)
 
-        acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
-        print(f"    Pre  — acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
+        for cond in ADVERSE_CONDITIONS:
+            if cond not in train_loaders:
+                continue
 
-        model.train()
-        for _, (proj_in, _, _, _, _, _, _, _, _, _, _, _, _, _, _) in \
-                enumerate(tqdm(train_loaders[cond], desc=f"    update [{cond}]", leave=False)):
-            if proj_in.shape[1] > 0:
-                model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0)
+            val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
+            acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
+            print(f"  [{cond}] Pre  — acc {acc_pre:.4f}  mIoU {miou_pre:.4f}")
 
-        acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
-        print(f"    Post — acc: {acc_post:.4f}  mIoU: {miou_post:.4f}  Δ mIoU: {miou_post - miou_pre:+.4f}")
+            model.train()
+            for _, (proj_in, *_) in enumerate(
+                    tqdm(train_loaders[cond], desc=f"    update [{cond}]", leave=False)):
+                if proj_in.shape[1] > 0:
+                    if cfg["online_subclusters"]:
+                        model.inference_update_with_subcluster_pull(proj_in.to(device), learning_rate=0.001, subcluster_lr=0.0005, distance_sensitivity=3.0, thresholds=cfg["thresholds"],
+                        )
+                    else:
+                        model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0, thresholds=cfg["thresholds"],)
 
-        history["steps_labels"].append(step_label)
-        history["conditions"].append(cond)
-        history["acc_pairs"].append((acc_pre,  acc_post))
-        history["miou_pairs"].append((miou_pre, miou_post))
+            acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
+            print(f"  [{cond}] Post — acc {acc_post:.4f}  mIoU {miou_post:.4f}  Δ mIoU {miou_post - miou_pre:+.4f}")
 
-    save_multi_step_dumbbell_ug(history, DATA, file_suffix="_condition_split")
+            history["steps_labels"].append(f"Updates on {cond.capitalize()}")
+            history["conditions"].append(cond)
+            history["acc_pairs"].append((acc_pre, acc_post))
+            history["miou_pairs"].append((miou_pre, miou_post))
 
-def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
+        ablation_histories.append(history)
+
+    save_ablation_dumbbell(ablation_histories, sunny_baseline=sunny_baseline)
+
+def _fresh_model(ARCH, device):
+    """Helper: Load a fresh copy of the pretrained HDC model."""
+    model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+    model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
+    model.to(device)
+    return model
+
+def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix="", sunny_baseline=None):
     labels = history["steps_labels"]
     conditions = history["conditions"]
     acc_pairs = np.array(history["acc_pairs"])
@@ -287,13 +305,91 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix=""):
             frameon=True, framealpha=0.9,
         )
 
-    plt.suptitle("Impact of Incremental Unsupervised Inference Updates", fontsize=16, fontweight='bold', y=1.01)
+    subtitle = ""
+    if sunny_baseline is not None:
+        subtitle = (f"Baseline sunny performance (no adaptation): acc {sunny_baseline['acc']:.4f}  |  mIoU {sunny_baseline['miou']:.4f}")
+    
+    plt.suptitle("Impact of Incremental Unsupervised Inference Updates", fontsize=16, fontweight='bold', y=1.03)
+    if subtitle:
+        fig.text(0.5, 1.005, subtitle, ha='center', fontsize=10, color='#666666')
+
     plt.tight_layout()
 
     out_path = f"incremental_dumbbell_results{file_suffix}.png"
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()
     print(f"Dumbbell plot saved to {out_path}")
+
+def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=""):
+    conditions = ablation_histories[0]["conditions"]
+    n_cond = len(conditions)
+    n_abl = len(ablation_histories)
+
+    band_height = 1.0
+    y_spread = 0.15
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, max(6, n_cond * 1.8 + 3)), sharey=True)
+    fig.subplots_adjust(wspace=0.08)
+
+    LINESTYLES = ['-', '--', ':', '-.']
+    ABLATION_COLORS = ['#555555', '#2266CC', '#CC6622', '#999999']
+    COLOR_PRE = '#4C9BE8'
+    COLOR_POST = '#E8574C'
+
+    def draw_ax(ax, pairs_key, title):
+        for ci, cond in enumerate(conditions):
+            y_center = ci
+            bg = CONDITION_COLORS.get(cond, DEFAULT_COLOR) + '33'
+            ax.axhspan(y_center - 0.45, y_center + 0.45, color=bg, zorder=0, alpha=0.9)
+
+            for ai, hist in enumerate(ablation_histories):
+                if ci >= len(hist[pairs_key]):
+                    continue
+                pre, post = hist[pairs_key][ci]
+                y = y_center + (ai - (n_abl - 1) / 2) * y_spread
+
+                ax.hlines(y, pre, post, color=ABLATION_COLORS[ai], linestyle=LINESTYLES[ai], linewidth=1.6, alpha=0.75, zorder=1)
+                ax.scatter(pre,  y, color=COLOR_PRE,  s=70, zorder=3, edgecolors='white', linewidths=0.6, marker=['o','^','s','D'][ai])
+                ax.scatter(post, y, color=COLOR_POST, s=70, zorder=3, edgecolors='white', linewidths=0.6, marker=['o','^','s','D'][ai])
+
+                delta = post - pre
+                x_mid = (pre + post) / 2
+                ax.text(x_mid, y + 0.055, f'{delta:+.3f}', ha='center', va='bottom', fontsize=7.5, color=ABLATION_COLORS[ai], alpha=0.85)
+
+        ax.set_title(title, fontsize=13, fontweight='bold', pad=10)
+        ax.grid(axis='x', linestyle='--', alpha=0.3)
+        ax.set_xlabel('Metric value', fontsize=10)
+        ax.spines[['top', 'right']].set_visible(False)
+
+    draw_ax(ax1, 'acc_pairs', 'Accuracy gain per condition')
+    draw_ax(ax2, 'miou_pairs', 'mIoU gain per condition')
+
+    y_pos = np.arange(n_cond)
+    ax1.set_yticks(y_pos)
+    ticks = ax1.set_yticklabels(conditions, fontsize=9)
+    for tick, cond in zip(ticks, conditions):
+        tick.set_color(CONDITION_COLORS.get(cond, 'black'))
+    ax2.tick_params(labelleft=False)
+
+    abl_handles = [plt.Line2D([0], [0], color=ABLATION_COLORS[i], linestyle=LINESTYLES[i], linewidth=1.8, marker=['o','^','s','D'][i], markersize=6, markerfacecolor='white', markeredgecolor=ABLATION_COLORS[i], label=hist['name']) for i, hist in enumerate(ablation_histories)]
+    ax1.legend(handles=abl_handles, title='Ablation config', fontsize=8, title_fontsize=8, loc='lower left', bbox_to_anchor=(0, -0.18), ncol=2, frameon=True, framealpha=0.9)
+
+    pre_post = [plt.scatter([], [], color=COLOR_PRE,  s=60, label='Pre-update'), plt.scatter([], [], color=COLOR_POST, s=60, label='Post-update'),]
+    ax2.legend(handles=pre_post, fontsize=8, loc='lower right')
+
+    title_str = 'Impact of incremental unsupervised inference updates — ablation study'
+    if sunny_baseline:
+        sub = (f"Baseline sunny (no adaptation): acc {sunny_baseline['acc']:.4f}  |  mIoU {sunny_baseline['miou']:.4f}")
+        plt.suptitle(title_str, fontsize=14, fontweight='bold', y=1.04)
+        fig.text(0.5, 1.01, sub, ha='center', fontsize=9.5, color='#666666')
+    else:
+        plt.suptitle(title_str, fontsize=14, fontweight='bold', y=1.02)
+
+    plt.tight_layout()
+    out_path = f'ablation_dumbbell{file_suffix}.png'
+    plt.savefig(out_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f'Ablation dumbbell plot saved to {out_path}')
 
 def save_final_plot(history):
     plt.figure(figsize=(10, 6))
