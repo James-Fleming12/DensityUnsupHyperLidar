@@ -397,7 +397,6 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
 
     plt.tight_layout(rect=[0, 0, 1, 0.93])
 
-    plt.tight_layout()
     out_path = f'ablation_dumbbell{file_suffix}.png'
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
     plt.close()
