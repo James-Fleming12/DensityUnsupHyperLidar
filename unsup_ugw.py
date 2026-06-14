@@ -354,7 +354,9 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
 
                 delta = post - pre
                 x_mid = (pre + post) / 2
-                ax.text(x_mid, y + 0.055, f'{delta:+.3f}', ha='center', va='bottom', fontsize=7.5, color=ABLATION_COLORS[ai], alpha=0.85)
+
+                delta_color = '#2a9d2a' if delta >= 0 else '#cc3333'
+                ax.text(x_mid, y + 0.055, f'{delta:+.3f}', ha='center', va='bottom', fontsize=7.5, color=delta_color, fontweight='bold')
 
         ax.set_title(title, fontsize=13, fontweight='bold', pad=10)
         ax.grid(axis='x', linestyle='--', alpha=0.3)
@@ -380,10 +382,12 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
     title_str = 'Impact of incremental unsupervised inference updates — ablation study'
     if sunny_baseline:
         sub = (f"Baseline sunny (no adaptation): acc {sunny_baseline['acc']:.4f}  |  mIoU {sunny_baseline['miou']:.4f}")
-        plt.suptitle(title_str, fontsize=14, fontweight='bold', y=1.04)
-        fig.text(0.5, 1.01, sub, ha='center', fontsize=9.5, color='#666666')
+        plt.suptitle(title_str, fontsize=14, fontweight='bold', y=0.98)
+        fig.text(0.5, 0.94, sub, ha='center', fontsize=9.5, color='#666666')
     else:
-        plt.suptitle(title_str, fontsize=14, fontweight='bold', y=1.02)
+        plt.suptitle(title_str, fontsize=14, fontweight='bold', y=0.98)
+
+    plt.tight_layout(rect=[0, 0, 1, 0.93])
 
     plt.tight_layout()
     out_path = f'ablation_dumbbell{file_suffix}.png'
