@@ -23,8 +23,8 @@ DATA_DIR = "/mnt/bravo/jmfleming/waymo_skitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 13
 
-MAX_HDC_EPOCHS = 8
-FEATURE_EXTRACTOR_EPOCHS = 50
+MAX_HDC_EPOCHS = 10
+FEATURE_EXTRACTOR_EPOCHS = 80
 
 HD_DIM = 10000
 
@@ -116,7 +116,7 @@ def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, co
     for cond in conditions:
         ds = WaymoDataset(**common_kwargs, weather_filter=[cond])
         if len(ds) == 0:
-            print(f"  [get_condition_loaders] '{cond}' — 0 frames in these sequences, skipping.")
+            print(f"  [get_condition_loaders] '{cond}' - 0 frames in these sequences, skipping.")
             continue
         loaders[cond] = torchdata.DataLoader(
             ds,
@@ -125,7 +125,7 @@ def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, co
             num_workers=ARCH["train"]["workers"],
             drop_last=False,
         )
-        print(f"  [get_condition_loaders] '{cond}' — {len(ds)} frames")
+        print(f"  [get_condition_loaders] '{cond}' - {len(ds)} frames")
 
     return loaders
 
@@ -161,7 +161,7 @@ def pretrain_pipeline(ARCH, DATA):
     ARCH["train"]["batch_size"] = 6
 
     print("Training HDC Density Model (sunny only)...")
-    model, hdc_trainer = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS, return_extractor=True)
+    model, _ = train_hdc(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=MAX_HDC_EPOCHS, return_extractor=True)
 
     sunny_loaders = get_condition_loaders(ARCH, PRE_DATA, PRE_DATA["split"]["train"], batch_size=ARCH["train"]["batch_size"], shuffle=True, conditions=["sunny"])
 
@@ -195,64 +195,65 @@ def incremental_update_test(ARCH, DATA):
         batch_size=1, shuffle=True,
         conditions=ADVERSE_CONDITIONS)
 
-    sunny_baseline = None
-    if "sunny" in val_loaders:
-        acc_s, miou_s = test_hdc_model(_fresh_model(ARCH, device), val_loaders["sunny"])
-        sunny_baseline = {"acc": acc_s, "miou": miou_s}
-        print(f"Sunny baseline — acc: {acc_s:.4f}  mIoU: {miou_s:.4f}")
+    if not train_loaders:
+        print("No adverse condition frames found - skipping.")
+        return
 
-    ablation_histories = []
+    ablation_configs = [
+        {"name": "Baseline", "use_subclusters": False, "conf_thresh": None},
+        {"name": "Online subclusters", "use_subclusters": True, "conf_thresh": None},
+        {"name": "High-conf (0.65)", "use_subclusters": True, "conf_thresh": 0.65},
+        {"name": "High-conf (0.75)", "use_subclusters": True, "conf_thresh": 0.75},
+    ]
 
-    for cfg in ABLATION_CONFIGS:
+    history = {
+        "steps_labels": [],
+        "conditions": [],
+        "acc_pairs": [],
+        "miou_pairs": [],
+        "config_names": [],
+    }
+
+    for cond in ADVERSE_CONDITIONS:
+        if cond not in train_loaders:
+            continue
+
         print(f"\n{'='*60}")
-        print(f"Ablation: {cfg['name']}")
+        print(f"Condition: [{cond.upper()}]")
 
-        history = {
-            "name": cfg["name"],
-            "steps_labels": [],
-            "conditions": [],
-            "acc_pairs": [],
-            "miou_pairs": [],
-        }
+        val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
 
-        model = _fresh_model(ARCH, device)
+        for cfg in ablation_configs:
+            model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+            model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
+            model.to(device)
 
-        for cond in ADVERSE_CONDITIONS:
-            if cond not in train_loaders:
-                continue
+            print(f"  Config: {cfg['name']}")
 
-            val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
             acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
-            print(f"  [{cond}] Pre  — acc {acc_pre:.4f}  mIoU {miou_pre:.4f}")
+            print(f"    Pre  - acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
             model.train()
-            for _, (proj_in, *_) in enumerate(
-                    tqdm(train_loaders[cond], desc=f"    update [{cond}]", leave=False)):
+            for _, (proj_in, *_) in enumerate(tqdm(train_loaders[cond], desc=f"    update [{cond}|{cfg['name']}]", leave=False)):
                 if proj_in.shape[1] > 0:
-                    if cfg["online_subclusters"]:
-                        model.inference_update_with_subcluster_pull(proj_in.to(device), learning_rate=0.001, subcluster_lr=0.0005, distance_sensitivity=3.0, thresholds=cfg["thresholds"],
-                        )
-                    else:
-                        model.inference_update(proj_in.to(device), learning_rate=0.001, distance_sensitivity=3.0, thresholds=cfg["thresholds"],)
+                    model.inference_update(
+                        proj_in.to(device),
+                        learning_rate=0.001,
+                        distance_sensitivity=3.0,
+                        use_subclusters=cfg["use_subclusters"],
+                        conf_thresh=cfg["conf_thresh"],
+                    )
 
             acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
-            print(f"  [{cond}] Post — acc {acc_post:.4f}  mIoU {miou_post:.4f}  Δ mIoU {miou_post - miou_pre:+.4f}")
+            print(f"    Post - acc: {acc_post:.4f}  mIoU: {miou_post:.4f}  Δ mIoU: {miou_post - miou_pre:+.4f}")
 
-            history["steps_labels"].append(f"Updates on {cond.capitalize()}")
+            history["steps_labels"].append(f"{cond.capitalize()}")
             history["conditions"].append(cond)
             history["acc_pairs"].append((acc_pre, acc_post))
             history["miou_pairs"].append((miou_pre, miou_post))
+            history["config_names"].append(cfg["name"])
 
-        ablation_histories.append(history)
-
-    save_ablation_dumbbell(ablation_histories, sunny_baseline=sunny_baseline)
-
-def _fresh_model(ARCH, device):
-    """Helper: Load a fresh copy of the pretrained HDC model."""
-    model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-    model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
-    model.to(device)
-    return model
+    save_multi_step_dumbbell_ug(history, DATA, file_suffix="_condition_split")
 
 def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix="", sunny_baseline=None):
     labels = history["steps_labels"]
@@ -387,15 +388,15 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
     pre_post = [plt.scatter([], [], color=COLOR_PRE,  s=60, label='Pre-update'), plt.scatter([], [], color=COLOR_POST, s=60, label='Post-update'),]
     ax2.legend(handles=pre_post, fontsize=8, loc='lower right')
 
-    title_str = 'Impact of incremental unsupervised inference updates — ablation study'
+    title_str = 'Impact of incremental unsupervised inference updates | Ablation Study'
     if sunny_baseline:
         sub = (f"Baseline sunny (no adaptation): acc {sunny_baseline['acc']:.4f}  |  mIoU {sunny_baseline['miou']:.4f}")
         plt.suptitle(title_str, fontsize=14, fontweight='bold', y=0.98)
-        fig.text(0.5, 0.94, sub, ha='center', fontsize=9.5, color='#666666')
+        fig.text(0.5, 0.91, sub, ha='center', fontsize=9.5, color='#666666')
     else:
         plt.suptitle(title_str, fontsize=14, fontweight='bold', y=0.98)
 
-    plt.tight_layout(rect=[0, 0, 1, 0.93])
+    plt.tight_layout(rect=[0, 0, 1, 0.90])
 
     out_path = f'ablation_dumbbell{file_suffix}.png'
     plt.savefig(out_path, dpi=300, bbox_inches='tight')
