@@ -1063,8 +1063,7 @@ class DensityModel(nn.Module):
                 sample_pull_vector = (sample_encs * weights_sample.unsqueeze(1)).sum(dim=0).float()
                 
                 # Subcluster regularization
-                abs_indices = c_id * self.num_subclusters + sub_indices
-                matched_subclusters = self.subclusters.data[abs_indices].float()
+                matched_subclusters = self.subclusters.data[sub_indices].float()
                 subcluster_pull_vector = (matched_subclusters * weights_sample.unsqueeze(1)).sum(dim=0).float()
                 
                 # 80/20 mix
@@ -1142,8 +1141,7 @@ class DensityModel(nn.Module):
                     weights_sample = s_sims / s_sims.sum()
                     pull_vec = (s_samples * weights_sample.unsqueeze(1)).sum(dim=0).float()
                     
-                    abs_idx = c_id * self.num_subclusters + sub_idx
-                    current_sub = self.subclusters.data[abs_idx].float()
+                    current_sub = self.subclusters.data[sub_idx].float()
                     
                     subcluster_lr = learning_rate * s_sims.mean().item()
                     updated_sub = (1.0 - subcluster_lr) * current_sub + subcluster_lr * pull_vec
@@ -1153,11 +1151,10 @@ class DensityModel(nn.Module):
                     else:
                         updated_sub = torch.sign(updated_sub)
                         
-                    self.subclusters.data[abs_idx] = updated_sub.to(self.subclusters.dtype)
+                    self.subclusters.data[sub_idx] = updated_sub.to(self.subclusters.dtype)
 
                 # Distill using Activity Weighting
-                abs_topk_subs = c_id * self.num_subclusters + unique_subs
-                active_subclusters = self.subclusters.data[abs_topk_subs].float()
+                active_subclusters = self.subclusters.data[unique_subs].float()
                 
                 weights = (sub_counts.float() / total_hits).unsqueeze(1)
                 distilled_prototype = (active_subclusters * weights).sum(dim=0)
@@ -1231,8 +1228,7 @@ class DensityModel(nn.Module):
                     weights_sample = s_sims / s_sims.sum()
                     pull_vec = (s_samples * weights_sample.unsqueeze(1)).sum(dim=0).float()
                     
-                    abs_idx = c_id * self.num_subclusters + sub_idx
-                    current_sub = self.subclusters.data[abs_idx].float()
+                    current_sub = self.subclusters.data[sub_idx].float()
                     
                     subcluster_lr = learning_rate * s_sims.mean().item()
                     updated_sub = (1.0 - subcluster_lr) * current_sub + subcluster_lr * pull_vec
@@ -1242,7 +1238,7 @@ class DensityModel(nn.Module):
                     else:
                         updated_sub = torch.sign(updated_sub)
                         
-                    self.subclusters.data[abs_idx] = updated_sub.to(self.subclusters.dtype)
+                    self.subclusters.data[sub_idx] = updated_sub.to(self.subclusters.dtype)
 
                 # Confidence-Weighted Distillation
                 start_idx = c_id * self.num_subclusters
