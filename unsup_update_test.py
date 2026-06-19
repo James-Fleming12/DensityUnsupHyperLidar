@@ -47,6 +47,7 @@ def main():
     if not val_loaders:
         raise RuntimeError("No validation frames found for any condition.")
 
+    ARCH["train"]["workers"] = 0 # Set to 0 to prevent worker crashes on bad dataset samples
     print("Building per-condition training loaders (for adaptation)...")
     train_loaders = get_condition_loaders(
         ARCH, DATA, train_seqs,
@@ -106,7 +107,20 @@ def main():
             
             update_fn = getattr(model, cfg["method"])
             
-            for _, (proj_in, *_) in enumerate(tqdm(train_loaders[cond], desc=f"    update [{cond}|{cfg['name']}]", leave=False)):
+            data_iter = iter(train_loaders[cond])
+            pbar = tqdm(total=len(train_loaders[cond]), desc=f"    update [{cond}|{cfg['name']}]", leave=False)
+            
+            while True:
+                try:
+                    batch = next(data_iter)
+                except StopIteration:
+                    break
+                except Exception as e:
+                    print(f"\n    [Warning] Skipping bad sample in dataset: {type(e).__name__} - {e}")
+                    pbar.update(1)
+                    continue
+
+                proj_in = batch[0]
                 if proj_in.shape[1] > 0:
                     update_fn(
                         proj_in.to(device),
@@ -114,6 +128,8 @@ def main():
                         distance_sensitivity=3.0,
                         thresholds=[0.45, 0.80] # Matching Baseline from unsup_ugw.py
                     )
+                pbar.update(1)
+            pbar.close()
 
             acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
             print(f"    Post - acc: {acc_post:.4f}  mIoU: {miou_post:.4f}  Δ mIoU: {miou_post - miou_pre:+.4f}")
