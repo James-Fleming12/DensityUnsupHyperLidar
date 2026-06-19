@@ -199,13 +199,6 @@ def incremental_update_test(ARCH, DATA):
         print("No adverse condition frames found - skipping.")
         return
 
-    ablation_configs = [
-        {"name": "Baseline", "use_subclusters": False, "conf_thresh": None},
-        {"name": "Online subclusters", "use_subclusters": True, "conf_thresh": None},
-        {"name": "High-conf (0.65)", "use_subclusters": True, "conf_thresh": 0.65},
-        {"name": "High-conf (0.75)", "use_subclusters": True, "conf_thresh": 0.75},
-    ]
-
     history = {
         "steps_labels": [],
         "conditions": [],
@@ -223,7 +216,7 @@ def incremental_update_test(ARCH, DATA):
 
         val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
 
-        for cfg in ablation_configs:
+        for cfg in ABLATION_CONFIGS:
             model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
             model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
             model.to(device)
@@ -234,14 +227,16 @@ def incremental_update_test(ARCH, DATA):
             print(f"    Pre  - acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
             model.train()
+            
+            update_fn = model.inference_update_with_subcluster_pull if cfg["online_subclusters"] else model.inference_update
+            
             for _, (proj_in, *_) in enumerate(tqdm(train_loaders[cond], desc=f"    update [{cond}|{cfg['name']}]", leave=False)):
                 if proj_in.shape[1] > 0:
-                    model.inference_update(
+                    update_fn(
                         proj_in.to(device),
                         learning_rate=0.001,
                         distance_sensitivity=3.0,
-                        use_subclusters=cfg["use_subclusters"],
-                        conf_thresh=cfg["conf_thresh"],
+                        thresholds=cfg["thresholds"]
                     )
 
             acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
