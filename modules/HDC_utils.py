@@ -1037,7 +1037,8 @@ class DensityModel(nn.Module):
 
             unique_classes = torch.unique(predictions)
             
-            sims = self.get_similarity(enc_norm)
+            normalized_prototypes = F.normalize(self.classify.weight)
+            sims = F.linear(enc_norm, normalized_prototypes)
             max_sims, _ = sims.max(dim=1)
             update_mask = max_sims > thresholds[0]
             
@@ -1116,7 +1117,8 @@ class DensityModel(nn.Module):
 
             unique_classes = torch.unique(predictions)
             
-            sims = self.get_similarity(enc_norm)
+            normalized_prototypes = F.normalize(self.classify.weight)
+            sims = F.linear(enc_norm, normalized_prototypes)
             max_sims, _ = sims.max(dim=1)
             
             batch_mu = max_sims.mean()
@@ -1187,7 +1189,8 @@ class DensityModel(nn.Module):
 
             unique_classes = torch.unique(predictions)
             
-            sims = self.get_similarity(enc_norm)
+            normalized_prototypes = F.normalize(self.classify.weight)
+            sims = F.linear(enc_norm, normalized_prototypes)
             max_sims, _ = sims.max(dim=1)
             update_mask = max_sims > thresholds[0]
             
