@@ -60,9 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Contrastive Neg Push", "method": "inference_update_cnp"},
-        {"name": "Dynamic Adaptive Thresh", "method": "inference_update_dat"},
-        {"name": "Subcluster Distillation", "method": "inference_update_cdsd"},
+        {"name": "Class-Balanced Thresh", "method": "inference_update_cbt"},
+        {"name": "Top-K Distillation", "method": "inference_update_tksd"},
+        {"name": "Self-Paced Pull", "method": "inference_update_sppp"},
+        {"name": "Subcluster-Gated Pull", "method": "inference_update_sgp"},
     ]
 
     ablation_histories = []
