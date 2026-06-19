@@ -60,10 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Class-Balanced Thresh", "method": "inference_update_cbt"},
-        {"name": "Top-K Distillation", "method": "inference_update_tksd"},
-        {"name": "Self-Paced Pull", "method": "inference_update_sppp"},
-        {"name": "Subcluster-Gated Pull", "method": "inference_update_sgp"},
+        {"name": "Distance-Weighted Pull", "method": "inference_update_dwp"},
+        {"name": "Momentum-Free Direct Pull", "method": "inference_update_mfdp"},
+        {"name": "High-Confidence Hard Pull", "method": "inference_update_hchp"},
+        {"name": "Multi-Scale Pull", "method": "inference_update_msp"},
     ]
 
     ablation_histories = []

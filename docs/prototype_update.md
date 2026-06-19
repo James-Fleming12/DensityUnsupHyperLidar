@@ -6,19 +6,15 @@ This document tracks the various unsupervised test-time adaptation methods appli
 These 4 methods were derived from standard DNN Test-Time Adaptation literature but failed to transfer effectively to the geometric properties of HDC prototypes.
 
 1. **Orthogonalized Exponential Moving Average (EMA)**
-   - *Concept:* Standard EMA applied to prototypes, projecting away from negative classes to prevent boundary collapse.
    - *Result:* Stagnation (Near zero gains).
    - *Problem:* The update rate was double-scaled by the EMA decay factor ($1 - \alpha$) and the similarity-based effective learning rate, causing the prototype to shift by microscopically small amounts.
 2. **Entropy-Gated Filtering**
-   - *Concept:* Scale the learning rate inversely by the Softmax entropy of the prediction.
    - *Result:* Degraded performance (mIoU dropped).
    - *Problem:* In a 13-class dataset, Softmax entropy often naturally hovers around 1.0-2.5. Scaling by $1/\text{entropy}$ severely crippled the learning rate, and hard-gating dropped too many valid samples.
 3. **Dynamic Prototype Synergy Bank**
-   - *Concept:* Maintain a temporal bank of previous prototypes and update the current prototype as a synergy (weighted average) of the bank.
    - *Result:* Minimal gains.
    - *Problem:* The history bank acted as a massive low-pass filter, dragging the model to its source domain and delaying adaptation to the target weather geometry.
 4. **Stochastic Source Restoration**
-   - *Concept:* 5% of the time, pull the prototype back to the pristine source domain to prevent catastrophic forgetting.
    - *Result:* Minimal gains.
    - *Problem:* The pull-back learning rate ($0.01$) overpowered the forward adaptation rate ($\approx 0.0007$), permanently tethering the model to the unadapted state.
 
@@ -26,26 +22,35 @@ These 4 methods were derived from standard DNN Test-Time Adaptation literature b
 These 3 methods attempted to leverage the unique subspace geometry of Hyperdimensional Computing but introduced new topological issues.
 
 1. **Contrastive Negative Push (CNP)**
-   - *Concept:* When confident, pull the target class but explicitly *push* the runner-up class away to expand the margin.
    - *Result:* Marginal accuracy gains, but **degraded mIoU (-0.004)**.
    - *Problem:* Pushing the runner-up prototype likely corrupted the representation of valid neighboring subclusters, destroying geometric boundaries for classes that naturally overlap (e.g., Road vs. Sidewalk).
 2. **Dynamic Adaptive Thresholding (DAT)**
-   - *Concept:* Calculate batch-level $\mu$ and $\sigma$ for similarities, setting a dynamic threshold ($\mu + \sigma$) to adapt to weather-induced global similarity drops.
    - *Result:* Barely moved (Near zero gains).
    - *Problem:* The threshold of $\mu + \sigma$ was overly strict. It either rejected too many samples, or the batch variance was so high that only noise/outliers exceeded the threshold.
 3. **Confidence-Decayed Subcluster Distillation (CDSD)**
-   - *Concept:* Update subclusters independently, then re-distill the master prototype as the mean of its subclusters.
    - *Result:* **Huge Accuracy Gain (+0.037 in rain)** but **Huge mIoU Drop (-0.014)**.
-   - *Problem:* Averaging *all* subclusters properly positioned the master prototype for dominant classes (background/roads) boosting accuracy, but completely destroyed the geometry of minority classes (pedestrians/bikes) whose subclusters might have been empty or noisy.
+   - *Problem:* Distillation forces the master prototype to the geometric center of all its subclusters. Because "Road" and "Background" dominate the subclusters, centering the master prototype improved overall accuracy (due to massive background/road pixel counts). However, for minority classes, empty or noisy subclusters dragged the master prototype out of bounds, destroying their intersection-over-union.
 
-## Round 3: New Proposed Methods
-To address the failures of Round 1 & 2, we propose 4 new methods focusing on class-balancing and robust filtering:
+## Round 3: Class-Balancing & Robust Filtering (Failed to Beat Baseline)
+These 4 methods attempted to solve the thresholding and distillation issues but proved the Standard Pull's superiority.
 
 1. **Class-Balanced Thresholding (CBT)**
-   - *Concept:* Global thresholds starve minority classes. We maintain a running EMA of similarity *per class*, updating the prototype only if the sample exceeds its specific class's historical average.
+   - *Result:* Dropped Accuracy (-0.017 Night) and mIoU (-0.004 Night).
+   - *Problem:* Dynamic per-class EMA thresholds likely became too relaxed for difficult classes, letting highly confident noise drag the prototypes.
 2. **Top-K Subcluster Distillation (TKSD)**
-   - *Concept:* Fixes the CDSD mIoU drop. We only distill the master prototype from the Top-2 most frequently activated subclusters, ignoring empty or noisy subclusters.
+   - *Result:* Huge mIoU drop (-0.017 Night, -0.023 Rain).
+   - *Problem:* Proves that any form of direct geometric distillation from subclusters destroys the intricate high-dimensional decision boundaries of minority classes. The original Standard Pull correctly treats the master prototype as an independent moving mass rather than a dependent center of mass.
 3. **Self-Paced Proportion Pull (SPPP)**
-   - *Concept:* Fixes DAT. Instead of statistical thresholds, rank all samples in the chunk and take exactly the Top 5% most confident samples, ensuring a stable, constant adaptation rate regardless of environmental severity.
+   - *Result:* Dropped Accuracy (-0.009 Night).
+   - *Problem:* Forcing a constant 5% update rate meant that in extremely noisy chunks, we forcefully updated using 5% of pure noise, poisoning the prototypes.
 4. **Subcluster-Gated Pull (SGP)**
-   - *Concept:* Dual-agreement filtering. Update the master prototype *only* if the sample has high similarity to the master prototype AND high similarity to its nearest subcluster.
+   - *Result:* Slight mIoU drop.
+   - *Problem:* Dual-agreement filtering was too strict, preventing the master prototype from escaping its source domain geometry in heavy rain.
+
+## Round 4: Back to Basics
+Given the unwavering dominance of the original `inference_update` (Standard Pull), we theorize that its success lies in its K-means-like simplicity: absolute global thresholding, direct master prototype pulling, and momentum buffering. The Round 4 methods are minor variations that maintain this "basic" architecture without over-engineering:
+
+1. **Distance-Weighted Pull (DWP):** Exponentially weights the pull vector by similarity, making highly confident samples pull exponentially harder than borderline samples.
+2. **Momentum-Free Direct Pull (MFDP):** Removes the momentum buffer to prevent drag, pulling the prototype purely via gradient descent to the current chunk's mean.
+3. **High-Confidence Hard Pull (HCHP):** Sets the base threshold aggressively high (0.70) but multiplies the learning rate by 10x, mimicking sparse but decisive pseudo-labeling.
+4. **Multi-Scale Pull (MSP):** Computes a strong pull vector for samples > 0.75 and a weak pull vector for samples > 0.45, combining them for a balanced update.
