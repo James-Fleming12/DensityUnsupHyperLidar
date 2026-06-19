@@ -112,7 +112,7 @@ def main():
                         proj_in.to(device),
                         learning_rate=0.001,
                         distance_sensitivity=3.0,
-                        thresholds=[0.65, 0.90] # Use high-conf setting
+                        thresholds=[0.45, 0.80] # Matching Baseline from unsup_ugw.py
                     )
 
             acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
