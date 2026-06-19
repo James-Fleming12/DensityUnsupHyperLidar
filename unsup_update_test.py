@@ -60,10 +60,9 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Orthogonalized EMA", "method": "inference_update_ema"},
-        {"name": "Entropy-Gated", "method": "inference_update_entropy"},
-        {"name": "Synergy Bank", "method": "inference_update_synergy"},
-        {"name": "Stochastic Restore", "method": "inference_update_stochastic"},
+        {"name": "Contrastive Neg Push", "method": "inference_update_cnp"},
+        {"name": "Dynamic Adaptive Thresh", "method": "inference_update_dat"},
+        {"name": "Subcluster Distillation", "method": "inference_update_cdsd"},
     ]
 
     ablation_histories = []
