@@ -1262,16 +1262,16 @@ class DensityModel(nn.Module):
                 effective_lr = learning_rate * sub_sims.mean().item()
 
                 current_weight = self.prototype_bank[c_id][-1]
-                self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
+                self.proto_momentum[c_id] = (0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector).to(self.proto_momentum.dtype)
                 updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
-                updated_weight = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                updated_weight = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(current_weight.dtype)
 
                 self.prototype_bank[c_id].append(updated_weight)
                 if len(self.prototype_bank[c_id]) > bank_size:
                     self.prototype_bank[c_id].pop(1) # Keep source at index 0
                 
-                bank_tensor = torch.stack(self.prototype_bank[c_id])
-                mean_sample = sample_encs.mean(dim=0)
+                bank_tensor = torch.stack(self.prototype_bank[c_id]).float()
+                mean_sample = sample_encs.mean(dim=0).float()
                 
                 sim_sample = torch.matmul(bank_tensor, mean_sample)
                 sim_bank = torch.matmul(bank_tensor, bank_tensor.T)
@@ -1280,7 +1280,7 @@ class DensityModel(nn.Module):
                 synergy_weights = F.softmax(sim_sample * 5.0 - lambda_penalty * redundancy, dim=0)
                 
                 active_prototype = torch.matmul(synergy_weights, bank_tensor)
-                self.classify.weight[c_id] = F.normalize(active_prototype.unsqueeze(0), dim=1).squeeze(0)
+                self.classify.weight[c_id] = F.normalize(active_prototype.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
 
             return full_predictions
 
