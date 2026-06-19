@@ -54,3 +54,19 @@ Given the unwavering dominance of the original `inference_update` (Standard Pull
 2. **Momentum-Free Direct Pull (MFDP):** Removes the momentum buffer to prevent drag, pulling the prototype purely via gradient descent to the current chunk's mean.
 3. **High-Confidence Hard Pull (HCHP):** Sets the base threshold aggressively high (0.70) but multiplies the learning rate by 10x, mimicking sparse but decisive pseudo-labeling.
 4. **Multi-Scale Pull (MSP):** Computes a strong pull vector for samples > 0.75 and a weak pull vector for samples > 0.45, combining them for a balanced update.
+
+
+## Round 4: Back to Basics (Failed to Beat Baseline)
+These 4 methods attempted to stick closely to the original K-means-like standard pull but tweaked the mechanics (momentum, scale, weighting) to optimize it.
+1. **Distance-Weighted Pull (DWP):** Dropped Acc (-0.015) and mIoU (-0.007). Exponential weighting gave too much power to ultra-confident noise.
+2. **Momentum-Free Direct Pull (MFDP):** Big drop in Night Acc (-0.029) and mIoU (-0.015). Removing momentum caused the prototype to violently oscillate into empty space.
+3. **High-Confidence Hard Pull (HCHP):** Massive drop in Night Acc (-0.044) and mIoU (-0.020). Using a high threshold (0.75) completely starved minority classes of updates, leaving them stuck in the source domain.
+4. **Multi-Scale Pull (MSP):** Negligible effect. The dual-scale learning rates cancelled each other out.
+
+## Round 5: Hybrid Pull & Distillation
+Given that Standard Pull is incredibly stable, and Subcluster Distillation provides massive Accuracy gains (but ruins mIoU), we hypothesize that distillation fails because it treats all subclusters equally. If a minority class has 8 empty subclusters and 2 active ones, a raw average drags the master prototype into dead space (destroying mIoU). We propose 4 new methods that combine the stable Standard Pull with intelligent, weighted Subcluster Distillation:
+
+1. **Subcluster-Regularized Pull (SRP):** Standard Pull on the master prototype, but the pull vector is an 80/20 mix of the raw sample mean and the geometric mean of the *source subclusters* those samples matched to. This prevents the prototype from drifting off the source manifold.
+2. **Activity-Weighted Distillation (AWD):** Updates subclusters independently. Instead of a raw mean, it distills the master prototype using an activity-weighted average of the subclusters (weighted by how many samples hit each subcluster in the current chunk).
+3. **Confidence-Weighted Distillation (CWD):** Updates subclusters independently. It distills the master prototype by weighting all subclusters based on their cosine similarity to the *current* master prototype (using Softmax). This ignores subclusters that have drifted into noise.
+4. **Prototype-Subcluster Ping-Pong (PSP):** Runs Standard Pull on the master prototype. Then, it gently pulls all subclusters for that class towards the *new* master prototype. This keeps the subclusters acting as a flexible, cohesive mesh around the master.

@@ -1011,8 +1011,8 @@ class DensityModel(nn.Module):
                     selected_proto = F.normalize(self.classify.weight[chunk_preds])
                     sims = torch.sum(chunk_enc_norm * selected_proto, dim=1)
 
-    def inference_update_dwp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], temperature=5.0):
-        """Distance-Weighted Pull Update"""
+    def inference_update_srp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
+        """Subcluster-Regularized Pull Update"""
         self.train()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -1055,14 +1055,20 @@ class DensityModel(nn.Module):
                 
                 if self.subcluster_type == 'bipolar':
                     target_encs = torch.sign(active_enc[class_indices])
-                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                    sub_sims, sub_indices = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
                 else:
-                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+                    sub_sims, sub_indices = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
 
-                # Exponential weighting based on similarity
-                exp_sims = torch.exp(sub_sims * temperature)
-                weights_sample = exp_sims / exp_sims.sum()
-                weighted_pull_vector = (sample_encs * weights_sample.unsqueeze(1)).sum(dim=0).float()
+                weights_sample = sub_sims / sub_sims.sum()
+                sample_pull_vector = (sample_encs * weights_sample.unsqueeze(1)).sum(dim=0).float()
+                
+                # Subcluster regularization
+                abs_indices = c_id * self.num_subclusters + sub_indices
+                matched_subclusters = self.subclusters.data[abs_indices].float()
+                subcluster_pull_vector = (matched_subclusters * weights_sample.unsqueeze(1)).sum(dim=0).float()
+                
+                # 80/20 mix
+                weighted_pull_vector = 0.8 * sample_pull_vector + 0.2 * subcluster_pull_vector
                 
                 effective_lr = learning_rate * sub_sims.mean().item()
 
@@ -1073,8 +1079,8 @@ class DensityModel(nn.Module):
 
             return full_predictions
 
-    def inference_update_mfdp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
-        """Momentum-Free Direct Pull Update"""
+    def inference_update_awd(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
+        """Activity-Weighted Distillation Update"""
         self.train()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -1109,33 +1115,63 @@ class DensityModel(nn.Module):
                 if len(class_indices) == 0:
                     continue
 
-                if max_updates_per_class != -1 and len(class_indices) > max_updates_per_class:
-                    fps_indices = self._farthest_point_sample(enc_norm[class_indices].cpu(), max_updates_per_class)
-                    class_indices = class_indices[fps_indices.to(self.device)]
-
                 sample_encs = enc_norm[class_indices]
                 
                 if self.subcluster_type == 'bipolar':
                     target_encs = torch.sign(active_enc[class_indices])
-                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                    sub_sims, max_sub_indices = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
                 else:
-                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+                    sub_sims, max_sub_indices = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
 
-                weights_sample = sub_sims / sub_sims.sum()
-                weighted_pull_vector = (sample_encs * weights_sample.unsqueeze(1)).sum(dim=0).float()
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+                max_sub_indices = max_sub_indices[valid_mask]
+
+                unique_subs, sub_counts = torch.unique(max_sub_indices, return_counts=True)
+                total_hits = sub_counts.sum().float()
                 
-                # Double the learning rate to compensate for lack of momentum
-                effective_lr = learning_rate * 2.0 * sub_sims.mean().item()
+                for sub_idx in unique_subs:
+                    s_mask = max_sub_indices == sub_idx
+                    s_samples = sample_encs[s_mask]
+                    s_sims = sub_sims[s_mask]
+                    
+                    weights_sample = s_sims / s_sims.sum()
+                    pull_vec = (s_samples * weights_sample.unsqueeze(1)).sum(dim=0).float()
+                    
+                    abs_idx = c_id * self.num_subclusters + sub_idx
+                    current_sub = self.subclusters.data[abs_idx].float()
+                    
+                    subcluster_lr = learning_rate * s_sims.mean().item()
+                    updated_sub = (1.0 - subcluster_lr) * current_sub + subcluster_lr * pull_vec
+                    
+                    if self.subcluster_type == 'continuous':
+                        updated_sub = F.normalize(updated_sub.unsqueeze(0), dim=1).squeeze(0)
+                    else:
+                        updated_sub = torch.sign(updated_sub)
+                        
+                    self.subclusters.data[abs_idx] = updated_sub.to(self.subclusters.dtype)
 
+                # Distill using Activity Weighting
+                abs_topk_subs = c_id * self.num_subclusters + unique_subs
+                active_subclusters = self.subclusters.data[abs_topk_subs].float()
+                
+                weights = (sub_counts.float() / total_hits).unsqueeze(1)
+                distilled_prototype = (active_subclusters * weights).sum(dim=0)
+                
+                effective_lr = learning_rate * sub_sims.mean().item()
                 current_weight = self.classify.weight[c_id].float()
-                # Direct pull without momentum drag
-                updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * weighted_pull_vector
+                updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * distilled_prototype
+                
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
 
             return full_predictions
 
-    def inference_update_hchp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.70, 0.90], lr_multiplier=10.0):
-        """High-Confidence Hard Pull Update"""
+    def inference_update_cwd(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], temp=0.1):
+        """Confidence-Weighted Distillation Update"""
         self.train()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -1159,8 +1195,99 @@ class DensityModel(nn.Module):
             normalized_prototypes = F.normalize(self.classify.weight)
             sims = F.linear(enc_norm, normalized_prototypes)
             max_sims, _ = sims.max(dim=1)
+            update_mask = max_sims > thresholds[0]
             
-            # Using heavily increased threshold
+            for class_id in unique_classes:
+                c_id = class_id.item()
+
+                class_mask = (predictions == c_id) & update_mask
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if len(class_indices) == 0:
+                    continue
+
+                sample_encs = enc_norm[class_indices]
+                
+                if self.subcluster_type == 'bipolar':
+                    target_encs = torch.sign(active_enc[class_indices])
+                    sub_sims, max_sub_indices = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                else:
+                    sub_sims, max_sub_indices = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+                max_sub_indices = max_sub_indices[valid_mask]
+
+                unique_subs = torch.unique(max_sub_indices)
+                for sub_idx in unique_subs:
+                    s_mask = max_sub_indices == sub_idx
+                    s_samples = sample_encs[s_mask]
+                    s_sims = sub_sims[s_mask]
+                    
+                    weights_sample = s_sims / s_sims.sum()
+                    pull_vec = (s_samples * weights_sample.unsqueeze(1)).sum(dim=0).float()
+                    
+                    abs_idx = c_id * self.num_subclusters + sub_idx
+                    current_sub = self.subclusters.data[abs_idx].float()
+                    
+                    subcluster_lr = learning_rate * s_sims.mean().item()
+                    updated_sub = (1.0 - subcluster_lr) * current_sub + subcluster_lr * pull_vec
+                    
+                    if self.subcluster_type == 'continuous':
+                        updated_sub = F.normalize(updated_sub.unsqueeze(0), dim=1).squeeze(0)
+                    else:
+                        updated_sub = torch.sign(updated_sub)
+                        
+                    self.subclusters.data[abs_idx] = updated_sub.to(self.subclusters.dtype)
+
+                # Confidence-Weighted Distillation
+                start_idx = c_id * self.num_subclusters
+                end_idx = start_idx + self.num_subclusters
+                class_subclusters = self.subclusters.data[start_idx:end_idx].float()
+                
+                current_weight = self.classify.weight[c_id].float()
+                sub_sims = F.linear(class_subclusters, current_weight.unsqueeze(0)).squeeze()
+                
+                # Softmax over similarities to ignore noisy subclusters
+                distill_weights = F.softmax(sub_sims / temp, dim=0).unsqueeze(1)
+                distilled_prototype = (class_subclusters * distill_weights).sum(dim=0)
+                
+                effective_lr = learning_rate * sub_sims.mean().item()
+                updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * distilled_prototype
+                
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
+
+            return full_predictions
+
+    def inference_update_psp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
+        """Prototype-Subcluster Ping-Pong Update"""
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            num_total_samples = enc.shape[0]
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+                
+            chunk_logits = self.classify(enc_norm)
+            predictions = chunk_logits.argmax(dim=1)
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=predictions.dtype)
+            full_predictions[valid_enc_mask] = predictions
+
+            unique_classes = torch.unique(predictions)
+            
+            normalized_prototypes = F.normalize(self.classify.weight)
+            sims = F.linear(enc_norm, normalized_prototypes)
+            max_sims, _ = sims.max(dim=1)
             update_mask = max_sims > thresholds[0]
             
             for class_id in unique_classes:
@@ -1187,81 +1314,29 @@ class DensityModel(nn.Module):
                 weights_sample = sub_sims / sub_sims.sum()
                 weighted_pull_vector = (sample_encs * weights_sample.unsqueeze(1)).sum(dim=0).float()
                 
-                # Multiplier mimicking self-training true pseudo-labels
-                effective_lr = learning_rate * lr_multiplier * sub_sims.mean().item()
-                # Clamp it to ensure no blowup
-                effective_lr = min(effective_lr, 0.5)
+                effective_lr = learning_rate * sub_sims.mean().item()
 
                 current_weight = self.classify.weight[c_id].float()
                 self.proto_momentum[c_id] = (0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector).to(self.proto_momentum.dtype)
                 updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id].float()
-                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
-
-            return full_predictions
-
-    def inference_update_msp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.75]):
-        """Multi-Scale Pull Update"""
-        self.train()
-        with torch.no_grad():
-            enc, _, _ = self.encode(x)
-            num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
-            if not torch.any(valid_enc_mask):
-                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
-            
-            active_enc = enc[valid_enc_mask]
-            enc_norm = F.normalize(active_enc)
-            if enc_norm.dtype != self.classify.weight.dtype:
-                enc_norm = enc_norm.to(self.classify.weight.dtype)
+                updated_weight = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                self.classify.weight[c_id] = updated_weight.to(self.classify.weight.dtype)
                 
-            chunk_logits = self.classify(enc_norm)
-            predictions = chunk_logits.argmax(dim=1)
-            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=predictions.dtype)
-            full_predictions[valid_enc_mask] = predictions
-
-            unique_classes = torch.unique(predictions)
-            
-            normalized_prototypes = F.normalize(self.classify.weight)
-            sims = F.linear(enc_norm, normalized_prototypes)
-            max_sims, _ = sims.max(dim=1)
-            
-            # Two scales
-            weak_mask = (max_sims > thresholds[0]) & (max_sims <= thresholds[1])
-            strong_mask = max_sims > thresholds[1]
-            
-            for class_id in unique_classes:
-                c_id = class_id.item()
-
-                weak_class_mask = (predictions == c_id) & weak_mask
-                strong_class_mask = (predictions == c_id) & strong_mask
+                # Ping-Pong: Gently pull all subclusters for this class towards the NEW master prototype
+                start_idx = c_id * self.num_subclusters
+                end_idx = start_idx + self.num_subclusters
                 
-                weak_indices = torch.nonzero(weak_class_mask).squeeze(1)
-                strong_indices = torch.nonzero(strong_class_mask).squeeze(1)
-
-                if len(weak_indices) == 0 and len(strong_indices) == 0:
-                    continue
-
-                updated_weight = self.classify.weight[c_id].float()
+                # Use a much smaller learning rate to preserve their spread
+                sub_pull_lr = effective_lr * 0.1
+                current_subs = self.subclusters.data[start_idx:end_idx].float()
+                updated_subs = (1.0 - sub_pull_lr) * current_subs + sub_pull_lr * updated_weight.unsqueeze(0)
                 
-                if len(weak_indices) > 0:
-                    sample_encs = enc_norm[weak_indices]
-                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
-                    weights_sample = sub_sims / sub_sims.sum()
-                    weak_pull = (sample_encs * weights_sample.unsqueeze(1)).sum(dim=0).float()
-                    # 10% LR for weak
-                    effective_lr_weak = learning_rate * 0.1 * sub_sims.mean().item()
-                    updated_weight = (1.0 - effective_lr_weak) * updated_weight + effective_lr_weak * weak_pull
-
-                if len(strong_indices) > 0:
-                    sample_encs = enc_norm[strong_indices]
-                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
-                    weights_sample = sub_sims / sub_sims.sum()
-                    strong_pull = (sample_encs * weights_sample.unsqueeze(1)).sum(dim=0).float()
-                    # 100% LR for strong
-                    effective_lr_strong = learning_rate * 1.0 * sub_sims.mean().item()
-                    updated_weight = (1.0 - effective_lr_strong) * updated_weight + effective_lr_strong * strong_pull
-
-                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
+                if self.subcluster_type == 'continuous':
+                    updated_subs = F.normalize(updated_subs, dim=1)
+                else:
+                    updated_subs = torch.sign(updated_subs)
+                    
+                self.subclusters.data[start_idx:end_idx] = updated_subs.to(self.subclusters.dtype)
 
             return full_predictions
     def inference_update_with_subcluster_pull(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, subcluster_lr=0.005, thresholds=(0.45, 0.80)):

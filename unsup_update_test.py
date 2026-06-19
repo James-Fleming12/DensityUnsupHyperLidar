@@ -60,10 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Distance-Weighted Pull", "method": "inference_update_dwp"},
-        {"name": "Momentum-Free Direct Pull", "method": "inference_update_mfdp"},
-        {"name": "High-Confidence Hard Pull", "method": "inference_update_hchp"},
-        {"name": "Multi-Scale Pull", "method": "inference_update_msp"},
+        {"name": "Subcluster-Reg Pull", "method": "inference_update_srp"},
+        {"name": "Activity-Weighted Distil", "method": "inference_update_awd"},
+        {"name": "Confidence-Weighted Distil", "method": "inference_update_cwd"},
+        {"name": "Proto-Sub Ping-Pong", "method": "inference_update_psp"},
     ]
 
     ablation_histories = []
