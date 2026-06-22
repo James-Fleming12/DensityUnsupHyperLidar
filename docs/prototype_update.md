@@ -114,5 +114,35 @@ In this round, we move beyond simple pulling and distillation to implement more 
    - *Result:* Minor success in Rain (+0.011 Acc, +0.002 mIoU), but failed to beat Baseline in Night (+0.006 Acc, -0.002 mIoU).
    - *Analysis:* While the replay buffer prevented catastrophic drift, pulling back to the source domain hindered the massive geometric leaps required to adapt to the severe signal destruction of the Night environment.
 
-### Conclusion on Prototype Updates
-Across 6 rigorous rounds of testing complex constraints (Distillations, Temporal Gating, Ping-Pong meshes, Active Anchoring, and Memory Replays), **the original Standard Pull baseline remains the undisputed champion.** Its success lies in its completely unconstrained, aggressive K-means-style plasticity. It does not try to preserve outdated source geometry, nor does it wait for complex temporal confirmations. It simply identifies high-confidence targets and pulls the master prototype directly towards them, allowing the HDC space to freely and massively warp to match the new domain.
+### Conclusion on Prototype Updates (Rounds 1-6)
+Across 6 rigorous rounds of testing complex constraints (Distillations, Temporal Gating, Ping-Pong meshes, Active Anchoring, and Memory Replays), the original Standard Pull baseline remained the champion due to its unconstrained, aggressive plasticity.
+
+## Round 7: Confidence Calibration & Tradeoffs
+This round tested four methods that maintain the gentle momentum of the Standard Pull but introduce specific structural tradeoffs to overcome minority-class starvation and weather noise.
+
+1. **Oracle-Verified Soft Pull (OVSP):**
+   - *Mechanism:* We fix the catastrophic failure of Round 6's OGAA. We actively hunt for the 5 "most confusing" samples per chunk and send them to the human Oracle. However, we do not do a Massive Hard Pull. Instead, we assign these 5 samples a synthetic confidence score of 1.0 and feed them into the exact same gentle, momentum-buffered Standard Pull as the rest of the unsupervised pipeline.
+   - *Tradeoff:* Target-Domain Labels (Micro-budget).
+   - *Result:* Minor gains in Rain (+0.005 Acc, -0.001 mIoU) and Night (+0.004 Acc, +0.003 mIoU).
+   - *Analysis:* While it avoided the catastrophic collapse of OGAA, the gentle momentum pull limited the impact of the oracle labels. It underperformed the unconstrained Standard Pull which had the freedom to warp aggressively based purely on confidence.
+
+2. **Density-Calibrated Standard Pull (DCSP):**
+   - *Mechanism:* In LiDAR, close objects generate 1,000s of points, while distant objects generate 10s. The baseline Standard Pull treats all these points equally. DCSP scales the pull weight inversely by the point cloud density (radial distance) of the target sample.
+   - *Tradeoff:* Compute (Range/Density tracking).
+   - *Result:* Massive Accuracy gains! Rain Acc increased by +0.144 and Night Acc by +0.132. Rain mIoU also increased by +0.043. However, Night mIoU dropped by -0.055.
+   - *Analysis:* Scaling by range is incredibly effective for raw accuracy. By preventing dense, easy objects from monopolizing the adaptation vector, the prototype manifold is successfully stretched across both close and distant target-domain geometries.
+
+3. **Cross-Augmentation Consistency Gating (CACG):**
+   - *Mechanism:* Relies on spatial consistency. For every incoming frame, we create a second, slightly augmented version (e.g., a spatial jitter/roll). If the extracted hypervector for the original frame and the augmented frame predict different classes, it is weather-induced noise and is discarded.
+   - *Tradeoff:* Compute (2x Inference per frame).
+   - *Result:* Minor gains in Rain (+0.007 Acc, +0.001 mIoU) but slight regressions in Night (-0.006 Acc, -0.005 mIoU).
+   - *Analysis:* The gating mechanism was too strict in extremely noisy environments (Night), discarding too many valid samples that suffered from structural jittering, leading to minor regressions compared to the baseline.
+
+4. **Dual-Buffer Memory Replay (DBMR):**
+   - *Mechanism:* Maintains two small buffers: a frozen Source Buffer (Sunny) and a dynamic Target Buffer (highly confident Rain/Night samples from recent chunks). The master prototype is simultaneously pulled by the target sample, a Source Buffer sample, and a Target Buffer sample.
+   - *Tradeoff:* Memory (2x Buffer Size).
+   - *Result:* Flat in Rain (+0.007 Acc, 0.000 mIoU) and regression in Night (-0.001 Acc, -0.008 mIoU).
+   - *Analysis:* The continuous "elastic tether" to both the source and target histories stagnated the model, preventing it from making the clean, aggressive breaks needed to adapt to severe weather shifts.
+
+### Final Conclusion
+After 7 exhaustive rounds, **Density-Calibrated Standard Pull (DCSP)** emerges as a highly potent strategy when raw **Accuracy** is the primary metric, netting massive +13-14% accuracy gains over the unadapted baseline by ensuring distant/sparse points pull just as heavily as close/dense points. However, if maintaining strict boundary masks (mIoU) in Night conditions is the priority, the original unconstrained **Standard Pull** remains the most balanced, lowest-compute, and robust method.

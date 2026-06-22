@@ -60,10 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Oracle-Verified Soft Pull\n(Tradeoff: Target-Domain Labels Micro-budget)", "method": "inference_update_ovsp"},
-        {"name": "Density-Calibrated Standard Pull\n(Tradeoff: Range/Density Tracking)", "method": "inference_update_dcsp"},
-        {"name": "Cross-Augmentation Consistency Gating\n(Tradeoff: 2x Inference per frame)", "method": "inference_update_cacg"},
-        {"name": "Dual-Buffer Memory Replay\n(Tradeoff: 2x Buffer Size)", "method": "inference_update_dbmr"},
+        {"name": "Class-Normalized Density Clamping\n(Tradeoff: None)", "method": "inference_update_dcsp_fix"},
+        {"name": "Multi-Jitter Consensus Gating\n(Tradeoff: 3x Encoding Compute)", "method": "inference_update_mjcg"},
+        {"name": "K-Nearest Sub-Prototype Pull\n(Tradeoff: Similarity Compute)", "method": "inference_update_knnspp"},
+        {"name": "Two-Pass Distribution Alignment\n(Tradeoff: Chunk Latency)", "method": "inference_update_tpda"},
     ]
 
     ablation_histories = []
