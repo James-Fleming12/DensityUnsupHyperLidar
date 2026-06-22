@@ -123,6 +123,8 @@ def collect_baseline(self, dataloader, class_id, max_samples=8000):
 
 def collect_reservoir(self, dataloader, class_id, max_samples=8000):
     global_sum = None
+    total_samples = 0
+    MAX_STREAM = max_samples * 2
     with torch.no_grad():
         for batch in dataloader:
             proj_in = batch[0].to(self.device)
@@ -137,6 +139,9 @@ def collect_reservoir(self, dataloader, class_id, max_samples=8000):
                 class_enc = enc[class_mask]
                 if global_sum is None: global_sum = class_enc.sum(dim=0)
                 else: global_sum += class_enc.sum(dim=0)
+                
+                total_samples += class_enc.shape[0]
+            if total_samples >= MAX_STREAM: break
                 
     if global_sum is None: return np.array([])
     Pglobal = torch.nn.functional.normalize(global_sum, dim=0)
@@ -172,6 +177,9 @@ def collect_reservoir(self, dataloader, class_id, max_samples=8000):
                     if key > reservoir[0][0]:
                         heapq.heappushpop(reservoir, (key, item_id, emb))
                 item_id += 1
+            
+            total_samples += class_enc.shape[0]
+            if total_samples >= MAX_STREAM: break
                 
     final_embs = [x[2] for x in reservoir]
     return torch.stack(final_embs).numpy()
@@ -182,6 +190,8 @@ def collect_sieve(self, dataloader, class_id, max_samples=8000):
     buffer_sum = None
     tau = 0.5
     decay_rate = 0.9999
+    total_samples = 0
+    MAX_STREAM = max_samples * 2
     
     with torch.no_grad():
         for batch in dataloader:
@@ -213,6 +223,9 @@ def collect_sieve(self, dataloader, class_id, max_samples=8000):
                     buffer_sum += hi
                     
                 tau *= decay_rate
+                
+            total_samples += class_enc.shape[0]
+            if total_samples >= MAX_STREAM: break
                 
             if len(buffer_embs) > max_samples + 500:
                 S_tensor = torch.stack(buffer_embs).to(self.device).float()
@@ -255,6 +268,8 @@ def collect_sieve(self, dataloader, class_id, max_samples=8000):
 
 def collect_minibatch_coreset(self, dataloader, class_id, max_samples=8000):
     S = []
+    total_samples = 0
+    MAX_STREAM = max_samples * 2
     
     with torch.no_grad():
         for batch in dataloader:
@@ -272,6 +287,9 @@ def collect_minibatch_coreset(self, dataloader, class_id, max_samples=8000):
             for hi in class_enc:
                 S.append(hi.cpu().half())
                 
+            total_samples += class_enc.shape[0]
+            if total_samples >= MAX_STREAM: break
+            
             if len(S) > max_samples + 1000:
                 S_tensor = torch.stack(S).to(self.device).float()
                 S_norm = torch.nn.functional.normalize(S_tensor, dim=1)
@@ -311,6 +329,8 @@ def collect_minibatch_coreset(self, dataloader, class_id, max_samples=8000):
 def collect_dpp(self, dataloader, class_id, max_samples=8000):
     buffer_embs = []
     buffer_sum = None
+    total_samples = 0
+    MAX_STREAM = max_samples * 2
     
     with torch.no_grad():
         for batch in dataloader:
@@ -343,6 +363,9 @@ def collect_dpp(self, dataloader, class_id, max_samples=8000):
                 if np.random.rand() < prob:
                     buffer_embs.append(hi.cpu().half())
                     buffer_sum += hi
+                    
+            total_samples += class_enc.shape[0]
+            if total_samples >= MAX_STREAM: break
                     
     if not buffer_embs: return np.array([])
     
