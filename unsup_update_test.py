@@ -60,10 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Subcluster-Reg Pull", "method": "inference_update_srp"},
-        {"name": "Activity-Weighted Distil", "method": "inference_update_awd"},
-        {"name": "Confidence-Weighted Distil", "method": "inference_update_cwd"},
-        {"name": "Proto-Sub Ping-Pong", "method": "inference_update_psp"},
+        {"name": "Temporal Consistency Gating\n(Tradeoff: Memory & Compute Buffer)", "method": "inference_update_tcg"},
+        {"name": "Oracle-Guided Active Anchoring\n(Tradeoff: Human Annotation Cost)", "method": "inference_update_ogaa"},
+        {"name": "Subcluster-Routed Translation\n(Tradeoff: Higher Compute for Translation Vectors)", "method": "inference_update_srt"},
+        {"name": "Decoupled Memory-Replay Pull\n(Tradeoff: Replay Buffer Memory Overhead)", "method": "inference_update_dmrp"},
     ]
 
     ablation_histories = []
@@ -121,12 +121,19 @@ def main():
                     continue
 
                 proj_in = batch[0]
+                oracle_labels = batch[2] if len(batch) > 2 else None
+                
+                kwargs = {}
+                if cfg["method"] != "inference_update":
+                    kwargs["oracle_labels"] = oracle_labels.to(device) if oracle_labels is not None else None
+                
                 if proj_in.shape[1] > 0:
                     update_fn(
                         proj_in.to(device),
                         learning_rate=0.001,
                         distance_sensitivity=3.0,
-                        thresholds=[0.45, 0.80] # Matching Baseline from unsup_ugw.py
+                        thresholds=[0.45, 0.80], # Matching Baseline from unsup_ugw.py
+                        **kwargs
                     )
                 pbar.update(1)
             pbar.close()
