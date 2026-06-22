@@ -60,10 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Temporal Consistency Gating\n(Tradeoff: Memory & Compute Buffer)", "method": "inference_update_tcg"},
-        {"name": "Oracle-Guided Active Anchoring\n(Tradeoff: Human Annotation Cost)", "method": "inference_update_ogaa"},
-        {"name": "Subcluster-Routed Translation\n(Tradeoff: Higher Compute for Translation Vectors)", "method": "inference_update_srt"},
-        {"name": "Decoupled Memory-Replay Pull\n(Tradeoff: Replay Buffer Memory Overhead)", "method": "inference_update_dmrp"},
+        {"name": "Oracle-Verified Soft Pull\n(Tradeoff: Target-Domain Labels Micro-budget)", "method": "inference_update_ovsp"},
+        {"name": "Density-Calibrated Standard Pull\n(Tradeoff: Range/Density Tracking)", "method": "inference_update_dcsp"},
+        {"name": "Cross-Augmentation Consistency Gating\n(Tradeoff: 2x Inference per frame)", "method": "inference_update_cacg"},
+        {"name": "Dual-Buffer Memory Replay\n(Tradeoff: 2x Buffer Size)", "method": "inference_update_dbmr"},
     ]
 
     ablation_histories = []

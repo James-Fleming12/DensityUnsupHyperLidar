@@ -93,19 +93,26 @@ In this round, we move beyond simple pulling and distillation to implement more 
 1. **Temporal Consistency Gating (TCG):**
    - *Mechanism:* Buffers $N=3$ consecutive LiDAR frames. A target sample is only allowed to exert a Standard Pull on the prototype if the exact same physical space is classified as the same object across all 3 frames. This explicitly filters out transient noise (like heavy rain points) while allowing a lower confidence threshold for capturing static minority classes.
    - *Tradeoff:* Memory & Compute Buffer (requires caching spatial frames).
-   - *Result:* (Awaiting Test Results)
+   - *Result:* Failed. Dropped Night Acc (-0.011) and mIoU (-0.008). Dropped Rain Acc (-0.000) and mIoU (-0.005). 
+   - *Analysis:* Delaying updates until 3 consecutive frames agree is too conservative. In highly dynamic scenarios, minority class objects or ego-motion shifts prevent consecutive physical overlap, causing the prototype to completely miss valid updates.
 
 2. **Oracle-Guided Active Anchoring (OGAA):**
    - *Mechanism:* Instead of relying on unsupervised confidence, this method isolates the top-5 most "confusing" samples per chunk (where the margin between the top-1 and top-2 predicted classes is the smallest). It queries an Oracle (ground-truth) for their true labels and executes a massive "Hard Pull" exclusively on these samples.
    - *Tradeoff:* Human Annotation Cost (requires a micro-budget of labeled data in the target domain).
-   - *Result:* (Awaiting Test Results)
+   - *Result:* Catastrophic Failure. Decimated Night Acc (-0.864) and mIoU (-0.123). Decimated Rain Acc (-0.136).
+   - *Analysis:* Pulling exclusively on the most confusing, boundary-case samples causes severe prototype collapse. By forcefully anchoring the master prototype to the absolute hardest edge cases, it completely forgets the core geometric center of the class.
 
 3. **Subcluster-Routed Translation (SRT):**
    - *Mechanism:* When a confident sample arrives, it matches to its closest Source Subcluster. We calculate a translation vector $V$ from the Subcluster to the Target Sample. Instead of pulling the Master Prototype directly to the sample, we apply $V$ directly to the Master Prototype. This theoretically retains relative geometric structure.
    - *Tradeoff:* Higher Compute (requires translation vector calculation per-sample against subclusters).
-   - *Result:* (Awaiting Test Results)
+   - *Result:* Failed in Night (-0.011 Acc, -0.005 mIoU), marginal gains in Rain (+0.003 Acc, -0.001 mIoU).
+   - *Analysis:* The relative translation vector $V$ assumes the geometric relationship between the subcluster and the master prototype is perfectly rigid across domains. In reality, the entire geometric distribution warps non-linearly, making rigid translations harmful.
 
 4. **Decoupled Memory-Replay Pull (DMRP):**
    - *Mechanism:* Combines the Unsupervised Standard Pull with a continuous Source Domain rehearsal. Every time the prototype is pulled toward a Target Sample, it is simultaneously pulled toward a randomly sampled Source Hypervector from a frozen Replay Buffer (approximated by the subclusters). This continuous "micro-anchoring" guarantees the prototype never drifts entirely into empty space.
    - *Tradeoff:* Replay Buffer Memory Overhead (requires maintaining historical source subclusters).
-   - *Result:* (Awaiting Test Results)
+   - *Result:* Minor success in Rain (+0.011 Acc, +0.002 mIoU), but failed to beat Baseline in Night (+0.006 Acc, -0.002 mIoU).
+   - *Analysis:* While the replay buffer prevented catastrophic drift, pulling back to the source domain hindered the massive geometric leaps required to adapt to the severe signal destruction of the Night environment.
+
+### Conclusion on Prototype Updates
+Across 6 rigorous rounds of testing complex constraints (Distillations, Temporal Gating, Ping-Pong meshes, Active Anchoring, and Memory Replays), **the original Standard Pull baseline remains the undisputed champion.** Its success lies in its completely unconstrained, aggressive K-means-style plasticity. It does not try to preserve outdated source geometry, nor does it wait for complex temporal confirmations. It simply identifies high-confidence targets and pulls the master prototype directly towards them, allowing the HDC space to freely and massively warp to match the new domain.
