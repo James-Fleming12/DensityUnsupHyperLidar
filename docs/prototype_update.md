@@ -144,5 +144,35 @@ This round tested four methods that maintain the gentle momentum of the Standard
    - *Result:* Flat in Rain (+0.007 Acc, 0.000 mIoU) and regression in Night (-0.001 Acc, -0.008 mIoU).
    - *Analysis:* The continuous "elastic tether" to both the source and target histories stagnated the model, preventing it from making the clean, aggressive breaks needed to adapt to severe weather shifts.
 
+### Conclusion on Prototype Updates (Rounds 1-7)
+After 7 exhaustive rounds, **Density-Calibrated Standard Pull (DCSP)** emerged as a highly potent strategy when raw **Accuracy** is the primary metric, netting massive +13-14% accuracy gains over the unadapted baseline by ensuring distant/sparse points pull just as heavily as close/dense points. However, if maintaining strict boundary masks (mIoU) in Night conditions is the priority, the original unconstrained **Standard Pull** remains the most balanced, lowest-compute, and robust method.
+
+## Round 8: Advanced Shock Absorbers & Local Geometric Tethers
+This round focused on fixing the tradeoffs from DCSP and testing local/consensus-based adaptation rules.
+
+1. **Class-Normalized Density Clamping (DCSP Fix):**
+   - *Mechanism:* Instead of scaling by global density, we scale the sample's density by an EMA of its predicted class's density, clamping the multiplier at a maximum of 1.5x to prevent anomalous sparse points from throwing the prototype into background noise.
+   - *Tradeoff:* None.
+   - *Result:* Failed to match Standard Pull. Rain Acc (+0.009) and mIoU (+0.001) were negligible, while Night Acc (-0.004) and mIoU (-0.007) regressed.
+   - *Analysis:* The strict clamping acted as too harsh of a shock absorber. It prevented the prototype from making the massive geometric leaps required to adapt to severe signal destruction in the Night domain, reverting the massive gains seen in the unconstrained DCSP.
+
+2. **Multi-Jitter Consensus Gating (MJCG):**
+   - *Mechanism:* Creates three versions of the input tensor (original, +1 spatial shift, -1 spatial shift). Only pulls the prototype if all three versions independently predict the exact same class, creating a nearly flawless noise filter.
+   - *Tradeoff:* 3x Encoding Compute.
+   - *Result:* Regression. Rain Acc (-0.004), Night Acc (-0.009), and Night mIoU (-0.007) all dropped.
+   - *Analysis:* The 3-way consensus was far too strict. While it successfully filtered out transient weather noise, it also filtered out the legitimate but highly-distorted edge cases that the model desperately needed to learn in order to adapt to the new domain.
+
+3. **K-Nearest Sub-Prototype Pull (KNN-SPP):**
+   - *Mechanism:* Instead of dragging the single master prototype, we route the pull vector exclusively to the closest matching local sub-prototype. The master prototype is then re-calculated as the geometric center of its sub-prototypes.
+   - *Tradeoff:* Similarity Compute against 65 subclusters.
+   - *Result:* Massive Accuracy gains! Rain Acc (+0.144) and Night Acc (+0.035). However, catastrophic mIoU collapse: Rain mIoU (-0.014) and Night mIoU (-0.061).
+   - *Analysis:* Adapting local sub-prototypes independently completely destroys the cohesive structural boundary of the class manifold. While it helps classify points deep inside the object (boosting Accuracy), the shattered boundaries decimate the strict mask requirements for semantic segmentation (cratering mIoU).
+
+4. **Two-Pass Distribution Alignment (TPDA):**
+   - *Mechanism:* Inference is run on the whole chunk to calculate a class distribution. This is compared to a slow-moving EMA source prior. If a class is wildly over-represented (e.g., a burst of noise looking like Pedestrians), its learning rate is penalized proportionally.
+   - *Tradeoff:* Chunk Latency.
+   - *Result:* Regression across the board. Night Acc (-0.008) and Night mIoU (-0.008) dropped.
+   - *Analysis:* Penalizing "over-represented" classes prevents the model from adapting to massive but legitimate real-world shifts (like a bus dominating the frame for 30 seconds).
+
 ### Final Conclusion
-After 7 exhaustive rounds, **Density-Calibrated Standard Pull (DCSP)** emerges as a highly potent strategy when raw **Accuracy** is the primary metric, netting massive +13-14% accuracy gains over the unadapted baseline by ensuring distant/sparse points pull just as heavily as close/dense points. However, if maintaining strict boundary masks (mIoU) in Night conditions is the priority, the original unconstrained **Standard Pull** remains the most balanced, lowest-compute, and robust method.
+After 8 exhaustive rounds of testing, the core paradigm holds true: **any method that attempts to restrict, gate, clamp, or tether the adaptation process inevitably causes regressions.** The unconstrained, aggressive **Standard Pull** remains the king of mIoU because it allows the HDC manifold to violently warp to the new domain. Methods that boost raw Accuracy (like DCSP or KNN-SPP) do so by destroying the cohesive boundary structure, leading to severe mIoU drops.

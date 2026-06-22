@@ -60,10 +60,9 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Class-Normalized Density Clamping\n(Tradeoff: None)", "method": "inference_update_dcsp_fix"},
-        {"name": "Multi-Jitter Consensus Gating\n(Tradeoff: 3x Encoding Compute)", "method": "inference_update_mjcg"},
-        {"name": "K-Nearest Sub-Prototype Pull\n(Tradeoff: Similarity Compute)", "method": "inference_update_knnspp"},
-        {"name": "Two-Pass Distribution Alignment\n(Tradeoff: Chunk Latency)", "method": "inference_update_tpda"},
+        {"name": "Equal-Volume Update Queues\n(Tradeoff: Memory FIFO)", "method": "inference_update_evuq"},
+        {"name": "Dynamic Class-Paced Momentum\n(Tradeoff: Frequency Tracking compute)", "method": "inference_update_dcpm"},
+        {"name": "Prior-Calibrated Similarity Gating\n(Tradeoff: None)", "method": "inference_update_pcsg"},
     ]
 
     ablation_histories = []
