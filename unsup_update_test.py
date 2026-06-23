@@ -60,10 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Density-Calibrated Dual-Rate Pull\n(Tradeoff: 2x compute)", "method": "inference_update_dcdrp"},
-        {"name": "Hypervector Prototype EMA Forking\n(Tradeoff: 2x storage)", "method": "inference_update_hpef"},
-        {"name": "Confidence-Stratified Batch Correction\n(Tradeoff: Chunk latency)", "method": "inference_update_csbc"},
-        {"name": "Geometry-Preserving Residual Pull\n(Tradeoff: O(C^2) overhead)", "method": "inference_update_gprp"},
+        {"name": "Minority-Only Density Calibration\n(Tradeoff: None)", "method": "inference_update_modc"},
+        {"name": "Asymmetric Confidence Momentum\n(Tradeoff: None)", "method": "inference_update_acm"},
+        {"name": "Prototype Velocity Damping\n(Tradeoff: Vector storage)", "method": "inference_update_pvd"},
+        {"name": "Sparse Confident Core Pull\n(Tradeoff: Sorting overhead)", "method": "inference_update_sccp"},
     ]
 
     ablation_histories = []
