@@ -3321,12 +3321,12 @@ class DensityModel(nn.Module):
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
 
                 if active_labels is not None:
-                    for i in range(sample_encs.shape[0]):
-                        self.taoc_buffer[c_id].append({
-                            'enc': sample_encs[i].clone(),
-                            'sim': sub_sims[i].item(),
-                            'gt': active_labels[valid_class_indices[i]].item()
-                        })
+                    cur_gt_cpu = active_labels[valid_class_indices].cpu().numpy()
+                    cur_sims_cpu = sub_sims.cpu().numpy()
+                    cur_encs = sample_encs.detach()
+                    
+                    new_items = [{'enc': cur_encs[i], 'sim': cur_sims_cpu[i], 'gt': cur_gt_cpu[i]} for i in range(len(cur_gt_cpu))]
+                    self.taoc_buffer[c_id].extend(new_items)
                     
                     if len(self.taoc_buffer[c_id]) > 50:
                         self.taoc_buffer[c_id] = self.taoc_buffer[c_id][-50:]
