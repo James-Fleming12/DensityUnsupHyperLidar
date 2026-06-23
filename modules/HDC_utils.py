@@ -2998,6 +2998,364 @@ class DensityModel(nn.Module):
 
             return full_predictions
 
+    def inference_update_cmop(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
+        """Confident Minority Oracle Pull"""
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            num_total_samples = enc.shape[0]
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+
+            chunk_logits = self.classify(enc_norm)
+            predictions = chunk_logits.argmax(dim=1)
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=predictions.dtype)
+            full_predictions[valid_enc_mask] = predictions
+
+            active_labels = None
+            if oracle_labels is not None:
+                active_labels = oracle_labels.view(-1)[valid_enc_mask]
+
+            unique_classes = torch.unique(predictions)
+            
+            class_data = []
+            class_counts = []
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (predictions == c_id)
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if len(class_indices) == 0:
+                    continue
+                    
+                sample_encs = enc_norm[class_indices]
+                if self.subcluster_type == 'bipolar':
+                    target_encs = torch.sign(active_enc[class_indices])
+                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                else:
+                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+                
+                count = valid_mask.sum().item()
+                class_counts.append((count, c_id))
+                class_data.append((c_id, class_indices, valid_mask, sample_encs, sub_sims))
+                
+            class_counts.sort() # Sort by count
+            minority_classes = [c_id for count, c_id in class_counts[:3]]
+            
+            for c_id, class_indices, valid_mask, sample_encs, sub_sims in class_data:
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+                class_indices = class_indices[valid_mask]
+                
+                if c_id in minority_classes and active_labels is not None:
+                    max_idx = torch.argmax(sub_sims).item()
+                    global_idx = class_indices[max_idx].item()
+                    gt_label = active_labels[global_idx].item()
+                    
+                    if gt_label == c_id:
+                        pull_vector = sample_encs[max_idx]
+                        effective_lr = learning_rate * 3.0 * sub_sims[max_idx].item()
+                    else:
+                        continue # Oracle rejects, discard update for this class entirely for this chunk? 
+                        # Actually let's just not update the minority class if the best is wrong.
+                else:
+                    weights = sub_sims / sub_sims.sum()
+                    pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                    effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_w = self.classify.weight[c_id].float()
+                self.proto_momentum[c_id] = (0.9 * self.proto_momentum[c_id] + 0.1 * pull_vector).to(self.proto_momentum.dtype)
+                
+                updated_weight = (1.0 - effective_lr) * current_w + effective_lr * self.proto_momentum[c_id].float()
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
+
+            return full_predictions
+
+    def inference_update_pdi(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
+        """Prototype Drift Intervention"""
+        if getattr(self, 'pdi_alpha', None) is None:
+            self.pdi_alpha = torch.ones(self.num_classes, device=self.device) * 0.9
+            
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            num_total_samples = enc.shape[0]
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+
+            chunk_logits = self.classify(enc_norm)
+            predictions = chunk_logits.argmax(dim=1)
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=predictions.dtype)
+            full_predictions[valid_enc_mask] = predictions
+
+            active_labels = None
+            if oracle_labels is not None:
+                active_labels = oracle_labels.view(-1)[valid_enc_mask]
+
+            unique_classes = torch.unique(predictions)
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (predictions == c_id)
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if len(class_indices) == 0:
+                    continue
+
+                sample_encs = enc_norm[class_indices]
+
+                if self.subcluster_type == 'bipolar':
+                    target_encs = torch.sign(active_enc[class_indices])
+                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                else:
+                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+                valid_class_indices = class_indices[valid_mask]
+
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_w = self.classify.weight[c_id].float()
+                
+                self.pdi_alpha[c_id] = max(0.9, self.pdi_alpha[c_id].item() - 0.01)
+                alpha = self.pdi_alpha[c_id].item()
+                
+                simulated_momentum = (alpha * self.proto_momentum[c_id] + (1.0 - alpha) * weighted_pull_vector).to(self.proto_momentum.dtype)
+                simulated_updated_weight = (1.0 - effective_lr) * current_w + effective_lr * simulated_momentum.float()
+                simulated_w_norm = F.normalize(simulated_updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+                drift = 1.0 - F.cosine_similarity(current_w.unsqueeze(0), simulated_w_norm.unsqueeze(0)).item()
+                
+                if drift > 0.005 and active_labels is not None: 
+                    k = min(5, sample_encs.shape[0])
+                    _, top_idx = torch.topk(sub_sims, k)
+                    global_indices = valid_class_indices[top_idx]
+                    
+                    gt_labels = active_labels[global_indices]
+                    correct_count = (gt_labels == c_id).sum().item()
+                    
+                    if correct_count < k / 2.0:
+                        self.pdi_alpha[c_id] = 0.99
+                        continue 
+                        
+                self.proto_momentum[c_id] = simulated_momentum
+                self.classify.weight[c_id] = simulated_w_norm.to(self.classify.weight.dtype)
+
+            return full_predictions
+
+    def inference_update_cbot(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
+        """Class Boundary Oracle Triangulation"""
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            num_total_samples = enc.shape[0]
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+
+            chunk_logits = self.classify(enc_norm)
+            predictions = chunk_logits.argmax(dim=1)
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=predictions.dtype)
+            full_predictions[valid_enc_mask] = predictions
+
+            active_labels = None
+            if oracle_labels is not None:
+                active_labels = oracle_labels.view(-1)[valid_enc_mask]
+
+            unique_classes = torch.unique(predictions)
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (predictions == c_id)
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if len(class_indices) == 0:
+                    continue
+
+                sample_encs = enc_norm[class_indices]
+
+                if self.subcluster_type == 'bipolar':
+                    target_encs = torch.sign(active_enc[class_indices])
+                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                else:
+                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_w = self.classify.weight[c_id].float()
+                self.proto_momentum[c_id] = (0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector).to(self.proto_momentum.dtype)
+                
+                updated_weight = (1.0 - effective_lr) * current_w + effective_lr * self.proto_momentum[c_id].float()
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
+
+            if active_labels is not None:
+                pairs = [(0, 1), (1, 2), (2, 3), (4, 5), (5, 6), (11, 12)] 
+                for p1, p2 in pairs:
+                    if p1 >= self.num_classes or p2 >= self.num_classes: continue
+                    
+                    sim1 = chunk_logits[:, p1]
+                    sim2 = chunk_logits[:, p2]
+                    
+                    score = torch.abs(sim1 - sim2) - 0.5 * (sim1 + sim2)
+                    idx = torch.argmin(score).item()
+                    
+                    gt_label = active_labels[idx].item()
+                    if gt_label == p1 or gt_label == p2:
+                        correct_p = gt_label
+                        wrong_p = p2 if gt_label == p1 else p1
+                        
+                        sample_enc = enc_norm[idx].float()
+                        wrong_w = self.classify.weight[wrong_p].float()
+                        
+                        proj = sample_enc - torch.dot(sample_enc, wrong_w) * wrong_w
+                        proj = F.normalize(proj.unsqueeze(0), dim=1).squeeze(0)
+                        
+                        current_w = self.classify.weight[correct_p].float()
+                        effective_lr = learning_rate * 3.0
+                        updated_weight = (1.0 - effective_lr) * current_w + effective_lr * proj
+                        self.classify.weight[correct_p] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
+                        
+            return full_predictions
+
+    def inference_update_taoc(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
+        """Temporal Anchor Oracle Correction"""
+        if getattr(self, 'taoc_buffer', None) is None:
+            self.taoc_buffer = {c: [] for c in range(self.num_classes)}
+            self.taoc_chunk_counter = 0
+            
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            num_total_samples = enc.shape[0]
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+
+            chunk_logits = self.classify(enc_norm)
+            predictions = chunk_logits.argmax(dim=1)
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=predictions.dtype)
+            full_predictions[valid_enc_mask] = predictions
+
+            active_labels = None
+            if oracle_labels is not None:
+                active_labels = oracle_labels.view(-1)[valid_enc_mask]
+
+            unique_classes = torch.unique(predictions)
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (predictions == c_id)
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if len(class_indices) == 0:
+                    continue
+
+                sample_encs = enc_norm[class_indices]
+
+                if self.subcluster_type == 'bipolar':
+                    target_encs = torch.sign(active_enc[class_indices])
+                    sub_sims, _ = self.get_max_subcluster_similarity(target_encs, c_id, distance_sensitivity)
+                else:
+                    sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+                valid_class_indices = class_indices[valid_mask]
+
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_w = self.classify.weight[c_id].float()
+                self.proto_momentum[c_id] = (0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector).to(self.proto_momentum.dtype)
+                
+                updated_weight = (1.0 - effective_lr) * current_w + effective_lr * self.proto_momentum[c_id].float()
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
+
+                if active_labels is not None:
+                    for i in range(sample_encs.shape[0]):
+                        self.taoc_buffer[c_id].append({
+                            'enc': sample_encs[i].clone(),
+                            'sim': sub_sims[i].item(),
+                            'gt': active_labels[valid_class_indices[i]].item()
+                        })
+                    
+                    if len(self.taoc_buffer[c_id]) > 50:
+                        self.taoc_buffer[c_id] = self.taoc_buffer[c_id][-50:]
+            
+            self.taoc_chunk_counter += 1
+            if self.taoc_chunk_counter >= 10 and active_labels is not None:
+                self.taoc_chunk_counter = 0
+                for c_id in range(self.num_classes):
+                    if len(self.taoc_buffer[c_id]) == 0:
+                        continue
+                    
+                    self.taoc_buffer[c_id].sort(key=lambda x: x['sim'])
+                    
+                    to_remove = []
+                    for i in range(min(3, len(self.taoc_buffer[c_id]))):
+                        item = self.taoc_buffer[c_id][i]
+                        if item['gt'] != c_id:
+                            bad_h = item['enc'].float()
+                            current_w = self.classify.weight[c_id].float()
+                            
+                            unpull = current_w - 0.1 * learning_rate * bad_h
+                            self.classify.weight[c_id] = F.normalize(unpull.unsqueeze(0), dim=1).squeeze(0).to(self.classify.weight.dtype)
+                            to_remove.append(i)
+                            
+                    for i in sorted(to_remove, reverse=True):
+                        self.taoc_buffer[c_id].pop(i)
+
+            return full_predictions
+
     def inference_update_with_subcluster_pull(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, subcluster_lr=0.005, thresholds=(0.45, 0.80)):
         """Temp Function for testing. Like inference_update, but also pulls the nearest subcluster toward high-confidence samples."""
         self.train()

@@ -60,10 +60,10 @@ def main():
 
     update_methods = [
         {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Minority-Only Density Calibration\n(Tradeoff: None)", "method": "inference_update_modc"},
-        {"name": "Asymmetric Confidence Momentum\n(Tradeoff: None)", "method": "inference_update_acm"},
-        {"name": "Prototype Velocity Damping\n(Tradeoff: Vector storage)", "method": "inference_update_pvd"},
-        {"name": "Sparse Confident Core Pull\n(Tradeoff: Sorting overhead)", "method": "inference_update_sccp"},
+        {"name": "Confident Minority Oracle Pull\n(Budget: Top-K starved)", "method": "inference_update_cmop"},
+        {"name": "Prototype Drift Intervention\n(Budget: Event-driven)", "method": "inference_update_pdi"},
+        {"name": "Class Boundary Oracle Triangulation\n(Budget: Fixed K edges)", "method": "inference_update_cbot"},
+        {"name": "Temporal Anchor Oracle Correction\n(Budget: Retroactive K)", "method": "inference_update_taoc"},
     ]
 
     ablation_histories = []
