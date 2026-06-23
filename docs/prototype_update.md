@@ -174,5 +174,26 @@ This round focused on fixing the tradeoffs from DCSP and testing local/consensus
    - *Result:* Regression across the board. Night Acc (-0.008) and Night mIoU (-0.008) dropped.
    - *Analysis:* Penalizing "over-represented" classes prevents the model from adapting to massive but legitimate real-world shifts (like a bus dominating the frame for 30 seconds).
 
-### Final Conclusion
+### Conclusion on Prototype Updates (Rounds 1-8)
 After 8 exhaustive rounds of testing, the core paradigm holds true: **any method that attempts to restrict, gate, clamp, or tether the adaptation process inevitably causes regressions.** The unconstrained, aggressive **Standard Pull** remains the king of mIoU because it allows the HDC manifold to violently warp to the new domain. Methods that boost raw Accuracy (like DCSP or KNN-SPP) do so by destroying the cohesive boundary structure, leading to severe mIoU drops.
+
+## Round 9: Update Normalization & Pacing
+This round tested if we could protect minority classes and prevent majority class runaway by equalizing the update rates and volumes across classes.
+
+1. **Equal-Volume Update Queues (EVUQ):**
+   - *Mechanism:* Completely disconnects updates from the inference stream. Confident samples are buffered into class-specific FIFO queues (size 100). The prototype is only pulled when the queue is perfectly full, ensuring all classes adapt at the exact same volumetric rate.
+   - *Tradeoff:* Memory FIFO.
+   - *Result:* Failed. Flatlined in Rain (0.000 Acc, 0.000 mIoU) and regressed in Night (-0.007 Acc, 0.000 mIoU).
+   - *Analysis:* Forcing classes to wait for equal volume completely breaks the temporal immediacy needed for adaptation. By the time a rare class fills its queue of 100 samples, the weather conditions or domain lighting may have completely shifted again. It is too slow to react.
+
+2. **Dynamic Class-Paced Momentum (DCPM):**
+   - *Mechanism:* Adjusts the learning rate/momentum based on the number of confident samples in the chunk. Massive majority classes (like Road) get highly stiff momentum so they can't runaway, while minority classes get loose momentum to exert maximum leverage from their rare points.
+   - *Tradeoff:* Frequency Tracking Compute.
+   - *Result:* Modest gains in Rain (+0.007 Acc) and Night (+0.006 Acc, +0.002 mIoU), but drastically underperformed the baseline Standard Pull (+0.055 Night Acc).
+   - *Analysis:* Artificially stiffening the momentum of majority classes prevents them from accurately mapping out the massive geometric shifts in the target domain. Majority classes *need* to run away to correctly model the new world.
+
+3. **Prior-Calibrated Similarity Gating (PCSG):**
+   - *Mechanism:* Adjusts the raw Cosine Similarity score of a sample based on its class's source training frequency (prior). Rare classes get a massive mathematical boost, artificially forcing their weak, noise-corrupted points over the confidence threshold.
+   - *Tradeoff:* None.
+   - *Result:* Total Regression. Dropped in Rain (-0.005 Acc, -0.003 mIoU) and Night (-0.007 Acc, -0.006 mIoU).
+   - *Analysis:* Artificially lowering the barrier to entry for rare classes is catastrophic. The confidence threshold exists for a reason: it filters out weather noise. By forcing weak minority points through the gate, the minority prototypes were instantly corrupted by rain artifacts and sensor noise.
