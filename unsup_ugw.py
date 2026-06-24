@@ -129,7 +129,7 @@ def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, co
 
     return loaders
 
-def pretrain_pipeline(ARCH, DATA):
+def pretrain_pipeline(ARCH, DATA, return_trainer=False):
     print(f"--- Starting Pretraining on ALL sunny scenarios ---")
 
     PRE_DATA = copy.deepcopy(DATA)
@@ -174,6 +174,8 @@ def pretrain_pipeline(ARCH, DATA):
     torch.save(model.state_dict(), HDC_SUB_PATH)
     print(f"Pretraining complete. Model saved to {HDC_SUB_PATH}")
 
+    if return_trainer:
+        return model, trainer
     return model
 
 def incremental_update_test(ARCH, DATA):

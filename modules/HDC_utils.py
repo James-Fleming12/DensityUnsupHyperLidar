@@ -754,35 +754,71 @@ class DensityModel(nn.Module):
         return torch.tensor(selected)
 
     def _process_single_class(self, class_emb_np, class_id, num_sub_per_cluster, bandwidth):
-        """Process a single class to generate its subclusters."""
+        """Process a single class to generate its subclusters using Adaptive KNN bandwidth estimation."""
         if len(class_emb_np) == 0:
             return []
         
-        print(f"  Running mean shift on {len(class_emb_np)} samples...")
-        cluster_centers = mean_shift_binary(
-            X=class_emb_np,
-            bandwidth=bandwidth,
-            quantile=self.quantile,
-            bandwidth_multiplier=self.mult,
-            dedup_scale=self.dedup
-        )
-        if self.subcluster_type == "bipolar":
-            cluster_centers = np.sign(cluster_centers)
+        print(f"  Running Adaptive KNN clustering on {len(class_emb_np)} samples...")
+        K = 15
+        H = torch.tensor(class_emb_np, device=self.device, dtype=torch.float32)
+
+        if len(H) > 2000:
+            H_sample = H[torch.randperm(len(H))[:2000]]
+        else:
+            H_sample = H
+            
+        H_sample = torch.nn.functional.normalize(H_sample, dim=1)
+        sim_matrix = torch.matmul(H_sample, H_sample.T)
+
+        topk_sims, _ = torch.topk(sim_matrix, min(K+1, len(H_sample)), dim=1)
+        if topk_sims.shape[1] > 1:
+            topk_dists = 1.0 - topk_sims[:, 1:] 
+            sigma_i = topk_dists.mean(dim=1)
+            sigma_i = torch.clamp(sigma_i, min=1e-3)
+        else:
+            sigma_i = torch.ones(len(H_sample), device=self.device) * 0.1
         
-        num_clusters_found = len(cluster_centers)
+        centers = H_sample.clone()
+        for _ in range(15):
+            sim = torch.matmul(H_sample, centers.T)
+            dist = 1.0 - sim
+
+            sigma = sigma_i.unsqueeze(1)
+            weights = torch.exp(-(dist ** 2) / (2 * (sigma ** 2) + 1e-8))
+
+            new_centers = torch.matmul(weights.T, H_sample)
+            new_centers = torch.nn.functional.normalize(new_centers, dim=1)
+            
+            shift = torch.norm(new_centers - centers, dim=1).max()
+            centers = new_centers
+            if shift < 1e-4: break
+
+        center_sim = torch.matmul(centers, centers.T)
+        keep = torch.ones(len(centers), dtype=torch.bool, device=self.device)
+        for i in range(len(centers)):
+            if keep[i]:
+                close = center_sim[i] > 0.95
+                close[i] = False
+                keep[close] = False
+                
+        unique_centers = centers[keep]
+        
+        if self.subcluster_type == "bipolar":
+            unique_centers = torch.sign(unique_centers)
+            unique_centers[unique_centers == 0] = -1.0 # Standardize to -1, 1
+
+        num_clusters_found = len(unique_centers)
         print(f"  Found {num_clusters_found} clusters")
 
         subclusters = []
         if num_clusters_found <= num_sub_per_cluster:
-            for center in cluster_centers:
-                center_tensor = torch.tensor(center, device='cpu', dtype=torch.float32)
-                subclusters.append(center_tensor)
+            for center in unique_centers:
+                subclusters.append(center.cpu())
         else:
-            center_tensor = torch.tensor(cluster_centers, dtype=torch.float32)
-            fps_indices = self._farthest_point_sample(center_tensor, num_sub_per_cluster)
+            unique_centers_cpu = unique_centers.cpu()
+            fps_indices = self._farthest_point_sample(unique_centers_cpu, num_sub_per_cluster)
             for idx in fps_indices.tolist():
-                center = torch.tensor(cluster_centers[idx], device='cpu', dtype=torch.float32)
-                subclusters.append(center)
+                subclusters.append(unique_centers_cpu[idx])
 
         return subclusters
 
