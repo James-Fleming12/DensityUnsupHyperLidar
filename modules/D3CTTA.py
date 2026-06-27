@@ -51,7 +51,7 @@ class D3CTTA(nn.Module):
         if mu is not None and sigma is not None:
             self.domains_bn_stats[domain_id] = {'mu': mu, 'sigma': sigma}
 
-    def forward(self, x, xyz=None):
+    def forward(self, x, xyz=None, *args, **kwargs):
         # Forward through feature extractor
         with torch.no_grad():
             # For ResNet_34, it returns (pred, out) or similar.

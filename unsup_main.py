@@ -107,9 +107,9 @@ def test_hdc_model(model, dataloader) -> None:
     model.eval()
     
     with torch.no_grad():
-        for _, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(dataloader):
-            proj_in = proj_in.to(device)
-            proj_labels = proj_labels.to(device)
+        for _, batch_data in enumerate(dataloader):
+            proj_in = batch_data[0].to(device)
+            proj_labels = batch_data[2].to(device)
             logits, _, indices, _ = model(proj_in, PERCENTAGE=None, is_wrong=None)
 
             # top_two = torch.topk(logits, k=2, dim=1).values
