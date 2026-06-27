@@ -173,7 +173,16 @@ def evaluate_and_adapt(model, target_dataloader, device):
             
     return {"mIoU": miou_history, "Accuracy": acc_history}
 
-def pretrain_pipeline(ARCH, DATA, data_dir, return_trainer=False):
+def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False):
+    import unsup_main
+    log_base = os.path.dirname(pretrained_path)
+    os.makedirs(log_base, exist_ok=True)
+    
+    unsup_main.LOG_DIR = log_base
+    unsup_main.MODEL_DIR = log_base
+    unsup_main.HDC_SAVE_PATH = os.path.join(log_base, "hdc.pth")
+    unsup_main.HDC_SUB_PATH = pretrained_path
+
     print(f"Pretraining feature extractor on {data_dir}...")
     trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True)
     
@@ -200,9 +209,8 @@ def pretrain_pipeline(ARCH, DATA, data_dir, return_trainer=False):
     dataloader = parser.get_train_set()
     model.init_subclusters(dataloader)
     
-    os.makedirs("logs", exist_ok=True)
-    torch.save(model.state_dict(), "logs/hdc_sub.pth")
-    print("Subcluster Initialized Model saved to logs/hdc_sub.pth")
+    torch.save(model.state_dict(), pretrained_path)
+    print(f"Subcluster Initialized Model saved to {pretrained_path}")
     
     if return_trainer:
         return model, trainer
@@ -230,7 +238,7 @@ def save_degradation_plot(save_path, title, data_dict, metric="mIoU"):
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates on KITTI-C")
     parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on standard KITTI')
-    parser.add_argument('--pretrained_path', type=str, default='logs/hdc_sub.pth', help='Path to load pretrained model')
+    parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
     args = parser.parse_args()
 
@@ -248,7 +256,11 @@ def main():
 
     if args.pretrain:
         logger.info(f"Starting Pretraining on standard KITTI at {data_dir}...")
-        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, return_trainer=True)
+        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True)
+        
+        opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')
+        torch.save(trainer.optimizer.state_dict(), opt_path)
+        logger.info(f"Successfully pretrained model on KITTI. Optimizer state saved to {opt_path}")
     else:
         logger.info(f"Loading pretrained model from {args.pretrained_path}")
         model = load_hdc_model(args.pretrained_path)
