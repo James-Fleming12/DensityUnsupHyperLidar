@@ -111,6 +111,11 @@ class D3CTTA(nn.Module):
                 G_inv = torch.linalg.inv(G + self.lambda_ridge * I)
                 logits = h @ G_inv @ C
             
+            # Match HDC behavior: predict Class 0 (unlabeled) for all empty background pixels
+            empty_mask = (x.sum(dim=1) == 0).view(-1)
+            logits[empty_mask, :] = -1e9
+            logits[empty_mask, 0] = 1e9
+            
         return logits, None, torch.arange(logits.shape[0], device=logits.device), h
 
     def inference_update(self, h, predictions, xyz):
