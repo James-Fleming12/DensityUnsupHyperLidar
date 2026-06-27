@@ -87,7 +87,7 @@ sqlparse>=0.4.4
 texttable>=1.7.0
 threadpoolctl>=3.2.0
 
-opencv-python>=4.13.0.92
+opencv-python<4.13.0
 torchvision>=0.25.0
 torch-hd>=5.8.4
 fire>=0.7.1
