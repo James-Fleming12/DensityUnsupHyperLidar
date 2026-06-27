@@ -36,6 +36,35 @@ def save_graphic(save_path, title, data):
     plt.savefig(save_path)
     plt.close()
 
+def save_improvement_bar_chart(save_path, title, data):
+    import numpy as np
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
+    plt.figure(figsize=(8, 6))
+    metrics = list(data.keys())
+    initial_vals = [data[m][0] if len(data[m]) > 0 else 0 for m in metrics]
+    final_vals = [data[m][-1] if len(data[m]) > 0 else 0 for m in metrics]
+    
+    x = np.arange(len(metrics))
+    width = 0.35
+    
+    plt.bar(x - width/2, initial_vals, width, label='Initial (Zero-Shot)', color='#4C9BE8')
+    plt.bar(x + width/2, final_vals, width, label='Final (Adapted)', color='#E8574C')
+    
+    plt.ylabel('Metric Value')
+    plt.title(f'{title} - Total Improvement')
+    plt.xticks(x, metrics)
+    plt.legend()
+    
+    for i, v in enumerate(initial_vals):
+        plt.text(i - width/2, v + 0.01, f'{v:.3f}', ha='center', va='bottom', fontweight='bold')
+    for i, v in enumerate(final_vals):
+        plt.text(i + width/2, v + 0.01, f'{v:.3f}', ha='center', va='bottom', fontweight='bold')
+        
+    plt.ylim(0, max(max(initial_vals), max(final_vals) if len(final_vals) > 0 else 0) * 1.2 + 0.05)
+    plt.tight_layout()
+    plt.savefig(save_path)
+    plt.close()
+
 def extract_metrics_from_conf_matrix(conf_matrix):
     tp = torch.diag(conf_matrix)
     union = conf_matrix.sum(dim=1) + conf_matrix.sum(dim=0) - tp
@@ -188,11 +217,13 @@ def main():
     kitti_data = run_semantic_kitti(model, logger)
     if kitti_data["mIoU"]:
         save_graphic(os.path.join(args.log_dir, 'waymo_to_kitti.png'), 'Waymo -> SemanticKITTI', kitti_data)
+        save_improvement_bar_chart(os.path.join(args.log_dir, 'waymo_to_kitti_bar.png'), 'Waymo -> SemanticKITTI', kitti_data)
 
     # Test NuScenes
     nuscenes_data = run_nuscenes(model, logger)
     if nuscenes_data["mIoU"]:
         save_graphic(os.path.join(args.log_dir, 'waymo_to_nuscenes.png'), 'Waymo -> NuScenes', nuscenes_data)
+        save_improvement_bar_chart(os.path.join(args.log_dir, 'waymo_to_nuscenes_bar.png'), 'Waymo -> NuScenes', nuscenes_data)
 
     logger.info("Completed Waymo Inference Tests!")
 
