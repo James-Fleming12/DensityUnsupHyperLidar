@@ -266,7 +266,7 @@ def load_d3ctta_model(path):
     se_path = os.path.join(os.path.dirname(path), "SENet_valid_best")
     if os.path.exists(se_path):
         w_dict = torch.load(se_path, map_location=device)
-        feature_extractor.load_state_dict(w_dict['state_dict'], strict=True)
+        feature_extractor.load_state_dict(w_dict['state_dict'], strict=False)
     feature_extractor.to(device)
     feature_extractor.eval()
     
