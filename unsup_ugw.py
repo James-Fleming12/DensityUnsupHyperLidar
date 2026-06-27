@@ -178,7 +178,7 @@ def pretrain_pipeline(ARCH, DATA, return_trainer=False):
         return model, trainer
     return model
 
-def incremental_update_test(ARCH, DATA):
+def incremental_update_test(ARCH, DATA, pretrained_path="logs/hdc_sub.pth", compare=False):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_seqs = DATA["split"]["train"]
     valid_seqs = DATA["split"]["valid"]
@@ -219,9 +219,15 @@ def incremental_update_test(ARCH, DATA):
         val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
 
         for cfg in ABLATION_CONFIGS:
-            model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-            model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
-            model.to(device)
+            if compare:
+                model = load_d3ctta_model(pretrained_path)
+                # D3CTTA does not support online subclusters logic easily, so we just use inference_update
+                update_fn = model.inference_update
+            else:
+                model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+                model.load_state_dict(torch.load(pretrained_path, map_location=device))
+                model.to(device)
+                update_fn = model.inference_update_with_subcluster_pull if cfg["online_subclusters"] else model.inference_update
 
             print(f"  Config: {cfg['name']}")
 
@@ -230,16 +236,27 @@ def incremental_update_test(ARCH, DATA):
 
             model.train()
             
-            update_fn = model.inference_update_with_subcluster_pull if cfg["online_subclusters"] else model.inference_update
-            
-            for _, (proj_in, *_) in enumerate(tqdm(train_loaders[cond], desc=f"    update [{cond}|{cfg['name']}]", leave=False)):
+            for _, batch_data in enumerate(tqdm(train_loaders[cond], desc=f"    update [{cond}|{cfg['name']}]", leave=False)):
+                proj_in = batch_data[0]
                 if proj_in.shape[1] > 0:
-                    update_fn(
-                        proj_in.to(device),
-                        learning_rate=0.001,
-                        distance_sensitivity=3.0,
-                        thresholds=cfg["thresholds"]
-                    )
+                    proj_in = proj_in.to(device)
+                    if compare:
+                        with torch.no_grad():
+                            logits, sims, indices, h = model(proj_in)
+                            predictions = torch.argmax(logits, dim=1)
+                        proj_xyz = batch_data[10].to(device) if len(batch_data) > 10 else None
+                        update_fn(
+                            h=h,
+                            predictions=predictions,
+                            xyz=proj_xyz
+                        )
+                    else:
+                        update_fn(
+                            proj_in,
+                            learning_rate=0.001,
+                            distance_sensitivity=3.0,
+                            thresholds=cfg["thresholds"]
+                        )
 
             acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
             print(f"    Post - acc: {acc_post:.4f}  mIoU: {miou_post:.4f}  Δ mIoU: {miou_post - miou_pre:+.4f}")
@@ -413,7 +430,34 @@ def save_final_plot(history):
     plt.close()
     print("Plot saved to incremental_update_test.png")
 
+import argparse
+
+def load_d3ctta_model(path):
+    print(f"Loading pretrained feature extractor for D3CTTA from {path}...")
+    from modules.network.ResNet import ResNet_34
+    from modules.D3CTTA import D3CTTA
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    NUM_CLASSES = 13
+    feature_extractor = ResNet_34(NUM_CLASSES, aux=False, use_adaptor=False)
+    
+    se_path = os.path.join(os.path.dirname(path), "SENet_valid_best")
+    if os.path.exists(se_path):
+        w_dict = torch.load(se_path, map_location=device)
+        feature_extractor.load_state_dict(w_dict['state_dict'], strict=True)
+    feature_extractor.to(device)
+    feature_extractor.eval()
+    
+    model = D3CTTA(feature_extractor, num_classes=NUM_CLASSES)
+    model.to(device)
+    return model
+
 def main():
+    parser = argparse.ArgumentParser(description="Test Unsupervised Updates on Waymo UGW")
+    parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on sunny conditions')
+    parser.add_argument('--pretrained_path', type=str, default='logs/hdc_sub.pth', help='Path to load pretrained model')
+    parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
+    args = parser.parse_args()
+    
     try:
         ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
     except Exception as e:
@@ -425,8 +469,10 @@ def main():
         print(f"Error opening data yaml file. {e}")
         quit()
 
-    model = pretrain_pipeline(ARCH, DATA)
-    incremental_update_test(ARCH, DATA)
+    if args.pretrain:
+        model = pretrain_pipeline(ARCH, DATA)
+    
+    incremental_update_test(ARCH, DATA, args.pretrained_path, args.compare)
 
 if __name__ == "__main__":
     main()
