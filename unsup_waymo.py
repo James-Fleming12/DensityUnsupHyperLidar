@@ -199,7 +199,7 @@ def load_d3ctta_model(path):
     from modules.D3CTTA import D3CTTA
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     NUM_CLASSES = 13
-    feature_extractor = ResNet_34(NUM_CLASSES, aux=False, use_adaptor=False)
+    feature_extractor = ResNet_34(NUM_CLASSES, aux=False, use_adaptor=True)
     
     # Try to load the best extractor from SENet_valid_best
     se_path = os.path.join(os.path.dirname(path), "SENet_valid_best")
