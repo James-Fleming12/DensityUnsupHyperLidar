@@ -12,6 +12,12 @@ class D3CTTA(nn.Module):
         self.proj_dim = proj_dim
         self.lambda_ridge = lambda_ridge
         
+        # Zero out the biases of the semantic_output layer so that empty background pixels 
+        # (which produce near-zero feature maps) naturally default to Class 0, matching HDC.
+        if hasattr(self.feature_extractor, 'semantic_output') and hasattr(self.feature_extractor.semantic_output, 'bias'):
+            if self.feature_extractor.semantic_output.bias is not None:
+                self.feature_extractor.semantic_output.bias.data.zero_()
+        
         # 2. Random Projection
         self.W = nn.Linear(feature_dim, proj_dim, bias=False)
         with torch.no_grad():
@@ -110,11 +116,6 @@ class D3CTTA(nn.Module):
                 I = torch.eye(self.proj_dim, device=device)
                 G_inv = torch.linalg.inv(G + self.lambda_ridge * I)
                 logits = h @ G_inv @ C
-            
-            # Match HDC behavior: predict Class 0 (unlabeled) for all empty background pixels
-            empty_mask = (x.sum(dim=1) == 0).view(-1)
-            logits[empty_mask, :] = -1e9
-            logits[empty_mask, 0] = 1e9
             
         return logits, None, torch.arange(logits.shape[0], device=logits.device), h
 
