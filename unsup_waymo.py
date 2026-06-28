@@ -185,11 +185,9 @@ def load_hdc_model(path):
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
     NUM_CLASSES = 13
-    model = DensityModel(ARCH, "logs", 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-    if os.path.exists(path):
-        model.load_state_dict(torch.load(path, map_location=device))
-    else:
-        print(f"Warning: Checkpoint not found at {path}, starting from random init.")
+    modeldir = os.path.dirname(path)
+    model = DensityModel(ARCH, modeldir, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+    model.load_state_dict(torch.load(path, map_location=device))
     model.to(device)
     return model
 
