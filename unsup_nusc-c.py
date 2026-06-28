@@ -359,15 +359,16 @@ def main():
                 results_acc[ctype][sev] = final_acc
                 
                 logger.info(f"Result for {ctype}-{sev}: mIoU={final_miou:.4f}, Acc={final_acc:.4f}")
-                
-                save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}.png'), f'{ctype} Sev {sev}', metrics)
+                suffix = "_d3ctta" if args.compare else ""
+                save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.png'), f'{ctype} Sev {sev}', metrics)
             else:
                 logger.info(f"No valid frames evaluated for {ctype}-{sev}")
 
-    save_degradation_plot(os.path.join(args.log_dir, 'degradation_miou.png'), 'NuScenes-C', results_miou, metric='mIoU')
-    save_degradation_plot(os.path.join(args.log_dir, 'degradation_acc.png'), 'NuScenes-C', results_acc, metric='Accuracy')
+    suffix = "_d3ctta" if args.compare else ""
+    save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'NuScenes-C', results_miou, metric='mIoU')
+    save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'NuScenes-C', results_acc, metric='Accuracy')
     
-    with open(os.path.join(args.log_dir, 'results.json'), 'w') as f:
+    with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
         json.dump({'mIoU': results_miou, 'Accuracy': results_acc}, f, indent=4)
 
 if __name__ == "__main__":

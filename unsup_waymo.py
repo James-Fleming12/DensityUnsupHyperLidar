@@ -255,17 +255,18 @@ def main():
         logger.error(f"Failed to load or pretrain model: {e}")
         return
 
+    suffix = "_d3ctta" if args.compare else ""
     # Test SemanticKITTI
     kitti_data = run_semantic_kitti(model, logger)
     if kitti_data["mIoU"]:
-        save_graphic(os.path.join(args.log_dir, 'waymo_to_kitti.png'), 'Waymo -> SemanticKITTI', kitti_data)
-        save_improvement_bar_chart(os.path.join(args.log_dir, 'waymo_to_kitti_bar.png'), 'Waymo -> SemanticKITTI', kitti_data)
+        save_graphic(os.path.join(args.log_dir, f'waymo_to_kitti{suffix}.png'), 'Waymo -> SemanticKITTI', kitti_data)
+        save_improvement_bar_chart(os.path.join(args.log_dir, f'waymo_to_kitti_bar{suffix}.png'), 'Waymo -> SemanticKITTI', kitti_data)
 
     # Test NuScenes
     nuscenes_data = run_nuscenes(model, logger)
     if nuscenes_data["mIoU"]:
-        save_graphic(os.path.join(args.log_dir, 'waymo_to_nuscenes.png'), 'Waymo -> NuScenes', nuscenes_data)
-        save_improvement_bar_chart(os.path.join(args.log_dir, 'waymo_to_nuscenes_bar.png'), 'Waymo -> NuScenes', nuscenes_data)
+        save_graphic(os.path.join(args.log_dir, f'waymo_to_nuscenes{suffix}.png'), 'Waymo -> NuScenes', nuscenes_data)
+        save_improvement_bar_chart(os.path.join(args.log_dir, f'waymo_to_nuscenes_bar{suffix}.png'), 'Waymo -> NuScenes', nuscenes_data)
 
     logger.info("Completed Waymo Inference Tests!")
 

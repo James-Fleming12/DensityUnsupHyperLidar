@@ -266,8 +266,8 @@ def incremental_update_test(ARCH, DATA, pretrained_path="logs/hdc_sub.pth", comp
             history["acc_pairs"].append((acc_pre, acc_post))
             history["miou_pairs"].append((miou_pre, miou_post))
             history["config_names"].append(cfg["name"])
-
-    save_multi_step_dumbbell_ug(history, DATA, file_suffix="_condition_split")
+    suffix = "_condition_split_d3ctta" if compare else "_condition_split"
+    save_multi_step_dumbbell_ug(history, DATA, file_suffix=suffix)
 
 def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix="", sunny_baseline=None):
     labels = history["steps_labels"]
