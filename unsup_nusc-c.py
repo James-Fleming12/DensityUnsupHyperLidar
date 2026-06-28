@@ -24,7 +24,7 @@ def corrupt_beam(points, severity):
     num_drop = int(len(unique_rings) * drop_fraction)
     dropped_rings = np.random.choice(unique_rings, num_drop, replace=False)
     mask = ~np.isin(ring_ids, dropped_rings)
-    return points[mask]
+    return points[mask], mask, 0
 
 def corrupt_crosstalk(points, severity):
     num_points = len(points)
@@ -35,7 +35,7 @@ def corrupt_crosstalk(points, severity):
     noise_xyz = np.random.uniform(min_bounds, max_bounds, size=(num_noise, 3))
     noise_intensity = np.random.uniform(0, 0.1, size=(num_noise, 1)) 
     noise_points = np.hstack((noise_xyz, noise_intensity))
-    return np.vstack((points, noise_points))
+    return np.vstack((points, noise_points)), np.ones(len(points), dtype=bool), num_noise
 
 def corrupt_fog(points, severity):
     distances = np.linalg.norm(points[:, :3], axis=1)
@@ -43,7 +43,7 @@ def corrupt_fog(points, severity):
     survival_prob = np.exp(-beta * distances)
     random_draw = np.random.uniform(0, 1, size=len(points))
     mask = random_draw < survival_prob
-    return points[mask]
+    return points[mask], mask, 0
 
 def corrupt_echo(points, severity):
     intensity_threshold = np.percentile(points[:, 3], 90)
@@ -52,7 +52,7 @@ def corrupt_echo(points, severity):
     shift_multiplier = 1.0 + (0.1 * severity) 
     echo_points[:, :3] = echo_points[:, :3] * shift_multiplier
     echo_points[:, 3] = echo_points[:, 3] * 0.5 
-    return np.vstack((points, echo_points))
+    return np.vstack((points, echo_points)), np.ones(len(points), dtype=bool), len(echo_points)
 
 def corrupt_motion(points, severity):
     azimuth = np.arctan2(points[:, 1], points[:, 0])
@@ -60,7 +60,7 @@ def corrupt_motion(points, severity):
     max_translation = 0.2 * severity 
     blur_shift = np.outer(timeline, np.array([max_translation, 0, 0])) 
     points[:, :3] += blur_shift
-    return points
+    return points, np.ones(len(points), dtype=bool), 0
 
 def corrupt_snow(points, severity):
     num_flakes = 1000 * severity
@@ -72,8 +72,8 @@ def corrupt_snow(points, severity):
     survive_ground = np.random.uniform(0, 1, size=np.sum(ground_mask)) > drop_prob
     final_points_mask = np.ones(len(points), dtype=bool)
     final_points_mask[ground_mask] = survive_ground
-    points = points[final_points_mask]
-    return np.vstack((points, snowflakes))
+    filtered_points = points[final_points_mask]
+    return np.vstack((filtered_points, snowflakes)), final_points_mask, num_flakes
 
 def apply_corruption(points, corruption_type, severity):
     if corruption_type == 'beam':
@@ -88,7 +88,7 @@ def apply_corruption(points, corruption_type, severity):
         return corrupt_motion(points, severity)
     elif corruption_type == 'snow':
         return corrupt_snow(points, severity)
-    return points
+    return points, np.ones(len(points), dtype=bool), 0
 
 class LiDARCorruptionWrapper(Dataset):
     def __init__(self, base_dataset, corruption_type=None, severity=1):
@@ -105,13 +105,19 @@ class LiDARCorruptionWrapper(Dataset):
         
         wrapper_self = self
         
+        original_label_open = SemLaserScan.open_label
+
         def patched_open_scan(scan_self, filename):
-            scan_self.reset()
             scan = np.fromfile(filename, dtype=np.float32)
             scan = scan.reshape((-1, 4))
             
             if wrapper_self.corruption_type:
-                scan = apply_corruption(scan, wrapper_self.corruption_type, wrapper_self.severity)
+                scan, mask, added_count = apply_corruption(scan, wrapper_self.corruption_type, wrapper_self.severity)
+                scan_self.corruption_mask = mask
+                scan_self.corruption_added = added_count
+            else:
+                scan_self.corruption_mask = None
+                scan_self.corruption_added = 0
                 
             points = scan[:, 0:3]
             remissions = scan[:, 3]
@@ -123,14 +129,34 @@ class LiDARCorruptionWrapper(Dataset):
 
             scan_self.set_points(points, remissions)
 
+        def patched_open_label(scan_self, filename):
+            if not any(filename.endswith(ext) for ext in scan_self.EXTENSIONS_LABEL):
+                raise RuntimeError("Filename extension is not valid label file.")
+            label = np.fromfile(filename, dtype=np.int32)
+            label = label.reshape((-1))
+            
+            if scan_self.drop_points is not False:
+                label = np.delete(label, scan_self.points_to_drop)
+                
+            if getattr(scan_self, 'corruption_mask', None) is not None:
+                label = label[scan_self.corruption_mask]
+                
+            if getattr(scan_self, 'corruption_added', 0) > 0:
+                fake_label = np.zeros(scan_self.corruption_added, dtype=label.dtype)
+                label = np.concatenate([label, fake_label])
+                
+            scan_self.set_label(label)
+
         SemLaserScan.open_scan = patched_open_scan
         LaserScan.open_scan = patched_open_scan
+        SemLaserScan.open_label = patched_open_label
         
         try:
             data = self.base_dataset[idx]
         finally:
             SemLaserScan.open_scan = original_open
             LaserScan.open_scan = original_laser_open
+            SemLaserScan.open_label = original_label_open
             
         return data
 
