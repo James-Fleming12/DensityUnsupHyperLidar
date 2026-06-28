@@ -219,12 +219,14 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
     unsup_main.HDC_SUB_PATH = pretrained_path
 
     if not skip_extractor:
+        ARCH["train"]["batch_size"] = 24
         print(f"Pretraining feature extractor on {data_dir}...")
         trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True)
     else:
         print(f"Skipping feature extractor pretraining...")
         trainer = None
     
+    ARCH["train"]["batch_size"] = 6
     print(f"Pretraining HDC density model on {data_dir}...")
     model, _ = train_hdc(ARCH, DATA, data_dir=data_dir, return_extractor=True)
     
