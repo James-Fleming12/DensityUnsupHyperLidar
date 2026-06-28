@@ -3392,6 +3392,204 @@ class DensityModel(nn.Module):
 
             return full_predictions
 
+    def inference_update_ttaug(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None, proj_xyz=None):
+        """Hypervector Bundling via Test-Time Augmentation (TTAug)"""
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            
+            # Generate 5 augmented views
+            x_aug1 = torch.roll(x, shifts=1, dims=3)
+            x_aug2 = torch.roll(x, shifts=-1, dims=3)
+            x_aug3 = x * 1.05
+            x_aug4 = x + torch.randn_like(x) * 0.05
+            
+            enc1, _, _ = self.encode(x_aug1)
+            enc2, _, _ = self.encode(x_aug2)
+            enc3, _, _ = self.encode(x_aug3)
+            enc4, _, _ = self.encode(x_aug4)
+            
+            num_total_samples = enc.shape[0]
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            active_enc1 = enc1[valid_enc_mask]
+            active_enc2 = enc2[valid_enc_mask]
+            active_enc3 = enc3[valid_enc_mask]
+            active_enc4 = enc4[valid_enc_mask]
+            
+            # Bundle hypervectors
+            bundled_enc = active_enc + active_enc1 + active_enc2 + active_enc3 + active_enc4
+            enc_norm = F.normalize(bundled_enc)
+            
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+
+            num_active = enc_norm.shape[0]
+            curr_chunk_size = num_active if chunk_size == -1 else chunk_size
+
+            all_predictions = []
+            all_update_masks = []
+
+            for i in range(0, num_active, curr_chunk_size):
+                chunk_enc_norm = enc_norm[i : i + curr_chunk_size]
+                chunk_logits = self.classify(chunk_enc_norm)
+                chunk_preds = torch.argmax(chunk_logits, dim=1)
+                all_predictions.append(chunk_preds)
+
+                selected_proto = F.normalize(self.classify.weight[chunk_preds])
+                sims = torch.sum(chunk_enc_norm * selected_proto, dim=1)
+                distances = (1.0 - sims) / 2.0
+                all_update_masks.append(distances > beta)
+
+            predictions = torch.cat(all_predictions)
+            update_mask = torch.cat(all_update_masks)
+
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = predictions
+
+            if not torch.any(update_mask):
+                return full_predictions
+
+            valid_indices_in_active = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(predictions[valid_indices_in_active])
+
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (predictions == c_id) & update_mask
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if max_updates_per_class != -1 and len(class_indices) > max_updates_per_class:
+                    fps_indices = self._farthest_point_sample(enc_norm[class_indices].cpu(), max_updates_per_class)
+                    class_indices = class_indices[fps_indices.to(self.device)]
+
+                sample_encs = enc_norm[class_indices]
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_weight = self.classify.weight[c_id]
+                self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
+                updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+
+            return full_predictions
+
+    def inference_update_gplp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None, proj_xyz=None):
+        """Graph-Laplacian Label Propagation"""
+        self.train()
+        with torch.no_grad():
+            enc, _, _ = self.encode(x)
+            num_total_samples = enc.shape[0]
+            valid_enc_mask = torch.any(enc != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc = enc[valid_enc_mask]
+            enc_norm = F.normalize(active_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+                
+            # Raw cosine similarity against HDC prototypes
+            prototypes = F.normalize(self.classify.weight)
+            S = enc_norm @ prototypes.T  # Shape: (num_active, num_classes)
+            
+            if proj_xyz is not None:
+                # Extract active xyz points
+                xyz_flat = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)
+                active_xyz = xyz_flat[valid_enc_mask]
+                
+                # KNN graph in physical space
+                # To prevent OOM, we can do cdist in chunks if needed, but active points are usually <30k
+                # A 30k x 30k float32 matrix is ~3.6GB. Let's do it safely.
+                num_active = active_xyz.shape[0]
+                K = 5
+                iterations = 3
+                
+                # Construct graph step-by-step to save memory
+                # We will just compute top-K for each row
+                topk_indices = []
+                chunk_s = 5000
+                for i in range(0, num_active, chunk_s):
+                    end = min(i + chunk_s, num_active)
+                    chunk_xyz = active_xyz[i:end]
+                    dist = torch.cdist(chunk_xyz, active_xyz)
+                    _, knn_idx = dist.topk(K + 1, largest=False)
+                    topk_indices.append(knn_idx[:, 1:]) # Exclude self
+                knn_idx = torch.cat(topk_indices, dim=0) # (num_active, K)
+                
+                # Propagate scores (Graph Laplacian smoothing)
+                for _ in range(iterations):
+                    # For each node, new score is average of its own and its neighbors
+                    neighbor_scores = S[knn_idx] # (num_active, K, num_classes)
+                    S = 0.5 * S + 0.5 * neighbor_scores.mean(dim=1)
+            
+            predictions = S.argmax(dim=1)
+            
+            # Now we use the smoothed similarity (or recompute distance to pulled prototypes)
+            # Standard standard pull logic follows:
+            all_update_masks = []
+            selected_proto = prototypes[predictions]
+            sims = torch.sum(enc_norm * selected_proto, dim=1)
+            # But wait, we should use the smoothed S for thresholding? 
+            # The prompt says: "If a pedestrian's torso is highly confident (0.85) but legs are corrupted (0.40), the graph propagation will allow the torso's confidence to 'bleed' down... raising the legs to 0.75. Now, the entire pedestrian crosses the threshold, pulling the prototype cohesively"
+            # So the pull criteria is based on the smoothed similarity S!
+            smoothed_sims = S.gather(1, predictions.unsqueeze(1)).squeeze(1)
+            distances = (1.0 - smoothed_sims) / 2.0
+            update_mask = distances > beta
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = predictions
+
+            if not torch.any(update_mask):
+                return full_predictions
+
+            valid_indices_in_active = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(predictions[valid_indices_in_active])
+
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (predictions == c_id) & update_mask
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if max_updates_per_class != -1 and len(class_indices) > max_updates_per_class:
+                    fps_indices = self._farthest_point_sample(enc_norm[class_indices].cpu(), max_updates_per_class)
+                    class_indices = class_indices[fps_indices.to(self.device)]
+
+                sample_encs = enc_norm[class_indices]
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_weight = self.classify.weight[c_id]
+                self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
+                updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+
+            return full_predictions
+
     def inference_update_with_subcluster_pull(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, subcluster_lr=0.005, thresholds=(0.45, 0.80)):
         """Temp Function for testing. Like inference_update, but also pulls the nearest subcluster toward high-confidence samples."""
         self.train()

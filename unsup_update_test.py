@@ -8,6 +8,7 @@ import copy
 
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import Model, DensityModel
+from modules.active_model import ActiveModel
 
 from tqdm import tqdm
 
@@ -59,11 +60,9 @@ def main():
         return
 
     update_methods = [
-        {"name": "Standard Pull", "method": "inference_update"},
-        {"name": "Confident Minority Oracle Pull\n(Budget: Top-K starved)", "method": "inference_update_cmop"},
-        {"name": "Prototype Drift Intervention\n(Budget: Event-driven)", "method": "inference_update_pdi"},
-        {"name": "Class Boundary Oracle Triangulation\n(Budget: Fixed K edges)", "method": "inference_update_cbot"},
-        {"name": "Temporal Anchor Oracle Correction\n(Budget: Retroactive K)", "method": "inference_update_taoc"},
+        {"name": "Outlier Oracle Anchor (ADA)", "method": "inference_update_ooa", "is_active": True},
+        {"name": "Hypervector Bundling (TTAug)", "method": "inference_update_ttaug", "is_active": False},
+        {"name": "Graph-Laplacian Label Propagation", "method": "inference_update_gplp", "is_active": False},
     ]
 
     ablation_histories = []
@@ -96,7 +95,10 @@ def main():
 
             val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
 
-            model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+            if cfg.get("is_active", False):
+                model = ActiveModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+            else:
+                model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
             model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
             model.to(device)
 
@@ -122,10 +124,13 @@ def main():
 
                 proj_in = batch[0]
                 oracle_labels = batch[2] if len(batch) > 2 else None
+                proj_xyz = batch[10] if len(batch) > 10 else None
                 
                 kwargs = {}
                 if cfg["method"] != "inference_update":
                     kwargs["oracle_labels"] = oracle_labels.to(device) if oracle_labels is not None else None
+                if cfg["method"] in ["inference_update_gplp", "inference_update_ooa", "inference_update_ttaug"]:
+                    kwargs["proj_xyz"] = proj_xyz.to(device) if proj_xyz is not None else None
                 
                 if proj_in.shape[1] > 0:
                     update_fn(
