@@ -160,7 +160,8 @@ class LiDARCorruptionWrapper(Dataset):
             
         return data
 
-def evaluate_and_adapt(model, target_dataloader, device):
+def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
+    """Helper method executing the forward/eval/adapt cycle."""
     miou_history = []
     acc_history = []
     num_classes = model.num_classes
@@ -190,20 +191,21 @@ def evaluate_and_adapt(model, target_dataloader, device):
             miou_history.append(cumulative_miou)
             acc_history.append(cumulative_acc)
             # Adapt: Inference Update
-            model.train()
-            if hasattr(model, 'G_d'):  # Duck typing for D3CTTA
-                model.inference_update(
-                    h=h,
-                    predictions=predictions,
-                    xyz=proj_xyz
-                )
-            else:
-                model.inference_update(
-                    proj_in,
-                    learning_rate=0.001,
-                    distance_sensitivity=3.0,
-                    thresholds=[0.45, 0.80]
-                )
+            if not eval_only:
+                model.train()
+                if hasattr(model, 'G_d'):  # Duck typing for D3CTTA
+                    model.inference_update(
+                        h=h,
+                        predictions=predictions,
+                        xyz=proj_xyz
+                    )
+                else:
+                    model.inference_update(
+                        proj_in,
+                        learning_rate=0.001,
+                        distance_sensitivity=3.0,
+                        thresholds=[0.45, 0.80]
+                    )
             
     return {"mIoU": miou_history, "Accuracy": acc_history}
 
@@ -364,6 +366,27 @@ def main():
 
     results_miou = {c: {} for c in corruptions}
     results_acc = {c: {} for c in corruptions}
+
+    logger.info("Evaluating on clean baseline (Sunny/Original) dataset...")
+    baseline_parser = Parser(root=data_dir,
+                    train_sequences=DATA["split"]["train"],
+                    valid_sequences=DATA["split"]["valid"],
+                    test_sequences=None,
+                    labels=DATA["labels"],
+                    color_map=DATA["color_map"],
+                    learning_map=DATA["learning_map"],
+                    learning_map_inv=DATA["learning_map_inv"],
+                    sensor=ARCH["dataset"]["sensor"],
+                    max_points=ARCH["dataset"]["max_points"],
+                    batch_size=1,
+                    workers=ARCH["train"]["workers"],
+                    gt=True,
+                    shuffle_train=False)
+    baseline_loader = DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
+    
+    baseline_metrics = evaluate_and_adapt(model, baseline_loader, device, eval_only=True)
+    if len(baseline_metrics["mIoU"]) > 0:
+        logger.info(f"Clean Baseline: mIoU={baseline_metrics['mIoU'][-1]:.4f}, Acc={baseline_metrics['Accuracy'][-1]:.4f}")
     
     for ctype in corruptions:
         for sev in severities:
@@ -404,6 +427,11 @@ def main():
                 
                 logger.info(f"Result for {ctype}-{sev}: mIoU={final_miou:.4f}, Acc={final_acc:.4f}")
                 suffix = "_d3ctta" if args.compare else ""
+                
+                traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
+                with open(traj_json_path, 'w') as f:
+                    json.dump(metrics, f, indent=4)
+                    
                 save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.png'), f'{ctype} Sev {sev}', metrics)
             else:
                 logger.info(f"No valid frames evaluated for {ctype}-{sev}")

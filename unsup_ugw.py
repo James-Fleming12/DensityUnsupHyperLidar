@@ -1,4 +1,5 @@
 import copy
+import json
 import os
 import numpy as np
 import torch
@@ -213,6 +214,18 @@ def incremental_update_test(ARCH, DATA, pretrained_path="logs/hdc_sub.pth", comp
         "config_names": [],
     }
 
+    if "sunny" in val_loaders:
+        print(f"\n{'='*60}")
+        print(f"Condition: [SUNNY BASELINE]")
+        if compare:
+            model_base = load_d3ctta_model(pretrained_path)
+        else:
+            model_base = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+            model_base.load_state_dict(torch.load(pretrained_path, map_location=device))
+            model_base.to(device)
+        acc_sunny, miou_sunny = test_hdc_model(model_base, val_loaders["sunny"])
+        print(f"    Baseline - acc: {acc_sunny:.4f}  mIoU: {miou_sunny:.4f}")
+
     for cond in ADVERSE_CONDITIONS:
         if cond not in train_loaders:
             continue
@@ -272,6 +285,12 @@ def incremental_update_test(ARCH, DATA, pretrained_path="logs/hdc_sub.pth", comp
             history["miou_pairs"].append((miou_pre, miou_post))
             history["config_names"].append(cfg["name"])
     suffix = "_condition_split_d3ctta" if compare else "_condition_split"
+    
+    json_path = f'ablation_dumbbell{suffix}.json'
+    with open(json_path, 'w') as f:
+        json.dump(history, f, indent=4)
+    print(f'Ablation metrics saved to {json_path}')
+    
     save_multi_step_dumbbell_ug(history, DATA, file_suffix=suffix)
 
 def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix="", sunny_baseline=None):

@@ -3,6 +3,7 @@ import logging
 import os
 import torch
 import yaml
+import json
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
@@ -147,7 +148,11 @@ def run_semantic_kitti(model, logger):
                         gt=True,
                         shuffle_train=True)
         target_dataloader = parser.get_train_set()
-        return evaluate_and_adapt(model, target_dataloader, device)
+        metrics = evaluate_and_adapt(model, target_dataloader, device)
+        if len(metrics["mIoU"]) > 0:
+            logger.info(f"  -> SemanticKITTI Initial (Zero-Shot) - mIoU: {metrics['mIoU'][0]:.4f}, Acc: {metrics['Accuracy'][0]:.4f}")
+            logger.info(f"  -> SemanticKITTI Final (Adapted)     - mIoU: {metrics['mIoU'][-1]:.4f}, Acc: {metrics['Accuracy'][-1]:.4f}")
+        return metrics
     except Exception as e:
         logger.error(f"Failed to load SemanticKITTI dataset: {e}")
         return {"mIoU": [], "Accuracy": []}
@@ -174,7 +179,11 @@ def run_nuscenes(model, logger):
                         gt=True,
                         shuffle_train=True)
         target_dataloader = parser.get_train_set()
-        return evaluate_and_adapt(model, target_dataloader, device)
+        metrics = evaluate_and_adapt(model, target_dataloader, device)
+        if len(metrics["mIoU"]) > 0:
+            logger.info(f"  -> NuScenes Initial (Zero-Shot) - mIoU: {metrics['mIoU'][0]:.4f}, Acc: {metrics['Accuracy'][0]:.4f}")
+            logger.info(f"  -> NuScenes Final (Adapted)     - mIoU: {metrics['mIoU'][-1]:.4f}, Acc: {metrics['Accuracy'][-1]:.4f}")
+        return metrics
     except Exception as e:
         logger.error(f"Failed to load NuScenes dataset: {e}")
         return {"mIoU": [], "Accuracy": []}
@@ -269,12 +278,18 @@ def main():
     # Test SemanticKITTI
     kitti_data = run_semantic_kitti(model, logger)
     if kitti_data["mIoU"]:
+        json_path = os.path.join(args.log_dir, f'waymo_to_kitti_metrics{suffix}.json')
+        with open(json_path, 'w') as f:
+            json.dump(kitti_data, f, indent=4)
         save_graphic(os.path.join(args.log_dir, f'waymo_to_kitti{suffix}.png'), 'Waymo -> SemanticKITTI', kitti_data)
         save_improvement_bar_chart(os.path.join(args.log_dir, f'waymo_to_kitti_bar{suffix}.png'), 'Waymo -> SemanticKITTI', kitti_data)
 
     # Test NuScenes
     nuscenes_data = run_nuscenes(model, logger)
     if nuscenes_data["mIoU"]:
+        json_path = os.path.join(args.log_dir, f'waymo_to_nuscenes_metrics{suffix}.json')
+        with open(json_path, 'w') as f:
+            json.dump(nuscenes_data, f, indent=4)
         save_graphic(os.path.join(args.log_dir, f'waymo_to_nuscenes{suffix}.png'), 'Waymo -> NuScenes', nuscenes_data)
         save_improvement_bar_chart(os.path.join(args.log_dir, f'waymo_to_nuscenes_bar{suffix}.png'), 'Waymo -> NuScenes', nuscenes_data)
 
