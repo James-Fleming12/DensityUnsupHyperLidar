@@ -184,8 +184,14 @@ def load_hdc_model(path):
     from modules.HDC_utils import DensityModel
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
-    NUM_CLASSES = 13
+    import os
     modeldir = os.path.dirname(path)
+    weights_path = os.path.join(modeldir, "SENet_valid_best")
+    if os.path.exists(weights_path):
+        tmp_dict = torch.load(weights_path, map_location='cpu')
+        NUM_CLASSES = tmp_dict['state_dict']['semantic_output.bias'].shape[0]
+    else:
+        NUM_CLASSES = 13 # Fallback
     model = DensityModel(ARCH, modeldir, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
     model.load_state_dict(torch.load(path, map_location=device))
     model.to(device)
@@ -196,7 +202,13 @@ def load_d3ctta_model(path):
     from modules.network.ResNet import ResNet_34
     from modules.D3CTTA import D3CTTA
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    NUM_CLASSES = 13
+    import os
+    se_path = os.path.join(os.path.dirname(path), "SENet_valid_best")
+    if os.path.exists(se_path):
+        tmp_dict = torch.load(se_path, map_location='cpu')
+        NUM_CLASSES = tmp_dict['state_dict']['semantic_output.bias'].shape[0]
+    else:
+        NUM_CLASSES = 13 # Fallback
     feature_extractor = ResNet_34(NUM_CLASSES, aux=False, use_adaptor=True)
     
     # Try to load the best extractor from SENet_valid_best
