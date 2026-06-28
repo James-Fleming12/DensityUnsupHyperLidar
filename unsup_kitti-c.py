@@ -207,7 +207,7 @@ def evaluate_and_adapt(model, target_dataloader, device):
             
     return {"mIoU": miou_history, "Accuracy": acc_history}
 
-def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False):
+def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False):
     import unsup_main
     log_base = os.path.dirname(pretrained_path)
     os.makedirs(log_base, exist_ok=True)
@@ -217,8 +217,12 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
     unsup_main.HDC_SAVE_PATH = os.path.join(log_base, "hdc.pth")
     unsup_main.HDC_SUB_PATH = pretrained_path
 
-    print(f"Pretraining feature extractor on {data_dir}...")
-    trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True)
+    if not skip_extractor:
+        print(f"Pretraining feature extractor on {data_dir}...")
+        trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True)
+    else:
+        print(f"Skipping feature extractor pretraining...")
+        trainer = None
     
     print(f"Pretraining HDC density model on {data_dir}...")
     model, _ = train_hdc(ARCH, DATA, data_dir=data_dir, return_extractor=True)
@@ -315,6 +319,7 @@ def load_d3ctta_model(path):
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates on KITTI-C")
     parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on standard KITTI')
+    parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
     parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
@@ -325,7 +330,7 @@ def main():
 
     try:
         ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
-        DATA = yaml.safe_load(open("config/labels/semantic-kitti.yaml", 'r'))
+        DATA = yaml.safe_load(open("config/labels/semantic-kitti-all.yaml", 'r'))
     except Exception as e:
         logger.error(f"Error loading configs: {e}")
         return
@@ -334,11 +339,12 @@ def main():
 
     if args.pretrain:
         logger.info(f"Starting Pretraining on standard KITTI at {data_dir}...")
-        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True)
+        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor)
         
-        opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')
-        torch.save(trainer.optimizer.state_dict(), opt_path)
-        logger.info(f"Successfully pretrained model on KITTI. Optimizer state saved to {opt_path}")
+        if trainer is not None:
+            opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')
+            torch.save(trainer.optimizer.state_dict(), opt_path)
+            logger.info(f"Successfully pretrained model on KITTI. Optimizer state saved to {opt_path}")
         
         if args.compare:
             logger.info("Compare flag enabled. Loading D3CTTA model...")

@@ -619,7 +619,7 @@ class DensityTrainer():
                     model.classify.weight[:] = F.normalize(model.classify_weights)
 
                 # print("Number of wrongs:", self.is_wrong_list[i].sum().item())
-                predictions, samples_hv, indices, self.is_wrong_list[i] = model(proj_in, self.mask, None, self.is_wrong_list[i])
+                predictions, samples_hv, indices, self.is_wrong_list[i] = model(proj_in, self.mask, 0.05, self.is_wrong_list[i])
                 argmax = predictions.argmax(dim=1) # (bsz*size, 1)
                 # #proj_labels shape: torch.Size([1, 64, 512])
                 proj_labels = proj_labels.view(-1)  # shape: (btsz*64*512, 1) 

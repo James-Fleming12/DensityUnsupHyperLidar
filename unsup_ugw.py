@@ -129,34 +129,38 @@ def get_condition_loaders(ARCH, DATA, sequences, batch_size=1, shuffle=False, co
 
     return loaders
 
-def pretrain_pipeline(ARCH, DATA, return_trainer=False):
+def pretrain_pipeline(ARCH, DATA, return_trainer=False, skip_extractor=False):
     print(f"--- Starting Pretraining on ALL sunny scenarios ---")
 
     PRE_DATA = copy.deepcopy(DATA)
     PRE_DATA["weather_filter"] = ["sunny"]
 
-    ARCH["train"]["batch_size"] = 24
-    print("Training Feature Extractor (sunny only)...")
-    trainer = train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS, return_trainer=True)
+    if not skip_extractor:
+        ARCH["train"]["batch_size"] = 24
+        print("Training Feature Extractor (sunny only)...")
+        trainer = train_extractor(ARCH, PRE_DATA, data_dir=DATA_DIR, epochs=FEATURE_EXTRACTOR_EPOCHS, return_trainer=True)
 
-    if USE_ENTROPY_MINIMIZATION:
-        print("Running target entropy minimization on adverse conditions...")
-        adverse_loaders = get_condition_loaders(ARCH, DATA, DATA["split"]["train"], batch_size=ARCH["train"]["batch_size"], shuffle=True, conditions=ADVERSE_CONDITIONS)
+        if USE_ENTROPY_MINIMIZATION:
+            print("Running target entropy minimization on adverse conditions...")
+            adverse_loaders = get_condition_loaders(ARCH, DATA, DATA["split"]["train"], batch_size=ARCH["train"]["batch_size"], shuffle=True, conditions=ADVERSE_CONDITIONS)
 
-        if adverse_loaders:
-            target_dataset = torch.utils.data.ConcatDataset([loader.dataset for loader in adverse_loaders.values()])
-            target_loader = torch.utils.data.DataLoader(target_dataset, batch_size=ARCH["train"]["batch_size"], shuffle=True, num_workers=ARCH["train"]["workers"], drop_last=True)
+            if adverse_loaders:
+                target_dataset = torch.utils.data.ConcatDataset([loader.dataset for loader in adverse_loaders.values()])
+                target_loader = torch.utils.data.DataLoader(target_dataset, batch_size=ARCH["train"]["batch_size"], shuffle=True, num_workers=ARCH["train"]["workers"], drop_last=True)
 
-            trainer.run_target_entropy_minimization(target_loader, epochs=3, lr=1e-5)
+                trainer.run_target_entropy_minimization(target_loader, epochs=3, lr=1e-5)
 
-            checkpoint_path = os.path.join(MODEL_DIR, "SENet_valid_best")
-            state = {'state_dict': trainer.model.state_dict()}
-            torch.save(state, checkpoint_path)
-            print(f"Saved adapted feature extractor weights to {checkpoint_path}")
+                checkpoint_path = os.path.join(MODEL_DIR, "SENet_valid_best")
+                state = {'state_dict': trainer.model.state_dict()}
+                torch.save(state, checkpoint_path)
+                print(f"Saved adapted feature extractor weights to {checkpoint_path}")
+            else:
+                print("  No adverse condition frames found, skipping entropy minimization.")
         else:
-            print("  No adverse condition frames found, skipping entropy minimization.")
+            print("Skipping entropy minimization (USE_ENTROPY_MINIMIZATION=False)")
     else:
-        print("Skipping entropy minimization (USE_ENTROPY_MINIMIZATION=False)")
+        print("Skipping Feature Extractor Pretraining... using existing weights.")
+        trainer = None
 
     ARCH["train"]["batch_size"] = 6
 
@@ -455,6 +459,7 @@ def load_d3ctta_model(path):
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates on Waymo UGW")
     parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on sunny conditions')
+    parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
     args = parser.parse_args()
@@ -471,7 +476,7 @@ def main():
         quit()
 
     if args.pretrain:
-        model = pretrain_pipeline(ARCH, DATA)
+        model = pretrain_pipeline(ARCH, DATA, skip_extractor=args.skip_extractor)
     
     incremental_update_test(ARCH, DATA, args.pretrained_path, args.compare)
 

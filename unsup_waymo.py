@@ -228,10 +228,11 @@ def load_d3ctta_model(path):
     return model
 
 def main():
-    parser = argparse.ArgumentParser(description="Pretrain HDC on Waymo and Test Inference on KITTI/NuScenes")
-    parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on Waymo instead of loading')
-    parser.add_argument('--pretrained_path', type=str, default='logs/hdc_sub.pth', help='Path to load pretrained Waymo model')
-    parser.add_argument('--log_dir', type=str, default='logs/waymo_pretrain_test', help='Directory to save logs and graphics')
+    parser = argparse.ArgumentParser(description="Test Unsupervised Updates on Waymo")
+    parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on sunny conditions')
+    parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
+    parser.add_argument('--pretrained_path', type=str, default='logs/hdc_sub.pth', help='Path to load pretrained model')
+    parser.add_argument('--log_dir', type=str, default='logs/waymo_test', help='Directory to save logs and graphics')
     parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
     args = parser.parse_args()
 
@@ -243,14 +244,13 @@ def main():
         WAYMO_ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
         WAYMO_DATA = yaml.safe_load(open("config/labels/waymo.yaml", 'r'))
         if args.pretrain:
-            logger.info("Starting Waymo Pretraining...")
-            model, trainer = pretrain_pipeline(WAYMO_ARCH, WAYMO_DATA, return_trainer=True)
+            logger.info("Starting Pretraining on Waymo sunny conditions...")
+            model, trainer = pretrain_pipeline(WAYMO_ARCH, WAYMO_DATA, skip_extractor=args.skip_extractor, return_trainer=True)
             
-            # Save the feature extractor optimizer so the user can resume or extend training later
-            opt_path = os.path.join(args.log_dir, 'feature_optimizer.pth')
-            torch.save(trainer.optimizer.state_dict(), opt_path)
-            logger.info(f"Successfully pretrained model on Waymo. Optimizer state saved to {opt_path}")
-            
+            if trainer is not None:
+                opt_path = os.path.join(args.log_dir, 'feature_optimizer.pth')
+                torch.save(trainer.optimizer.state_dict(), opt_path)
+                logger.info(f"Successfully pretrained model on Waymo. Optimizer state saved to {opt_path}")
             if args.compare:
                 logger.info("Compare flag enabled. Loading D3CTTA model...")
                 model = load_d3ctta_model(args.pretrained_path)

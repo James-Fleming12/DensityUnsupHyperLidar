@@ -17,7 +17,7 @@ DATA_DIR = "/mnt/alpha/jmfleming/nuscenes_kitti"
 LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
-MAX_HDC_EPOCHS = 5
+MAX_HDC_EPOCHS = 10
 FEATURE_EXTRACTOR_EPOCHS = 30
 
 HD_DIM = 10000
