@@ -218,7 +218,8 @@ def incremental_update_test(ARCH, DATA, pretrained_path="logs/hdc_sub.pth", comp
 
         val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
 
-        for cfg in ABLATION_CONFIGS:
+        configs_to_run = [ABLATION_CONFIGS[0]] if compare else ABLATION_CONFIGS
+        for cfg in configs_to_run:
             if compare:
                 model = load_d3ctta_model(pretrained_path)
                 # D3CTTA does not support online subclusters logic easily, so we just use inference_update
