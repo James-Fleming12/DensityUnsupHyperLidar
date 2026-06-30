@@ -68,13 +68,13 @@ class ActiveModel(DensityModel):
                 
                 # 2. Highest distance from known subclusters
                 if torch.any(valid_density_mask):
-                    subclusters = F.normalize(self.subclusters.data)
+                    subclusters = F.normalize(self.subclusters.data).to(enc_norm.dtype)
                     sims_sub = enc_norm @ subclusters.T
                     max_sims_sub, _ = sims_sub.max(dim=1)
                     
                     # Also consider distance to existing oracle subclusters
                     if self.oracle_subclusters.shape[0] > 0:
-                        sims_oracle_sub = enc_norm @ F.normalize(self.oracle_subclusters).T
+                        sims_oracle_sub = enc_norm @ F.normalize(self.oracle_subclusters).T.to(enc_norm.dtype)
                         max_sims_oracle_sub, _ = sims_oracle_sub.max(dim=1)
                         max_sims_sub = torch.maximum(max_sims_sub, max_sims_oracle_sub)
                     
