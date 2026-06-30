@@ -125,8 +125,8 @@ def test_hdc_model(model, dataloader) -> None:
             proj_labels_flat = proj_labels.view(-1)
             selected_labels = proj_labels_flat[indices]
             
-            batch_correct = (predictions == selected_labels).sum().item()
-            batch_total = selected_labels.size(0)
+            batch_correct = ((predictions == selected_labels) & (selected_labels > 0)).sum().item()
+            batch_total = (selected_labels > 0).sum().item()
             batch_accuracy = batch_correct / batch_total if batch_total > 0 else 0
             all_accuracies.append(batch_accuracy)
             global_correct += batch_correct
@@ -159,11 +159,12 @@ def test_hdc_model(model, dataloader) -> None:
         else:
             per_class_accuracy[class_id] = 0.0
         
-        # Calculate IoU for each class
+        # Calculate IoU for each class (Exclude Class 0 which is typically the ignored/unlabeled class)
         if class_union[class_id] > 0:
             iou = (class_intersection[class_id] / class_union[class_id]).item()
             per_class_iou[class_id] = iou
-            valid_ious.append(iou)
+            if class_id > 0:
+                valid_ious.append(iou)
         else:
             per_class_iou[class_id] = 0.0
 

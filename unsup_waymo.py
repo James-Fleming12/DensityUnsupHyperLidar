@@ -70,9 +70,18 @@ def extract_metrics_from_conf_matrix(conf_matrix):
     tp = torch.diag(conf_matrix)
     union = conf_matrix.sum(dim=1) + conf_matrix.sum(dim=0) - tp
     iou_per_class = tp / (union + 1e-6)
+    
+    # Exclude class 0 (unlabeled/ignore)
     valid_classes = union > 0 
+    valid_classes[0] = False
+    
     miou = iou_per_class[valid_classes].mean().item()
-    overall_acc = tp.sum().item() / (conf_matrix.sum().item() + 1e-6)
+    
+    # Calculate overall accuracy excluding class 0
+    total_correct_valid = tp[1:].sum().item()
+    total_samples_valid = conf_matrix[1:, :].sum().item()
+    overall_acc = total_correct_valid / (total_samples_valid + 1e-6)
+    
     return miou, overall_acc
 
 def evaluate_and_adapt(model, target_dataloader, device):
