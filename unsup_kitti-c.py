@@ -262,9 +262,15 @@ def save_degradation_plot(save_path, title, data_dict, metric="mIoU", baseline_v
     plt.figure(figsize=(10, 6))
     
     severities = [1, 2, 3, 4, 5]
-    for corr, sev_dict in data_dict.items():
-        vals = [sev_dict.get(s, 0) for s in severities]
-        plt.plot(severities, vals, marker='o', label=corr)
+    colors = plt.cm.tab10.colors
+    
+    for i, (corr, sev_dict) in enumerate(data_dict.items()):
+        color = colors[i % len(colors)]
+        initial_vals = [sev_dict.get(s, (0, 0))[0] for s in severities]
+        final_vals = [sev_dict.get(s, (0, 0))[1] for s in severities]
+        
+        plt.plot(severities, initial_vals, marker='x', linestyle=':', color=color, alpha=0.6, label=f'{corr} (Initial)')
+        plt.plot(severities, final_vals, marker='o', linestyle='-', color=color, label=f'{corr} (Final)')
         
     if baseline_val is not None:
         plt.axhline(y=baseline_val, color='r', linestyle='--', label=f'Clean Baseline ({baseline_val:.4f})')
@@ -425,13 +431,15 @@ def main():
             metrics = evaluate_and_adapt(model, target_dataloader, device)
             
             if len(metrics["mIoU"]) > 0:
+                initial_miou = metrics["mIoU"][0]
                 final_miou = metrics["mIoU"][-1]
+                initial_acc = metrics["Accuracy"][0]
                 final_acc = metrics["Accuracy"][-1]
                 
-                results_miou[ctype][sev] = final_miou
-                results_acc[ctype][sev] = final_acc
+                results_miou[ctype][sev] = (initial_miou, final_miou)
+                results_acc[ctype][sev] = (initial_acc, final_acc)
                 
-                logger.info(f"Result for {ctype}-{sev}: mIoU={final_miou:.4f}, Acc={final_acc:.4f}")
+                logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
                 suffix = "_d3ctta" if args.compare else ""
                 
                 traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
