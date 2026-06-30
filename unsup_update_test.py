@@ -99,7 +99,7 @@ def main():
                 model = ActiveModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
             else:
                 model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-            model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
+            model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device), strict=False)
             model.to(device)
 
             acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
