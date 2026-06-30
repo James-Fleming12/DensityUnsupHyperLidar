@@ -258,7 +258,7 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
         return model, trainer
     return model
 
-def save_degradation_plot(save_path, title, data_dict, metric="mIoU"):
+def save_degradation_plot(save_path, title, data_dict, metric="mIoU", baseline_val=None):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.figure(figsize=(10, 6))
     
@@ -266,6 +266,9 @@ def save_degradation_plot(save_path, title, data_dict, metric="mIoU"):
     for corr, sev_dict in data_dict.items():
         vals = [sev_dict.get(s, 0) for s in severities]
         plt.plot(severities, vals, marker='o', label=corr)
+        
+    if baseline_val is not None:
+        plt.axhline(y=baseline_val, color='r', linestyle='--', label=f'Clean Baseline ({baseline_val:.4f})')
     
     plt.title(f"{title} - {metric} Degradation")
     plt.xlabel("Severity")
@@ -439,11 +442,15 @@ def main():
                 logger.info(f"No valid frames evaluated for {ctype}-{sev}")
 
     suffix = "_d3ctta" if args.compare else ""
-    save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'NuScenes-C', results_miou, metric='mIoU')
-    save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'NuScenes-C', results_acc, metric='Accuracy')
+    
+    baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
+    baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
+    
+    save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'NuScenes-C', results_miou, metric='mIoU', baseline_val=baseline_miou)
+    save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'NuScenes-C', results_acc, metric='Accuracy', baseline_val=baseline_acc)
     
     with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
-        json.dump({'mIoU': results_miou, 'Accuracy': results_acc}, f, indent=4)
+        json.dump({'mIoU': results_miou, 'Accuracy': results_acc, 'Baseline_mIoU': baseline_miou, 'Baseline_Acc': baseline_acc}, f, indent=4)
 
 if __name__ == "__main__":
     main()

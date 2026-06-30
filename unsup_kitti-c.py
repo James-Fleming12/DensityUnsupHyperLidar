@@ -208,7 +208,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
             
     return {"mIoU": miou_history, "Accuracy": acc_history}
 
-def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False):
+def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None):
     import unsup_main
     log_base = os.path.dirname(pretrained_path)
     os.makedirs(log_base, exist_ok=True)
@@ -221,7 +221,7 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
     if not skip_extractor:
         ARCH["train"]["batch_size"] = 24
         print(f"Pretraining feature extractor on {data_dir}...")
-        trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True)
+        trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True, resume_path=resume_path)
     else:
         print(f"Skipping feature extractor pretraining...")
         trainer = None
@@ -257,7 +257,7 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
         return model, trainer
     return model
 
-def save_degradation_plot(save_path, title, data_dict, metric="mIoU"):
+def save_degradation_plot(save_path, title, data_dict, metric="mIoU", baseline_val=None):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.figure(figsize=(10, 6))
     
@@ -265,6 +265,9 @@ def save_degradation_plot(save_path, title, data_dict, metric="mIoU"):
     for corr, sev_dict in data_dict.items():
         vals = [sev_dict.get(s, 0) for s in severities]
         plt.plot(severities, vals, marker='o', label=corr)
+        
+    if baseline_val is not None:
+        plt.axhline(y=baseline_val, color='r', linestyle='--', label=f'Clean Baseline ({baseline_val:.4f})')
     
     plt.title(f"{title} - {metric} Degradation")
     plt.xlabel("Severity")
@@ -326,6 +329,7 @@ def main():
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
     parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
+    parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -342,7 +346,8 @@ def main():
 
     if args.pretrain:
         logger.info(f"Starting Pretraining on standard KITTI at {data_dir}...")
-        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor)
+        resume_dir = os.path.dirname(args.pretrained_path) if args.continue_pretrain else None
+        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor, resume_path=resume_dir)
         
         if trainer is not None:
             opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')
@@ -438,11 +443,15 @@ def main():
                 logger.info(f"No valid frames evaluated for {ctype}-{sev}")
 
     suffix = "_d3ctta" if args.compare else ""
-    save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'KITTI-C', results_miou, metric='mIoU')
-    save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'KITTI-C', results_acc, metric='Accuracy')
+    
+    baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
+    baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
+    
+    save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'KITTI-C', results_miou, metric='mIoU', baseline_val=baseline_miou)
+    save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'KITTI-C', results_acc, metric='Accuracy', baseline_val=baseline_acc)
     
     with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
-        json.dump({'mIoU': results_miou, 'Accuracy': results_acc}, f, indent=4)
+        json.dump({'mIoU': results_miou, 'Accuracy': results_acc, 'Baseline_mIoU': baseline_miou, 'Baseline_Acc': baseline_acc}, f, indent=4)
 
 if __name__ == "__main__":
     main()

@@ -8,11 +8,11 @@ train:
   aux_loss: True
   lamda: 1.0
   scheduler: "consine"  # "consine" or "decay"
-  max_epochs: 30
+  max_epochs: 80
   consine:
     min_lr: 0.0001
     max_lr: 0.01
-    first_cycle: 30
+    first_cycle: 80
     cycle: 1
     wup_epochs: 1
     gamma: 1.0

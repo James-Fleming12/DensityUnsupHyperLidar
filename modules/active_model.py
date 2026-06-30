@@ -36,7 +36,7 @@ class ActiveModel(DensityModel):
                 # Compare similarity to standard prototypes vs oracle subclusters
                 sim_proto = torch.sum(enc_norm * F.normalize(self.classify.weight[preds]), dim=1)
                 
-                sim_oracle = enc_norm @ F.normalize(self.oracle_subclusters).T
+                sim_oracle = enc_norm @ F.normalize(self.oracle_subclusters).T.to(enc_norm.dtype)
                 max_sim_oracle, max_oracle_idx = sim_oracle.max(dim=1)
                 
                 # Override prediction if oracle subcluster is more similar

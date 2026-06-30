@@ -18,7 +18,7 @@ LOG_DIR = "logs"
 NUM_CLASSES = 17 # the arch config has a learning_map that maps the 32 classes to 17 (???)
 
 MAX_HDC_EPOCHS = 10
-FEATURE_EXTRACTOR_EPOCHS = 30
+FEATURE_EXTRACTOR_EPOCHS = 80
 
 HD_DIM = 10000
 
@@ -37,8 +37,8 @@ def convert_dataset():
 
     print("Conversion Complete: Output Saved to ")
 
-def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS, data_dir=None, return_trainer=False):
-    trainer = Trainer(ARCH, DATA, data_dir if data_dir else DATA_DIR, LOG_DIR) # saves in "/logs/SENet_..."
+def train_extractor(ARCH, DATA, epochs=FEATURE_EXTRACTOR_EPOCHS, data_dir=None, return_trainer=False, resume_path=None):
+    trainer = Trainer(ARCH, DATA, data_dir if data_dir else DATA_DIR, LOG_DIR, path=resume_path) # saves in "/logs/SENet_..."
     trainer.train(epochs=epochs)
 
     if return_trainer:
