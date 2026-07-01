@@ -146,18 +146,13 @@ class BasicHD():
 
                 # samples_hv = self.model.encode(proj_in, self.mask) # (bsz*size, hd_dim)
                 start = time.time()
-                samples_hv, _, _ = self.model.encode(proj_in, self.mask)
+                samples_hv, indices, _ = self.model.encode(proj_in, self.mask, PERCENTAGE=0.05)
                 samples_hv = samples_hv.to(model.classify_weights.dtype)
 
-                # samples_hv = samples_hv.float()
                 #proj_labels shape: torch.Size([1, 64, 512])
                 proj_labels = proj_labels.view(-1)  # shape: (btsz*64*512, 1)
                 proj_labels = proj_labels.to(self.device)
-                
-                # Debug - manually update the labels to the corresponding class
-                # for i in range(samples_hv.shape[0]):
-                #     model.classify_weights[proj_labels[i]] += samples_hv[i]
-                #     model.classify_sample_cnt[proj_labels[i]] += 1
+                proj_labels = proj_labels[indices]
                 
                 model.classify_weights.index_add_(0, proj_labels, samples_hv)
                 if torch.cuda.is_available():
@@ -253,7 +248,7 @@ class BasicHD():
                 start = time.time()
                 model.classify.weight[:] = F.normalize(model.classify_weights)
                 # print("Number of wrongs:", self.is_wrong_list[i].sum().item())
-                predictions, samples_hv, indices, self.is_wrong_list[i] = model(proj_in, self.mask, None, self.is_wrong_list[i])
+                predictions, samples_hv, indices, self.is_wrong_list[i] = model(proj_in, self.mask, 0.05, self.is_wrong_list[i])
                 argmax = predictions.argmax(dim=1) # (bsz*size, 1)
                 # #proj_labels shape: torch.Size([1, 64, 512])
                 proj_labels = proj_labels.view(-1)  # shape: (btsz*64*512, 1) 

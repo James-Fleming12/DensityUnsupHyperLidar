@@ -111,30 +111,26 @@ class Model(nn.Module):
         # sample_hv = torch.zeros((x.shape[0], self.hd_dim), device=self.device)
         # print("x.shape", x.shape)  # torch.Size([32768, 128])
         if PERCENTAGE is not None:
-            # # Pick by the wrong and keep the PERCENTAGE
-            wrong_indices = torch.nonzero(is_wrong, as_tuple=False).squeeze()
             num_samples = int(x.shape[0] * PERCENTAGE)  # Calculate the number of samples to select
-            # selected_indices = torch.randperm(x.shape[0], device=x.device)[:num_samples]
-            # print("selected_indices", selected_indices.shape)  # e.g., torch.Size([1638])
-            # print("x", x.shape)  # e.g., torch.Size([1638])
-            # print("x[selected_indices]", x[selected_indices[0]])  # e.g., torch.Size([1638, 128])
-
-            # # print("num_samples", num_samples)  # e.g., 32768 * 0.05 = 1638
-            # # print("wrong_indices", wrong_indices.shape)
-            # # print("is_wrong", is_wrong.shape)  # e.g., torch.Size([32768])
-
-            if wrong_indices.numel() >= num_samples:
-                # If there are enough wrong samples, randomly select from them
-                selected_indices = wrong_indices[torch.randperm(wrong_indices.shape[0], device=x.device)[:num_samples]]
-                is_wrong[selected_indices] = False # Mark the selected indices as used
+            
+            if is_wrong is not None:
+                # # Pick by the wrong and keep the PERCENTAGE
+                wrong_indices = torch.nonzero(is_wrong, as_tuple=False).squeeze()
+                
+                if wrong_indices.numel() >= num_samples:
+                    # If there are enough wrong samples, randomly select from them
+                    selected_indices = wrong_indices[torch.randperm(wrong_indices.shape[0], device=x.device)[:num_samples]]
+                    is_wrong[selected_indices] = False # Mark the selected indices as used
+                else:
+                    # If there are not enough wrong samples, fill the rest with random samples
+                    non_wrong_indices = torch.nonzero(~is_wrong, as_tuple=False).squeeze()
+                    remaining = num_samples - wrong_indices.numel()
+                    fill_indices = non_wrong_indices[torch.randperm(non_wrong_indices.shape[0], device=x.device)[:remaining]]
+    
+                    selected_indices = torch.cat([wrong_indices, fill_indices], dim=0)
+                    is_wrong[selected_indices] = False # Mark the selected indices as used
             else:
-                # If there are not enough wrong samples, fill the rest with random samples
-                non_wrong_indices = torch.nonzero(~is_wrong, as_tuple=False).squeeze()
-                remaining = num_samples - wrong_indices.numel()
-                fill_indices = non_wrong_indices[torch.randperm(non_wrong_indices.shape[0], device=x.device)[:remaining]]
-
-                selected_indices = torch.cat([wrong_indices, fill_indices], dim=0)
-                is_wrong[selected_indices] = False # Mark the selected indices as used
+                selected_indices = torch.randperm(x.shape[0], device=x.device)[:num_samples]
 
             selected_indices, _ = selected_indices.sort()  # Optional: sort to preserve order
             # print("selected_indices", selected_indices.shape)  # e.g., torch.Size([1638])
