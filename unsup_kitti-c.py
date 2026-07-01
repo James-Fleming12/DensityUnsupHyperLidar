@@ -208,7 +208,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
             
     return {"mIoU": miou_history, "Accuracy": acc_history}
 
-def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None):
+def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=10):
     import unsup_main
     log_base = os.path.dirname(pretrained_path)
     os.makedirs(log_base, exist_ok=True)
@@ -227,8 +227,8 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
         trainer = None
     
     ARCH["train"]["batch_size"] = 6
-    print(f"Pretraining HDC density model on {data_dir}...")
-    model, _ = train_hdc(ARCH, DATA, data_dir=data_dir, return_extractor=True)
+    print(f"Pretraining HDC density model on {data_dir} for {hdc_epochs} epochs...")
+    model, _ = train_hdc(ARCH, DATA, epochs=hdc_epochs, data_dir=data_dir, return_extractor=True)
     
     print("Initializing subclusters...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -336,6 +336,7 @@ def main():
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
     parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
     parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
+    parser.add_argument('--hdc_epochs', type=int, default=30, help='Number of epochs to train the HDC density model')
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -353,7 +354,7 @@ def main():
     if args.pretrain:
         logger.info(f"Starting Pretraining on standard KITTI at {data_dir}...")
         resume_dir = os.path.dirname(args.pretrained_path) if args.continue_pretrain else None
-        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor, resume_path=resume_dir)
+        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor, resume_path=resume_dir, hdc_epochs=args.hdc_epochs)
         
         if trainer is not None:
             opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')

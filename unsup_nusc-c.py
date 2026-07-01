@@ -209,7 +209,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
             
     return {"mIoU": miou_history, "Accuracy": acc_history}
 
-def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False):
+def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=10):
     import unsup_main
     log_base = os.path.dirname(pretrained_path)
     os.makedirs(log_base, exist_ok=True)
@@ -222,14 +222,14 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
     if not skip_extractor:
         ARCH["train"]["batch_size"] = 24
         print(f"Pretraining feature extractor on {data_dir}...")
-        trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True)
+        trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True, resume_path=resume_path)
     else:
         print(f"Skipping feature extractor pretraining...")
         trainer = None
     
     ARCH["train"]["batch_size"] = 6
-    print(f"Pretraining HDC density model on {data_dir}...")
-    model, _ = train_hdc(ARCH, DATA, data_dir=data_dir, return_extractor=True)
+    print(f"Pretraining HDC density model on {data_dir} for {hdc_epochs} epochs...")
+    model, _ = train_hdc(ARCH, DATA, epochs=hdc_epochs, data_dir=data_dir, return_extractor=True)
     
     print("Initializing subclusters...")
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -286,25 +286,6 @@ def save_degradation_plot(save_path, title, data_dict, metric="mIoU", baseline_v
     plt.savefig(save_path)
     plt.close()
 
-def load_hdc_model(path):
-    print(f"Loading pretrained HDC model from {path}...")
-    from modules.HDC_utils import DensityModel
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
-    import os
-    modeldir = os.path.dirname(path)
-    weights_path = os.path.join(modeldir, "SENet_valid_best")
-    if os.path.exists(weights_path):
-        tmp_dict = torch.load(weights_path, map_location='cpu')
-        NUM_CLASSES = tmp_dict['state_dict']['semantic_output.bias'].shape[0]
-    else:
-        NUM_CLASSES = 17 # Fallback for NuScenes
-    modeldir = os.path.dirname(path)
-    model = DensityModel(ARCH, modeldir, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-    model.load_state_dict(torch.load(path, map_location=device))
-    model.to(device)
-    return model
-
 def load_d3ctta_model(path):
     print(f"Loading pretrained feature extractor for D3CTTA from {path}...")
     from modules.network.ResNet import ResNet_34
@@ -336,6 +317,8 @@ def main():
     parser.add_argument('--pretrained_path', type=str, default='logs/nusc_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/nusc_c_test', help='Directory to save logs and graphics')
     parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
+    parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
+    parser.add_argument('--hdc_epochs', type=int, default=30, help='Number of epochs to train the HDC density model')
     args = parser.parse_args()
 
     os.makedirs(args.log_dir, exist_ok=True)
@@ -352,7 +335,8 @@ def main():
 
     if args.pretrain:
         logger.info(f"Starting Pretraining on standard NuScenes at {data_dir}...")
-        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor)
+        resume_dir = os.path.dirname(args.pretrained_path) if args.continue_pretrain else None
+        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor, resume_path=resume_dir, hdc_epochs=args.hdc_epochs)
         
         if trainer is not None:
             opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')
