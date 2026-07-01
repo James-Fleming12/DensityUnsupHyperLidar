@@ -75,9 +75,27 @@ def corrupt_snow(points, severity):
     filtered_points = points[final_points_mask]
     return np.vstack((filtered_points, snowflakes)), final_points_mask, num_flakes
 
+def corrupt_cross_sensor(points, severity):
+    distances = np.linalg.norm(points[:, :3], axis=1)
+    pitch = np.arcsin(points[:, 2] / (distances + 1e-6))
+    
+    # 64 bins simulate the typical 64-beam sensor
+    bins = np.linspace(np.min(pitch), np.max(pitch), 65) 
+    ring_ids = np.digitize(pitch, bins)
+    
+    # Severity 1, 2, 3 maps to keeping 1/2, 1/4, or 1/8 of the beams
+    step = 2 ** severity 
+    
+    # Keep only beams where the ring ID aligns with the step size
+    mask = (ring_ids % step == 0)
+    
+    return points[mask], mask, 0
+
 def apply_corruption(points, corruption_type, severity):
     if corruption_type == 'beam':
         return corrupt_beam(points, severity)
+    elif corruption_type == 'cross_sensor':
+        return corrupt_cross_sensor(points, severity)
     elif corruption_type == 'crosstalk':
         return corrupt_crosstalk(points, severity)
     elif corruption_type == 'fog':
@@ -356,7 +374,7 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    corruptions = ['beam', 'crosstalk', 'fog', 'echo', 'motion', 'snow']
+    corruptions = ['beam', 'cross_sensor', 'crosstalk', 'fog', 'echo', 'motion', 'snow']
     severities = [1, 2, 3, 4, 5]
 
     results_miou = {c: {} for c in corruptions}

@@ -8,3 +8,4 @@ common/*
 /logs/*
 *.txt
 *.png
+thirdparty
