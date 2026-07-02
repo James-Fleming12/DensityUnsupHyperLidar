@@ -910,7 +910,8 @@ class DensityModel(nn.Module):
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
 
-            valid_enc_mask = torch.any(enc != 0, dim=1) # ignore background from updates
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1) # ignore background from updates
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1010,7 +1011,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             
@@ -1049,7 +1051,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             
@@ -1116,7 +1119,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             
@@ -1205,7 +1209,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             
@@ -1297,7 +1302,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             
@@ -1376,7 +1382,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1447,7 +1454,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1492,7 +1500,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1560,7 +1569,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1628,7 +1638,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1710,7 +1721,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1783,7 +1795,8 @@ class DensityModel(nn.Module):
             enc_aug, _, _ = self.encode(x_aug)
             
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1861,7 +1874,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -1948,7 +1962,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2030,7 +2045,8 @@ class DensityModel(nn.Module):
             enc2, _, _ = self.encode(x_aug2)
             
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2105,7 +2121,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2178,7 +2195,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2255,7 +2273,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2317,7 +2336,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2387,7 +2407,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2455,7 +2476,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2531,7 +2553,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2601,7 +2624,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2666,7 +2690,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2744,7 +2769,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2825,7 +2851,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2897,7 +2924,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -2970,7 +2998,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -3036,7 +3065,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -3124,7 +3154,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -3206,7 +3237,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -3298,7 +3330,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -3406,7 +3439,8 @@ class DensityModel(nn.Module):
             enc4, _, _ = self.encode(x_aug4)
             
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -3489,7 +3523,8 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
@@ -3591,7 +3626,8 @@ class DensityModel(nn.Module):
         self.train()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             if not torch.any(valid_enc_mask):
                 return torch.zeros(enc.shape[0], device=self.device, dtype=torch.long)
 

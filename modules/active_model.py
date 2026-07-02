@@ -15,7 +15,8 @@ class ActiveModel(DensityModel):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
-            valid_enc_mask = torch.any(enc != 0, dim=1)
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
             
             if not torch.any(valid_enc_mask):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
