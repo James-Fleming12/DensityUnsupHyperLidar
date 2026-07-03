@@ -3769,5 +3769,179 @@ class DensityModel(nn.Module):
 
         return accuracy, confidence_map, class_accuracies
 
-def set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type='bipolar'):
+    def inference_update_gvgb(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None, proj_xyz=None):
+        """Geometric Variance-Gated Bundling (GVGB)"""
+        self.eval()
+        with torch.no_grad():
+            x_aug_rot = torch.roll(x, shifts=14, dims=3)
+            x_aug_scale = x * 0.95
+            
+            enc_A, _, _ = self.encode(x)
+            enc_B, _, _ = self.encode(x_aug_rot)
+            enc_C, _, _ = self.encode(x_aug_scale)
+            
+            num_total_samples = enc_A.shape[0]
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_enc_A = enc_A[valid_enc_mask]
+            active_enc_B = enc_B[valid_enc_mask]
+            active_enc_C = enc_C[valid_enc_mask]
+            
+            norm_A = F.normalize(active_enc_A)
+            norm_B = F.normalize(active_enc_B)
+            norm_C = F.normalize(active_enc_C)
+            
+            sim_AB = torch.sum(norm_A * norm_B, dim=1)
+            sim_AC = torch.sum(norm_A * norm_C, dim=1)
+            
+            variance_mask = (sim_AB >= 0.40) & (sim_AC >= 0.40)
+            
+            # Use only valid points for bundling
+            valid_enc_A = active_enc_A[variance_mask]
+            valid_enc_B = active_enc_B[variance_mask]
+            valid_enc_C = active_enc_C[variance_mask]
+            
+            bundled_enc = valid_enc_A + valid_enc_B + valid_enc_C
+            enc_norm = F.normalize(bundled_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+                
+            chunk_logits = self.classify(enc_norm)
+            preds = torch.argmax(chunk_logits, dim=1)
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            
+            active_predictions = torch.zeros(active_enc_A.shape[0], device=self.device, dtype=torch.long)
+            active_predictions[~variance_mask] = torch.argmax(self.classify(norm_A[~variance_mask]), dim=1)
+            active_predictions[variance_mask] = preds
+            
+            full_predictions[valid_enc_mask] = active_predictions
+
+            selected_proto = F.normalize(self.classify.weight[preds])
+            sims = torch.sum(enc_norm * selected_proto, dim=1)
+            distances = (1.0 - sims) / 2.0
+            update_mask = distances > beta
+            
+            if not torch.any(update_mask):
+                return full_predictions
+
+            valid_indices_in_active = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices_in_active])
+
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if max_updates_per_class != -1 and len(class_indices) > max_updates_per_class:
+                    fps_indices = self._farthest_point_sample(enc_norm[class_indices].cpu(), max_updates_per_class)
+                    class_indices = class_indices[fps_indices.to(self.device)]
+
+                sample_encs = enc_norm[class_indices]
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+
+                weights = sub_sims / sub_sims.sum()
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_weight = self.classify.weight[c_id]
+                self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
+                updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+
+            return full_predictions
+
+    def inference_update_dabp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None, proj_xyz=None):
+        """Density-Aware Bundled Pull (DABP)"""
+        self.eval()
+        with torch.no_grad():
+            x_aug_rot = torch.roll(x, shifts=14, dims=3)
+            x_aug_scale = x * 0.95
+            
+            enc_A, _, _ = self.encode(x)
+            enc_B, _, _ = self.encode(x_aug_rot)
+            enc_C, _, _ = self.encode(x_aug_scale)
+            
+            num_total_samples = enc_A.shape[0]
+            original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
+            valid_enc_mask = torch.any(original_x != 0, dim=1)
+            
+            if not torch.any(valid_enc_mask):
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            x_flat = x.permute(0, 2, 3, 1).reshape(-1, x.shape[1])
+            active_ranges = x_flat[valid_enc_mask, 0] 
+            
+            active_enc_A = enc_A[valid_enc_mask]
+            active_enc_B = enc_B[valid_enc_mask]
+            active_enc_C = enc_C[valid_enc_mask]
+            
+            bundled_enc = active_enc_A + active_enc_B + active_enc_C
+            enc_norm = F.normalize(bundled_enc)
+            if enc_norm.dtype != self.classify.weight.dtype:
+                enc_norm = enc_norm.to(self.classify.weight.dtype)
+                
+            chunk_logits = self.classify(enc_norm)
+            preds = torch.argmax(chunk_logits, dim=1)
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+
+            selected_proto = F.normalize(self.classify.weight[preds])
+            sims = torch.sum(enc_norm * selected_proto, dim=1)
+            distances = (1.0 - sims) / 2.0
+            update_mask = distances > beta
+            
+            if not torch.any(update_mask):
+                return full_predictions
+
+            valid_indices_in_active = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices_in_active])
+
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                class_indices = torch.nonzero(class_mask).squeeze(1)
+
+                if max_updates_per_class != -1 and len(class_indices) > max_updates_per_class:
+                    fps_indices = self._farthest_point_sample(enc_norm[class_indices].cpu(), max_updates_per_class)
+                    class_indices = class_indices[fps_indices.to(self.device)]
+
+                sample_encs = enc_norm[class_indices]
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+
+                valid_mask = sub_sims > thresholds[0]
+                if not torch.any(valid_mask):
+                    continue
+
+                sample_encs = sample_encs[valid_mask]
+                sub_sims = sub_sims[valid_mask]
+                
+                # Density-Calibrated Pull Logic (from DCSP)
+                sample_ranges = active_ranges[class_indices][valid_mask].abs()
+                range_scale = sample_ranges / (sample_ranges.max() + 1e-4)
+                
+                combined_weight = sub_sims * range_scale
+                weights = combined_weight / combined_weight.sum()
+
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                effective_lr = learning_rate * sub_sims.mean().item()
+
+                current_weight = self.classify.weight[c_id]
+                self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
+                updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+
+            return full_predictionsdef set_dense_model(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type='bipolar'):
     return DensityModel(ARCH, modeldir, hd_encoder, num_levels, randomness, num_classes, device, subcluster_type=subcluster_type)

@@ -69,6 +69,10 @@ def main():
         {"name": "Outlier Oracle Anchor (ADA)", "method": "inference_update_ooa", "is_active": True},
         {"name": "Hypervector Bundling (TTAug)", "method": "inference_update_ttaug", "is_active": False},
         {"name": "Graph-Laplacian Label Propagation", "method": "inference_update_gplp", "is_active": False},
+        {"name": "Oracle-Anchored Graph Propagation (OAGP)", "method": "inference_update_oagp", "is_active": True},
+        {"name": "Multi-View Oracle Subclustering (MVOS)", "method": "inference_update_mvos", "is_active": True},
+        {"name": "Geometric Variance-Gated Bundling (GVGB)", "method": "inference_update_gvgb", "is_active": False},
+        {"name": "Density-Aware Bundled Pull (DABP)", "method": "inference_update_dabp", "is_active": False},
     ]
 
     ablation_histories = []
@@ -155,12 +159,12 @@ def main():
                 kwargs = {}
                 if cfg["method"] != "inference_update":
                     kwargs["oracle_labels"] = oracle_labels.to(device) if oracle_labels is not None else None
-                if cfg["method"] in ["inference_update_gplp", "inference_update_ooa", "inference_update_ttaug"]:
+                if cfg["method"] in ["inference_update_gplp", "inference_update_ooa", "inference_update_ttaug", "inference_update_oagp", "inference_update_mvos", "inference_update_gvgb", "inference_update_dabp"]:
                     kwargs["proj_xyz"] = proj_xyz.to(device) if proj_xyz is not None else None
                 
                 if proj_in.shape[1] > 0:
                     curr_thresholds = [0.30, 0.65]
-                    if cfg["method"] == "inference_update_ttaug":
+                    if cfg["method"] in ["inference_update_ttaug", "inference_update_gvgb", "inference_update_dabp"]:
                         curr_thresholds = [0.45, 0.80]
                         
                     update_fn(
