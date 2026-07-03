@@ -132,9 +132,10 @@ def test_hdc_model(model, dataloader) -> None:
             global_correct += batch_correct
             global_total += batch_total
             
+            valid_eval_mask = (selected_labels > 0)
             for class_id in range(model.num_classes):
                 class_mask = (selected_labels == class_id)
-                pred_mask = (predictions == class_id)
+                pred_mask = (predictions == class_id) & valid_eval_mask
                 
                 if class_mask.any():
                     class_correct[class_id] += (predictions[class_mask] == class_id).sum().item()
