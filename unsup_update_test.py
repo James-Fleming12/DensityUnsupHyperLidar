@@ -83,8 +83,9 @@ def main():
         sunny_loaders = get_condition_loaders(ARCH, PRE_DATA, train_seqs, batch_size=6, shuffle=True, conditions=["sunny"])
         model_base.eval()
         model_base.init_subclusters(sunny_loaders["sunny"])
-
-    saved_subclusters = model_base.subclusters.data.clone()
+        
+        print(f"Saving updated model weights to {HDC_SUB_PATH}...")
+        torch.save(model_base.state_dict(), HDC_SUB_PATH)
     
     print("\nEvaluating baseline on sunny...")
     acc_sunny, miou_sunny = test_hdc_model(model_base, val_loaders["sunny"])
@@ -114,7 +115,6 @@ def main():
             else:
                 model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
             model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device), strict=False)
-            model.subclusters.data = saved_subclusters.clone()
             model.to(device)
 
             acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
