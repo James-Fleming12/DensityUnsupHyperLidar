@@ -33,16 +33,7 @@ class ActiveModel(DensityModel):
             chunk_logits = self.classify(enc_norm)
             preds = torch.argmax(chunk_logits, dim=1)
             
-            if self.oracle_subclusters.shape[0] > 0:
-                # Compare similarity to standard prototypes vs oracle subclusters
-                sim_proto = torch.sum(enc_norm * F.normalize(self.classify.weight[preds]), dim=1)
-                
-                sim_oracle = enc_norm @ F.normalize(self.oracle_subclusters).T.to(enc_norm.dtype)
-                max_sim_oracle, max_oracle_idx = sim_oracle.max(dim=1)
-                
-                # Override prediction if oracle subcluster is more similar
-                override_mask = max_sim_oracle > sim_proto
-                preds[override_mask] = self.oracle_subcluster_labels[max_oracle_idx[override_mask]]
+            # Removed hard override prediction logic to maintain smooth Voronoi boundaries
                 
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -64,7 +55,7 @@ class ActiveModel(DensityModel):
                     # number of neighbors within 0.5m radius
                     densities[i:end] = (dist < 0.5).sum(dim=1).float()
                 
-                density_threshold = 10
+                density_threshold = 15
                 valid_density_mask = densities >= density_threshold
                 
                 # 2. Highest distance from known subclusters
@@ -93,8 +84,7 @@ class ActiveModel(DensityModel):
                         self.oracle_subclusters = torch.cat([self.oracle_subclusters, new_subcluster], dim=0)
                         self.oracle_subcluster_labels = torch.cat([self.oracle_subcluster_labels, torch.tensor([oracle_label], device=self.device)])
                         
-                        # Bypass the 0.001 learning rate entirely. Treat as a hard anchor.
-                        self.proto_momentum[oracle_label] = new_subcluster.squeeze(0)
+                        # Soft HDC Integration: bundle it directly into the target class's prototype with standard mass weighting
                         self.classify.weight[oracle_label] = F.normalize(
                             self.classify.weight[oracle_label] + new_subcluster.squeeze(0), dim=0
                         )

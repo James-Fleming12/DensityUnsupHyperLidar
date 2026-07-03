@@ -149,11 +149,15 @@ def main():
                     kwargs["proj_xyz"] = proj_xyz.to(device) if proj_xyz is not None else None
                 
                 if proj_in.shape[1] > 0:
+                    curr_thresholds = [0.30, 0.65]
+                    if cfg["method"] == "inference_update_ttaug":
+                        curr_thresholds = [0.45, 0.80]
+                        
                     update_fn(
                         proj_in.to(device),
                         learning_rate=0.001,
                         distance_sensitivity=3.0,
-                        thresholds=[0.30, 0.65], # Lowered to allow points to enter update pipeline
+                        thresholds=curr_thresholds,
                         **kwargs
                     )
                 pbar.update(1)

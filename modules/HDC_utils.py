@@ -3427,16 +3427,12 @@ class DensityModel(nn.Module):
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             
-            # Generate 5 augmented views
-            x_aug1 = torch.roll(x, shifts=1, dims=3)
-            x_aug2 = torch.roll(x, shifts=-1, dims=3)
-            x_aug3 = x * 1.05
-            x_aug4 = x + torch.randn_like(x) * 0.05
+            # Generate 3 augmented views for Multi-Scale Constructive Interference
+            x_aug_rot = torch.roll(x, shifts=14, dims=3) # Spatially rotated (+5 degrees yaw, ~14 pixels on 1024 width)
+            x_aug_scale = x * 0.95                       # Scaled slightly (95% size)
             
-            enc1, _, _ = self.encode(x_aug1)
-            enc2, _, _ = self.encode(x_aug2)
-            enc3, _, _ = self.encode(x_aug3)
-            enc4, _, _ = self.encode(x_aug4)
+            enc_rot, _, _ = self.encode(x_aug_rot)
+            enc_scale, _, _ = self.encode(x_aug_scale)
             
             num_total_samples = enc.shape[0]
             original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])
@@ -3446,13 +3442,11 @@ class DensityModel(nn.Module):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             
             active_enc = enc[valid_enc_mask]
-            active_enc1 = enc1[valid_enc_mask]
-            active_enc2 = enc2[valid_enc_mask]
-            active_enc3 = enc3[valid_enc_mask]
-            active_enc4 = enc4[valid_enc_mask]
+            active_enc_rot = enc_rot[valid_enc_mask]
+            active_enc_scale = enc_scale[valid_enc_mask]
             
-            # Bundle hypervectors
-            bundled_enc = active_enc + active_enc1 + active_enc2 + active_enc3 + active_enc4
+            # Bundle hypervectors (H_bundled = H_A + H_B + H_C)
+            bundled_enc = active_enc + active_enc_rot + active_enc_scale
             enc_norm = F.normalize(bundled_enc)
             
             if enc_norm.dtype != self.classify.weight.dtype:
