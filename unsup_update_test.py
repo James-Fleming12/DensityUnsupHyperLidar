@@ -1,10 +1,10 @@
+import argparse
 import copy
 import os
 import numpy as np
 import torch
 import yaml
 import matplotlib.pyplot as plt
-import copy
 
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import Model, DensityModel
@@ -24,6 +24,10 @@ ALL_CONDITIONS = ["sunny", "rain", "night"]
 ADVERSE_CONDITIONS = [c for c in ALL_CONDITIONS if c != "sunny"]
 
 def main():
+    parser = argparse.ArgumentParser(description="Test Unsupervised Update Methods")
+    parser.add_argument("--reinit_subclusters", action="store_true", help="Reinitialize subclusters with Local KNN Adaptive method")
+    args = parser.parse_args()
+
     try:
         ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
     except Exception as e:
@@ -72,6 +76,16 @@ def main():
     model_base.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
     model_base.to(device)
     
+    if args.reinit_subclusters:
+        print("\nReinitializing subclusters with Local KNN Adaptive method...")
+        PRE_DATA = copy.deepcopy(DATA)
+        PRE_DATA["weather_filter"] = ["sunny"]
+        sunny_loaders = get_condition_loaders(ARCH, PRE_DATA, train_seqs, batch_size=6, shuffle=True, conditions=["sunny"])
+        model_base.eval()
+        model_base.init_subclusters(sunny_loaders["sunny"])
+
+    saved_subclusters = model_base.subclusters.data.clone()
+    
     print("\nEvaluating baseline on sunny...")
     acc_sunny, miou_sunny = test_hdc_model(model_base, val_loaders["sunny"])
     sunny_baseline = {"acc": acc_sunny, "miou": miou_sunny}
@@ -100,6 +114,7 @@ def main():
             else:
                 model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
             model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device), strict=False)
+            model.subclusters.data = saved_subclusters.clone()
             model.to(device)
 
             acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
