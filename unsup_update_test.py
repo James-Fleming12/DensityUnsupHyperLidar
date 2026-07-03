@@ -81,14 +81,22 @@ def main():
         print(f"\nRetraining HDC prototypes for {args.hdc_epochs} epochs...")
         import unsup_main
         unsup_main.MODEL_DIR = MODEL_DIR
-        unsup_main.HDC_SAVE_PATH = HDC_SUB_PATH
         ARCH["train"]["batch_size"] = 6
-        train_hdc(ARCH, DATA, epochs=args.hdc_epochs, data_dir=DATA_DIR)
+        model_retrained = train_hdc(ARCH, DATA, epochs=args.hdc_epochs, data_dir=DATA_DIR)
+        torch.save(model_retrained.state_dict(), HDC_SUB_PATH)
         args.reinit_subclusters = True # Force reinitialization since the new model lacks subclusters
 
     # Store sunny baseline performance
     model_base = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-    model_base.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
+    
+    # Load with weights_only=False to support both state_dicts and full models
+    loaded_obj = torch.load(HDC_SUB_PATH, map_location=device, weights_only=False)
+    if isinstance(loaded_obj, torch.nn.Module):
+        model_base.load_state_dict(loaded_obj.state_dict(), strict=False)
+        # Resave as state_dict to clean it up for next time
+        torch.save(loaded_obj.state_dict(), HDC_SUB_PATH)
+    else:
+        model_base.load_state_dict(loaded_obj, strict=False)
     model_base.to(device)
     
     if args.reinit_subclusters:
