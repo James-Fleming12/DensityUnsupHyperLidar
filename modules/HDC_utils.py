@@ -905,7 +905,7 @@ class DensityModel(nn.Module):
         return max_similarities, absolute_indices
 
     def inference_update(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1007,7 +1007,7 @@ class DensityModel(nn.Module):
 
     def inference_update_ema(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], alpha=0.999):
         """Orthogonalized Exponential Moving Average Update"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1047,7 +1047,7 @@ class DensityModel(nn.Module):
 
     def inference_update_srp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
         """Subcluster-Regularized Pull Update"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1115,7 +1115,7 @@ class DensityModel(nn.Module):
 
     def inference_update_awd(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
         """Activity-Weighted Distillation Update"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1205,7 +1205,7 @@ class DensityModel(nn.Module):
 
     def inference_update_cwd(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], temp=0.1):
         """Confidence-Weighted Distillation Update"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1298,7 +1298,7 @@ class DensityModel(nn.Module):
 
     def inference_update_psp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
         """Prototype-Subcluster Ping-Pong Update"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1378,7 +1378,7 @@ class DensityModel(nn.Module):
         if not hasattr(self, 'tcg_buffer'):
             self.tcg_buffer = []
 
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1450,7 +1450,7 @@ class DensityModel(nn.Module):
 
     def inference_update_ogaa(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Oracle-Guided Active Anchoring"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1496,7 +1496,7 @@ class DensityModel(nn.Module):
 
     def inference_update_srt(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Subcluster-Routed Translation"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1565,7 +1565,7 @@ class DensityModel(nn.Module):
 
     def inference_update_dmrp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Decoupled Memory-Replay Pull"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1634,7 +1634,7 @@ class DensityModel(nn.Module):
 
     def inference_update_ovsp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Oracle-Verified Soft Pull"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1717,7 +1717,7 @@ class DensityModel(nn.Module):
 
     def inference_update_dcsp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Density-Calibrated Standard Pull"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1787,7 +1787,7 @@ class DensityModel(nn.Module):
 
     def inference_update_cacg(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Cross-Augmentation Consistency Gating"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             
@@ -1870,7 +1870,7 @@ class DensityModel(nn.Module):
                 c = self.subcluster_to_class[i].item()
                 self.dbmr_source_buffer[c].append(self.subclusters.data[i].clone())
         
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -1958,7 +1958,7 @@ class DensityModel(nn.Module):
         """Class-Normalized Density Clamping"""
         if getattr(self, 'expected_class_density', None) is None:
             self.expected_class_density = torch.zeros(self.num_classes, device=self.device)
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2036,7 +2036,7 @@ class DensityModel(nn.Module):
 
     def inference_update_mjcg(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Multi-Jitter Consensus Gating"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             x_aug1 = torch.roll(x, shifts=1, dims=3)
@@ -2117,7 +2117,7 @@ class DensityModel(nn.Module):
 
     def inference_update_knnspp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """K-Nearest Sub-Prototype Pull"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2191,7 +2191,7 @@ class DensityModel(nn.Module):
 
     def inference_update_tpda(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Two-Pass Distribution Alignment"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2269,7 +2269,7 @@ class DensityModel(nn.Module):
         if getattr(self, 'evuq_queues', None) is None:
             self.evuq_queues = {c: [] for c in range(self.num_classes)}
             
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2332,7 +2332,7 @@ class DensityModel(nn.Module):
 
     def inference_update_dcpm(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Dynamic Class-Paced Momentum"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2403,7 +2403,7 @@ class DensityModel(nn.Module):
             p = p / p.sum()
             self.pcsg_prior = p
             
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2472,7 +2472,7 @@ class DensityModel(nn.Module):
         if getattr(self, 'source_prototypes_dcdrp', None) is None:
             self.source_prototypes_dcdrp = self.classify.weight.clone().detach()
 
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2549,7 +2549,7 @@ class DensityModel(nn.Module):
         if getattr(self, 'hpef_slow_prototypes', None) is None:
             self.hpef_slow_prototypes = self.classify.weight.clone().detach()
 
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2620,7 +2620,7 @@ class DensityModel(nn.Module):
 
     def inference_update_csbc(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Confidence-Stratified Batch Correction"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2686,7 +2686,7 @@ class DensityModel(nn.Module):
 
     def inference_update_gprp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Geometry-Preserving Residual Pull"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2765,7 +2765,7 @@ class DensityModel(nn.Module):
         if getattr(self, 'modc_counts', None) is None:
             self.modc_counts = torch.zeros(self.num_classes, device=self.device)
 
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2847,7 +2847,7 @@ class DensityModel(nn.Module):
         if getattr(self, 'acm_ema_conf', None) is None:
             self.acm_ema_conf = torch.ones(self.num_classes, device=self.device) * 0.70
 
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2920,7 +2920,7 @@ class DensityModel(nn.Module):
         if getattr(self, 'pvd_velocity', None) is None:
             self.pvd_velocity = torch.zeros_like(self.classify.weight)
 
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -2994,7 +2994,7 @@ class DensityModel(nn.Module):
 
     def inference_update_sccp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Sparse Confident Core Pull"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -3061,7 +3061,7 @@ class DensityModel(nn.Module):
 
     def inference_update_cmop(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Confident Minority Oracle Pull"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -3150,7 +3150,7 @@ class DensityModel(nn.Module):
         if getattr(self, 'pdi_alpha', None) is None:
             self.pdi_alpha = torch.ones(self.num_classes, device=self.device) * 0.9
             
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -3233,7 +3233,7 @@ class DensityModel(nn.Module):
 
     def inference_update_cbot(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None):
         """Class Boundary Oracle Triangulation"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -3326,7 +3326,7 @@ class DensityModel(nn.Module):
             self.taoc_buffer = {c: [] for c in range(self.num_classes)}
             self.taoc_chunk_counter = 0
             
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -3423,7 +3423,7 @@ class DensityModel(nn.Module):
 
     def inference_update_ttaug(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None, proj_xyz=None):
         """Hypervector Bundling via Test-Time Augmentation (TTAug)"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             
@@ -3519,7 +3519,7 @@ class DensityModel(nn.Module):
 
     def inference_update_gplp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None, proj_xyz=None):
         """Graph-Laplacian Label Propagation"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
@@ -3623,7 +3623,7 @@ class DensityModel(nn.Module):
 
     def inference_update_with_subcluster_pull(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, subcluster_lr=0.005, thresholds=(0.45, 0.80)):
         """Temp Function for testing. Like inference_update, but also pulls the nearest subcluster toward high-confidence samples."""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             original_x = x.permute(0, 2, 3, 1).contiguous().reshape(-1, x.shape[1])

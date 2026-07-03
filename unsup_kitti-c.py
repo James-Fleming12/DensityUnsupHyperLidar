@@ -209,7 +209,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
             acc_history.append(cumulative_acc)
             # Adapt: Inference Update
             if not eval_only:
-                model.train()
+                model.eval()
                 if hasattr(model, 'G_d'):  # Duck typing for D3CTTA
                     model.inference_update(
                         h=h,

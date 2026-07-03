@@ -11,7 +11,7 @@ class ActiveModel(DensityModel):
 
     def inference_update_ooa(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], oracle_labels=None, proj_xyz=None):
         """Density-Filtered Outliers (Outlier Oracle Anchor) Active Domain Adaptation"""
-        self.train()
+        self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
             num_total_samples = enc.shape[0]
