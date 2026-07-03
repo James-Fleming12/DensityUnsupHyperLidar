@@ -64,6 +64,7 @@ def main():
         return
 
     update_methods = [
+        {"name": "Baseline", "method": "inference_update", "is_active": False},
         {"name": "Outlier Oracle Anchor (ADA)", "method": "inference_update_ooa", "is_active": True},
         {"name": "Hypervector Bundling (TTAug)", "method": "inference_update_ttaug", "is_active": False},
         {"name": "Graph-Laplacian Label Propagation", "method": "inference_update_gplp", "is_active": False},
@@ -152,7 +153,7 @@ def main():
                         proj_in.to(device),
                         learning_rate=0.001,
                         distance_sensitivity=3.0,
-                        thresholds=[0.45, 0.80], # Matching Baseline from unsup_ugw.py
+                        thresholds=[0.30, 0.65], # Lowered to allow points to enter update pipeline
                         **kwargs
                     )
                 pbar.update(1)

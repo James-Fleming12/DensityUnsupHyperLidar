@@ -93,6 +93,12 @@ class ActiveModel(DensityModel):
                         self.oracle_subclusters = torch.cat([self.oracle_subclusters, new_subcluster], dim=0)
                         self.oracle_subcluster_labels = torch.cat([self.oracle_subcluster_labels, torch.tensor([oracle_label], device=self.device)])
                         
+                        # Bypass the 0.001 learning rate entirely. Treat as a hard anchor.
+                        self.proto_momentum[oracle_label] = new_subcluster.squeeze(0)
+                        self.classify.weight[oracle_label] = F.normalize(
+                            self.classify.weight[oracle_label] + new_subcluster.squeeze(0), dim=0
+                        )
+                        
             # Standard pull update
             selected_proto = F.normalize(self.classify.weight[preds])
             sims = torch.sum(enc_norm * selected_proto, dim=1)
