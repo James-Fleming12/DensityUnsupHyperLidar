@@ -12,7 +12,7 @@ from modules.active_model import ActiveModel
 
 from tqdm import tqdm
 
-from unsup_main import test_hdc_model
+from unsup_main import test_hdc_model, train_hdc
 from unsup_ugw import get_condition_loaders, save_ablation_dumbbell, save_multi_step_dumbbell_ug
 
 MODEL_DIR = "logs"
@@ -26,6 +26,7 @@ ADVERSE_CONDITIONS = [c for c in ALL_CONDITIONS if c != "sunny"]
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Update Methods")
     parser.add_argument("--reinit_subclusters", action="store_true", help="Reinitialize subclusters with Local KNN Adaptive method")
+    parser.add_argument("--hdc_epochs", type=int, default=0, help="Number of epochs to retrain HDC model (0 to skip)")
     args = parser.parse_args()
 
     try:
@@ -72,6 +73,15 @@ def main():
 
     ablation_histories = []
     
+    if args.hdc_epochs > 0:
+        print(f"\nRetraining HDC prototypes for {args.hdc_epochs} epochs...")
+        import unsup_main
+        unsup_main.MODEL_DIR = MODEL_DIR
+        unsup_main.HDC_SAVE_PATH = HDC_SUB_PATH
+        ARCH["train"]["batch_size"] = 6
+        train_hdc(ARCH, DATA, epochs=args.hdc_epochs, data_dir=DATA_DIR)
+        args.reinit_subclusters = True # Force reinitialization since the new model lacks subclusters
+
     # Store sunny baseline performance
     model_base = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
     model_base.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device))
