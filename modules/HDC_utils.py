@@ -3816,7 +3816,7 @@ class DensityModel(nn.Module):
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             
             active_predictions = torch.zeros(active_enc_A.shape[0], device=self.device, dtype=torch.long)
-            active_predictions[~variance_mask] = torch.argmax(self.classify(norm_A[~variance_mask]), dim=1)
+            active_predictions[~variance_mask] = torch.argmax(self.classify(norm_A[~variance_mask].to(self.classify.weight.dtype)), dim=1)
             active_predictions[variance_mask] = preds
             
             full_predictions[valid_enc_mask] = active_predictions

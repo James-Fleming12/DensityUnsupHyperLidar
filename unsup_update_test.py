@@ -5,6 +5,8 @@ import numpy as np
 import torch
 import yaml
 import matplotlib.pyplot as plt
+import json
+import time
 
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import Model, DensityModel
@@ -127,6 +129,7 @@ def main():
             "conditions": [],
             "acc_pairs": [],
             "miou_pairs": [],
+            "stats": {}
         }
 
         for cond in ADVERSE_CONDITIONS:
@@ -142,12 +145,11 @@ def main():
                 continue
                 
             if cond not in condition_baselines:
-                # Calculate pre-update baseline once per condition using the base model
                 print(f"    Evaluating baseline metrics for condition: {cond}...")
-                b_acc, b_miou = test_hdc_model(model_base, val_loader_for_cond)
-                condition_baselines[cond] = (b_acc, b_miou)
+                b_acc, b_miou, b_stats = test_hdc_model(model_base, val_loader_for_cond, return_detailed=True)
+                condition_baselines[cond] = (b_acc, b_miou, b_stats)
                 
-            acc_pre, miou_pre = condition_baselines[cond]
+            acc_pre, miou_pre, stats_pre = condition_baselines[cond]
             print(f"    Pre  - acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
             model = ActiveModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous') if cfg["method"] != "inference_update" else DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
@@ -195,15 +197,25 @@ def main():
                 pbar.update(1)
             pbar.close()
 
-            acc_post, miou_post = test_hdc_model(model, val_loader_for_cond)
+            acc_post, miou_post, stats_post = test_hdc_model(model, val_loader_for_cond, return_detailed=True)
             print(f"    Post - acc: {acc_post:.4f}  mIoU: {miou_post:.4f}  Δ mIoU: {miou_post - miou_pre:+.4f}")
 
             history["steps_labels"].append(f"{cond.capitalize()}")
             history["conditions"].append(cond)
             history["acc_pairs"].append((acc_pre, acc_post))
             history["miou_pairs"].append((miou_pre, miou_post))
+            history["stats"][cond] = {
+                "pre": stats_pre,
+                "post": stats_post,
+                "delta_miou": miou_post - miou_pre
+            }
 
         ablation_histories.append(history)
+
+    log_path = f"ablation_log_{int(time.time())}.json"
+    print(f"\nSaving detailed stats to {log_path}...")
+    with open(log_path, 'w') as f:
+        json.dump(ablation_histories, f, indent=4)
 
     save_ablation_dumbbell(ablation_histories, sunny_baseline=sunny_baseline, file_suffix="_methods_comparison")
 

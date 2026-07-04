@@ -93,7 +93,7 @@ def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, data_dir=None, return_extractor
 
     return model
 
-def test_hdc_model(model, dataloader) -> None:
+def test_hdc_model(model, dataloader, return_detailed=False) -> None:
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     all_accuracies = []
     class_correct = torch.zeros(model.num_classes, device=device)
@@ -188,6 +188,17 @@ def test_hdc_model(model, dataloader) -> None:
             print(f"  Class {class_id}: Acc={acc:.4f} ({correct}/{total}), IoU={iou:.4f}")
         else:
             print(f"  Class {class_id}: No samples")
+
+    if return_detailed:
+        detailed_stats = {
+            "per_class_acc": per_class_accuracy,
+            "per_class_iou": per_class_iou,
+            "class_total": {i: int(class_total[i].item()) for i in range(model.num_classes)},
+            "class_correct": {i: int(class_correct[i].item()) for i in range(model.num_classes)},
+            "class_intersection": {i: int(class_intersection[i].item()) for i in range(model.num_classes)},
+            "class_union": {i: int(class_union[i].item()) for i in range(model.num_classes)}
+        }
+        return global_accuracy, miou, detailed_stats
 
     return global_accuracy, miou
 
