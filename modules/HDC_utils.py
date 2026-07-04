@@ -308,7 +308,14 @@ class DensityModel(nn.Module):
         if self.ARCH["train"]["pipeline"] != "pointpillar":
             w_dict = torch.load(modeldir + "/SENet_valid_best",
                                 map_location=lambda storage, loc: storage)
-            self.net.load_state_dict(w_dict['state_dict'], strict=False)
+            
+            state_dict = w_dict['state_dict']
+            model_state = self.net.state_dict()
+            for k in list(state_dict.keys()):
+                if k in model_state and state_dict[k].shape != model_state[k].shape:
+                    del state_dict[k]
+                    
+            self.net.load_state_dict(state_dict, strict=False)
             self.net.eval()
             if torch.cuda.is_available() and torch.cuda.device_count() > 0:
                 self.gpu = True
