@@ -433,18 +433,18 @@ class ActiveModel(DensityModel):
                         
                         if not hasattr(self, 'fcsr_ages'):
                             self.fcsr_ages = torch.zeros(self.subclusters.shape[0], device=self.device)
-                            self.fcsr_counts = torch.bincount(self.subcluster_classes, minlength=self.num_classes)
+                            self.fcsr_counts = torch.bincount(self.subcluster_to_class, minlength=self.num_classes)
                             self.fcsr_capacity = 20
                         
                         self.fcsr_ages += 1
                         
                         if self.fcsr_counts[oracle_label] < self.fcsr_capacity:
                             self.subclusters = torch.nn.Parameter(torch.cat([self.subclusters.data, bundle.to(self.subclusters.dtype)], dim=0))
-                            self.subcluster_classes = torch.cat([self.subcluster_classes, torch.tensor([oracle_label], device=self.device)])
+                            self.subcluster_to_class = torch.cat([self.subcluster_to_class, torch.tensor([oracle_label], device=self.device)])
                             self.fcsr_ages = torch.cat([self.fcsr_ages, torch.tensor([0.0], device=self.device)])
                             self.fcsr_counts[oracle_label] += 1
                         else:
-                            class_mask = (self.subcluster_classes == oracle_label)
+                            class_mask = (self.subcluster_to_class == oracle_label)
                             class_indices = torch.nonzero(class_mask).squeeze(1)
                             if len(class_indices) > 0:
                                 oldest_idx = class_indices[self.fcsr_ages[class_indices].argmax()]
@@ -652,7 +652,7 @@ class ActiveModel(DensityModel):
                                              enc2[valid_enc_mask][outlier_idx].unsqueeze(0))
                         
                         self.subclusters = torch.nn.Parameter(torch.cat([self.subclusters.data, bundle.to(self.subclusters.dtype)], dim=0))
-                        self.subcluster_classes = torch.cat([self.subcluster_classes, torch.tensor([oracle_label], device=self.device)])
+                        self.subcluster_to_class = torch.cat([self.subcluster_to_class, torch.tensor([oracle_label], device=self.device)])
 
             selected_proto = F.normalize(self.classify.weight[preds])
             sims = torch.sum(enc_norm * selected_proto, dim=1)
@@ -754,7 +754,7 @@ class ActiveModel(DensityModel):
                         if sim >= 0.50:
                             bundle = F.normalize(base_h + roll_h + scale_h)
                             self.subclusters = torch.nn.Parameter(torch.cat([self.subclusters.data, bundle.to(self.subclusters.dtype)], dim=0))
-                            self.subcluster_classes = torch.cat([self.subcluster_classes, torch.tensor([oracle_label], device=self.device)])
+                            self.subcluster_to_class = torch.cat([self.subcluster_to_class, torch.tensor([oracle_label], device=self.device)])
 
             selected_proto = F.normalize(self.classify.weight[preds])
             sims = torch.sum(enc_norm * selected_proto, dim=1)
