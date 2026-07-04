@@ -389,6 +389,8 @@ class ActiveModel(DensityModel):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
                 
             prototypes = F.normalize(self.classify.weight)
+            if enc_norm.dtype != prototypes.dtype:
+                enc_norm = enc_norm.to(prototypes.dtype)
             S = enc_norm @ prototypes.T
             preds = S.argmax(dim=1)
             
@@ -505,6 +507,8 @@ class ActiveModel(DensityModel):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
                 
             prototypes = F.normalize(self.classify.weight)
+            if enc_norm.dtype != prototypes.dtype:
+                enc_norm = enc_norm.to(prototypes.dtype)
             S = enc_norm @ prototypes.T
             preds = S.argmax(dim=1)
             
@@ -605,6 +609,8 @@ class ActiveModel(DensityModel):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
                 
             prototypes = F.normalize(self.classify.weight)
+            if enc_norm.dtype != prototypes.dtype:
+                enc_norm = enc_norm.to(prototypes.dtype)
             S = enc_norm @ prototypes.T
             preds = S.argmax(dim=1)
             
@@ -703,6 +709,8 @@ class ActiveModel(DensityModel):
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
                 
             prototypes = F.normalize(self.classify.weight)
+            if enc_norm.dtype != prototypes.dtype:
+                enc_norm = enc_norm.to(prototypes.dtype)
             S = enc_norm @ prototypes.T
             preds = S.argmax(dim=1)
             
