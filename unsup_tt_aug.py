@@ -51,6 +51,10 @@ def train_aug_hdc(ARCH, DATA, epochs=10, data_dir=None) -> AugModel:
                         shuffle_train=True)
     
     dataloader = parser.get_train_set()
+    
+    # Subsample to dramatically speed up pretraining (every 4th frame)
+    dataloader.dataset.scan_files = dataloader.dataset.scan_files[::4]
+    dataloader.dataset.label_files = dataloader.dataset.label_files[::4]
 
     trainer = AugTrainer(ARCH, DATA, data_dir, LOG_DIR, MODEL_DIR, None)
 
@@ -80,8 +84,10 @@ def main():
         quit()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    train_seqs = DATA["split"]["train"]
+    # Truncate training sequences to [0, 1, 2, 3] (~9000 frames) so SemanticKITTI trains much faster than Waymo
+    train_seqs = DATA["split"]["train"][:4]
     valid_seqs = DATA["split"]["valid"]
+    DATA["split"]["train"] = train_seqs
 
     print("Building SemanticKITTI clean baseline parser...")
     baseline_parser = Parser(root=DATA_DIR,
@@ -99,7 +105,17 @@ def main():
                     gt=True,
                     shuffle_train=False)
 
-    val_loaders = {"sunny": DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])}
+    # Subsample training data by taking every 4th frame across the sequences
+    train_dataset = baseline_parser.get_train_set().dataset
+    train_dataset.scan_files = train_dataset.scan_files[::4]
+    train_dataset.label_files = train_dataset.label_files[::4]
+
+    # Subsample validation data by taking every 10th frame (1Hz) to speed up ablation testing
+    valid_dataset = baseline_parser.validloader.dataset
+    valid_dataset.scan_files = valid_dataset.scan_files[::10]
+    valid_dataset.label_files = valid_dataset.label_files[::10]
+
+    val_loaders = {"sunny": DataLoader(valid_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])}
     train_loaders = {}
     
     ARCH["train"]["workers"] = 0 
