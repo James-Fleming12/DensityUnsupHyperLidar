@@ -68,17 +68,10 @@ def main():
 
     update_methods = [
         {"name": "Baseline", "method": "inference_update", "is_active": False},
-        {"name": "Outlier Oracle Anchor (ADA)", "method": "inference_update_ooa", "is_active": True},
-        {"name": "Hypervector Bundling (TTAug)", "method": "inference_update_ttaug", "is_active": True},
-        {"name": "Graph-Laplacian Label Propagation", "method": "inference_update_gplp", "is_active": True},
-        {"name": "Oracle-Anchored Graph Propagation (OAGP)", "method": "inference_update_oagp", "is_active": True},
-        {"name": "Multi-View Oracle Subclustering (MVOS)", "method": "inference_update_mvos", "is_active": True},
-        {"name": "Geometric Variance-Gated Bundling (GVGB)", "method": "inference_update_gvgb", "is_active": True},
-        {"name": "Density-Aware Bundled Pull (DABP)", "method": "inference_update_dabp", "is_active": True},
-        {"name": "Fixed-Capacity Subcluster Replacement (FCSR)", "method": "inference_update_fcsr", "is_active": True},
-        {"name": "Oracle-Weighted Master Pull (OWMP)", "method": "inference_update_owmp", "is_active": True},
-        {"name": "Margin-Gated Oracle Anchor (MGOA)", "method": "inference_update_mgoa", "is_active": True},
-        {"name": "Variance-Gated Oracle (VGO)", "method": "inference_update_vgo", "is_active": True},
+        {"name": "Confidence-Weighted Superposition (CWS)", "method": "inference_update_cws"},
+        {"name": "Density-Adaptive View Allocation (DAVA)", "method": "inference_update_dava"},
+        {"name": "Multi-Scale Spatial Bundling (MSSB)", "method": "inference_update_mssb"},
+        {"name": "Temporal Hypervector Accumulation (THA)", "method": "inference_update_tha"}
     ]
 
     ablation_histories = []
