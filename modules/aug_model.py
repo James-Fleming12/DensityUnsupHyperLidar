@@ -97,30 +97,34 @@ class AugModel(DensityModel):
 
     def inference_update_symmetric(self, x, learning_rate=0.001, threshold=0.80, **kwargs):
         with torch.no_grad():
-            x_yaw = torch.roll(x, shifts=14, dims=3)
-            x_scale = x * 0.95
-            
             enc_base, _, _ = self.encode(x)
-            enc_yaw, _, _ = self.encode(x_yaw)
-            enc_scale, _, _ = self.encode(x_scale)
             
             num_total_samples = enc_base.shape[0]
             valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
             
             e_base = F.normalize(enc_base[valid_enc_mask])
-            e_yaw = F.normalize(enc_yaw[valid_enc_mask])
-            e_scale = F.normalize(enc_scale[valid_enc_mask])
+            del enc_base
             
             if e_base.shape[0] == 0:
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
                 
             prototypes = F.normalize(self.classify.weight)
-            if e_base.dtype != prototypes.dtype:
-                e_base = e_base.to(prototypes.dtype)
-                e_yaw = e_yaw.to(prototypes.dtype)
-                e_scale = e_scale.to(prototypes.dtype)
-                
-            bundled_target = F.normalize(e_base + e_yaw + e_scale)
+            e_base = e_base.to(prototypes.dtype)
+            bundled_target = e_base
+            
+            x_yaw = torch.roll(x, shifts=14, dims=3)
+            enc_yaw, _, _ = self.encode(x_yaw)
+            del x_yaw
+            bundled_target.add_(F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype))
+            del enc_yaw
+            
+            x_scale = x * 0.95
+            enc_scale, _, _ = self.encode(x_scale)
+            del x_scale
+            bundled_target.add_(F.normalize(enc_scale[valid_enc_mask]).to(prototypes.dtype))
+            del enc_scale
+            
+            bundled_target = F.normalize(bundled_target)
             
             S = bundled_target @ prototypes.T
             preds = S.argmax(dim=1)
@@ -173,8 +177,9 @@ class AugTrainer(DensityTrainer):
                     
                 enc_base, _, _ = self.model.encode(proj_in)
                 
-                samples_hv = torch.zeros_like(enc_base, dtype=model.classify_weights.dtype)
                 valid_mask = (enc_base.abs().sum(dim=1) > 0)
+                num_total_samples = enc_base.shape[0]
+                hd_dim = enc_base.shape[1]
                 
                 bundled = F.normalize(enc_base[valid_mask])
                 del enc_base
@@ -192,7 +197,9 @@ class AugTrainer(DensityTrainer):
                 del enc_scale
                 
                 bundled = F.normalize(bundled).to(model.classify_weights.dtype)
+                samples_hv = torch.zeros((num_total_samples, hd_dim), device=self.device, dtype=model.classify_weights.dtype)
                 samples_hv[valid_mask] = bundled
+                del bundled
                 
                 proj_labels = proj_labels.view(-1).to(self.device)
                 
@@ -235,8 +242,9 @@ class AugTrainer(DensityTrainer):
                     
                 enc_base, _, _ = self.model.encode(proj_in)
                 
-                samples_hv = torch.zeros_like(enc_base, dtype=model.classify_weights.dtype)
                 valid_mask = (enc_base.abs().sum(dim=1) > 0)
+                num_total_samples = enc_base.shape[0]
+                hd_dim = enc_base.shape[1]
                 
                 bundled = F.normalize(enc_base[valid_mask])
                 del enc_base
@@ -254,7 +262,9 @@ class AugTrainer(DensityTrainer):
                 del enc_scale
                 
                 bundled = F.normalize(bundled).to(model.classify_weights.dtype)
+                samples_hv = torch.zeros((num_total_samples, hd_dim), device=self.device, dtype=model.classify_weights.dtype)
                 samples_hv[valid_mask] = bundled
+                del bundled
                 
                 proj_labels = proj_labels.view(-1).to(self.device)
                 
