@@ -23,10 +23,10 @@ unsup_kitti_c = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(unsup_kitti_c)
 LiDARCorruptionWrapper = unsup_kitti_c.LiDARCorruptionWrapper
 
-MODEL_DIR = "logs"
+MODEL_DIR = "logs/kitti_pretrain"
 DATA_DIR = "/mnt/alpha/jmfleming/KITTI"
 NUM_CLASSES = 20
-HDC_SUB_PATH = "logs/hdc_sub_aug.pth"
+HDC_SUB_PATH = "logs/kitti_pretrain/hdc_sub_aug.pth"
 LOG_DIR = "logs"
 
 ALL_CONDITIONS = ["sunny", "snow", "fog", "motion"]
