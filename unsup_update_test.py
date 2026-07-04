@@ -66,13 +66,13 @@ def main():
 
     update_methods = [
         {"name": "Baseline", "method": "inference_update", "is_active": False},
-        {"name": "Outlier Oracle Anchor (ADA)", "method": "inference_update_ooa", "is_active": False},
-        {"name": "Hypervector Bundling (TTAug)", "method": "inference_update_ttaug", "is_active": False},
-        {"name": "Graph-Laplacian Label Propagation", "method": "inference_update_gplp", "is_active": False},
-        {"name": "Oracle-Anchored Graph Propagation (OAGP)", "method": "inference_update_oagp", "is_active": False},
-        {"name": "Multi-View Oracle Subclustering (MVOS)", "method": "inference_update_mvos", "is_active": False},
-        {"name": "Geometric Variance-Gated Bundling (GVGB)", "method": "inference_update_gvgb", "is_active": False},
-        {"name": "Density-Aware Bundled Pull (DABP)", "method": "inference_update_dabp", "is_active": False},
+        {"name": "Outlier Oracle Anchor (ADA)", "method": "inference_update_ooa", "is_active": True},
+        {"name": "Hypervector Bundling (TTAug)", "method": "inference_update_ttaug", "is_active": True},
+        {"name": "Graph-Laplacian Label Propagation", "method": "inference_update_gplp", "is_active": True},
+        {"name": "Oracle-Anchored Graph Propagation (OAGP)", "method": "inference_update_oagp", "is_active": True},
+        {"name": "Multi-View Oracle Subclustering (MVOS)", "method": "inference_update_mvos", "is_active": True},
+        {"name": "Geometric Variance-Gated Bundling (GVGB)", "method": "inference_update_gvgb", "is_active": True},
+        {"name": "Density-Aware Bundled Pull (DABP)", "method": "inference_update_dabp", "is_active": True},
         {"name": "Fixed-Capacity Subcluster Replacement (FCSR)", "method": "inference_update_fcsr", "is_active": True},
         {"name": "Oracle-Weighted Master Pull (OWMP)", "method": "inference_update_owmp", "is_active": True},
         {"name": "Margin-Gated Oracle Anchor (MGOA)", "method": "inference_update_mgoa", "is_active": True},
@@ -137,10 +137,10 @@ def main():
 
             val_loader_for_cond = val_loaders.get(cond, next(iter(val_loaders.values())))
 
-            if cfg.get("is_active", False):
-                model = ActiveModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-            else:
-                model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+            if not cfg.get("is_active", True):
+                continue
+                
+            model = ActiveModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous') if cfg["method"] != "inference_update" else DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
             model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device), strict=False)
             model.to(device)
 
@@ -171,7 +171,7 @@ def main():
                 kwargs = {}
                 if cfg["method"] != "inference_update":
                     kwargs["oracle_labels"] = oracle_labels.to(device) if oracle_labels is not None else None
-                if cfg["method"] in ["inference_update_gplp", "inference_update_ooa", "inference_update_ttaug", "inference_update_oagp", "inference_update_mvos", "inference_update_gvgb", "inference_update_dabp"]:
+                if cfg["method"] in ["inference_update_gplp", "inference_update_ooa", "inference_update_ttaug", "inference_update_oagp", "inference_update_mvos", "inference_update_gvgb", "inference_update_dabp", "inference_update_fcsr", "inference_update_owmp", "inference_update_mgoa", "inference_update_vgo"]:
                     kwargs["proj_xyz"] = proj_xyz.to(device) if proj_xyz is not None else None
                 
                 if proj_in.shape[1] > 0:
