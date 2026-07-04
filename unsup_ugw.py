@@ -368,9 +368,14 @@ def save_multi_step_dumbbell_ug(history, DATA=None, file_suffix="", sunny_baseli
     print(f"Dumbbell plot saved to {out_path}")
 
 def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=""):
-    conditions = ablation_histories[0]["conditions"]
+    active_histories = [h for h in ablation_histories if len(h["conditions"]) > 0]
+    if not active_histories:
+        print("No active ablation histories to plot.")
+        return
+        
+    conditions = active_histories[0]["conditions"]
     n_cond = len(conditions)
-    n_abl = len(ablation_histories)
+    n_abl = len(active_histories)
 
     band_height = 1.0
     y_spread = 0.15
@@ -390,7 +395,7 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
             bg = CONDITION_COLORS.get(cond, DEFAULT_COLOR) + '33'
             ax.axhspan(y_center - 0.45, y_center + 0.45, color=bg, zorder=0, alpha=0.9)
 
-            for ai, hist in enumerate(ablation_histories):
+            for ai, hist in enumerate(active_histories):
                 if ci >= len(hist[pairs_key]):
                     continue
                 pre, post = hist[pairs_key][ci]
@@ -424,7 +429,7 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
         tick.set_color(CONDITION_COLORS.get(cond, 'black'))
     ax2.tick_params(labelleft=False)
 
-    abl_handles = [plt.Line2D([0], [0], color=ABLATION_COLORS[i % len(ABLATION_COLORS)], linestyle=LINESTYLES[i % len(LINESTYLES)], linewidth=1.8, marker=MARKERS[i % len(MARKERS)], markersize=6, markerfacecolor='white', markeredgecolor=ABLATION_COLORS[i % len(ABLATION_COLORS)], label=hist['name']) for i, hist in enumerate(ablation_histories)]
+    abl_handles = [plt.Line2D([0], [0], color=ABLATION_COLORS[i % len(ABLATION_COLORS)], linestyle=LINESTYLES[i % len(LINESTYLES)], linewidth=1.8, marker=MARKERS[i % len(MARKERS)], markersize=6, markerfacecolor='white', markeredgecolor=ABLATION_COLORS[i % len(ABLATION_COLORS)], label=hist['name']) for i, hist in enumerate(active_histories)]
     ax1.legend(handles=abl_handles, title='Ablation config', fontsize=8, title_fontsize=8, loc='lower left', bbox_to_anchor=(0, -0.18), ncol=2, frameon=True, framealpha=0.9)
 
     pre_post = [plt.scatter([], [], color=COLOR_PRE,  s=60, label='Pre-update'), plt.scatter([], [], color=COLOR_POST, s=60, label='Post-update'),]
