@@ -39,25 +39,33 @@ class AugModel(DensityModel):
                         
                     proj_labels = proj_labels[valid_label_mask]
                     
-                    x_yaw = torch.roll(proj_in, shifts=14, dims=3)
-                    x_scale = proj_in * 0.95
-                    
                     enc_base, _, _ = self.encode(proj_in)
-                    enc_yaw, _, _ = self.encode(x_yaw)
-                    enc_scale, _, _ = self.encode(x_scale)
+                    c_base = enc_base[valid_label_mask]
+                    del enc_base
                     
-                    enc_base = enc_base[valid_label_mask]
-                    enc_yaw = enc_yaw[valid_label_mask]
-                    enc_scale = enc_scale[valid_label_mask]
-
                     class_mask = proj_labels == class_id
                     
                     if torch.any(class_mask):
-                        c_base = F.normalize(enc_base[class_mask])
-                        c_yaw = F.normalize(enc_yaw[class_mask])
-                        c_scale = F.normalize(enc_scale[class_mask])
+                        bundled = F.normalize(c_base[class_mask])
+                        del c_base
                         
-                        bundled = F.normalize(c_base + c_yaw + c_scale).cpu().half()
+                        x_yaw = torch.roll(proj_in, shifts=14, dims=3)
+                        enc_yaw, _, _ = self.encode(x_yaw)
+                        del x_yaw
+                        c_yaw = enc_yaw[valid_label_mask]
+                        del enc_yaw
+                        bundled.add_(F.normalize(c_yaw[class_mask]))
+                        del c_yaw
+                        
+                        x_scale = proj_in * 0.95
+                        enc_scale, _, _ = self.encode(x_scale)
+                        del x_scale
+                        c_scale = enc_scale[valid_label_mask]
+                        del enc_scale
+                        bundled.add_(F.normalize(c_scale[class_mask]))
+                        del c_scale
+                        
+                        bundled = F.normalize(bundled).cpu().half()
                         class_embeddings.append(bundled)
                         total_samples += bundled.shape[0]
                     
@@ -163,22 +171,27 @@ class AugTrainer(DensityTrainer):
                 if self.gpu:
                     proj_in = proj_in.cuda()
                     
-                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
-                x_scale = proj_in * 0.95
-                
                 enc_base, _, _ = self.model.encode(proj_in)
-                enc_yaw, _, _ = self.model.encode(x_yaw)
-                enc_scale, _, _ = self.model.encode(x_scale)
                 
-                # We need to construct samples_hv as the bundled version
                 samples_hv = torch.zeros_like(enc_base, dtype=model.classify_weights.dtype)
                 valid_mask = (enc_base.abs().sum(dim=1) > 0)
                 
-                e_base = F.normalize(enc_base[valid_mask])
-                e_yaw = F.normalize(enc_yaw[valid_mask])
-                e_scale = F.normalize(enc_scale[valid_mask])
+                bundled = F.normalize(enc_base[valid_mask])
+                del enc_base
                 
-                bundled = F.normalize(e_base + e_yaw + e_scale).to(model.classify_weights.dtype)
+                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
+                enc_yaw, _, _ = self.model.encode(x_yaw)
+                del x_yaw
+                bundled.add_(F.normalize(enc_yaw[valid_mask]))
+                del enc_yaw
+                
+                x_scale = proj_in * 0.95
+                enc_scale, _, _ = self.model.encode(x_scale)
+                del x_scale
+                bundled.add_(F.normalize(enc_scale[valid_mask]))
+                del enc_scale
+                
+                bundled = F.normalize(bundled).to(model.classify_weights.dtype)
                 samples_hv[valid_mask] = bundled
                 
                 proj_labels = proj_labels.view(-1).to(self.device)
@@ -220,21 +233,27 @@ class AugTrainer(DensityTrainer):
                 if self.gpu:
                     proj_in = proj_in.cuda()
                     
-                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
-                x_scale = proj_in * 0.95
-                
                 enc_base, _, _ = self.model.encode(proj_in)
-                enc_yaw, _, _ = self.model.encode(x_yaw)
-                enc_scale, _, _ = self.model.encode(x_scale)
                 
                 samples_hv = torch.zeros_like(enc_base, dtype=model.classify_weights.dtype)
                 valid_mask = (enc_base.abs().sum(dim=1) > 0)
                 
-                e_base = F.normalize(enc_base[valid_mask])
-                e_yaw = F.normalize(enc_yaw[valid_mask])
-                e_scale = F.normalize(enc_scale[valid_mask])
+                bundled = F.normalize(enc_base[valid_mask])
+                del enc_base
                 
-                bundled = F.normalize(e_base + e_yaw + e_scale).to(model.classify_weights.dtype)
+                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
+                enc_yaw, _, _ = self.model.encode(x_yaw)
+                del x_yaw
+                bundled.add_(F.normalize(enc_yaw[valid_mask]))
+                del enc_yaw
+                
+                x_scale = proj_in * 0.95
+                enc_scale, _, _ = self.model.encode(x_scale)
+                del x_scale
+                bundled.add_(F.normalize(enc_scale[valid_mask]))
+                del enc_scale
+                
+                bundled = F.normalize(bundled).to(model.classify_weights.dtype)
                 samples_hv[valid_mask] = bundled
                 
                 proj_labels = proj_labels.view(-1).to(self.device)
