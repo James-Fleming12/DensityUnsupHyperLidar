@@ -118,6 +118,7 @@ def main():
     acc_sunny, miou_sunny = test_hdc_model(model_base, val_loaders["sunny"])
     sunny_baseline = {"acc": acc_sunny, "miou": miou_sunny}
     print(f"Baseline Sunny - acc: {acc_sunny:.4f} mIoU: {miou_sunny:.4f}")
+    condition_baselines = {}
 
     for cfg in update_methods:
         history = {
@@ -140,13 +141,18 @@ def main():
             if not cfg.get("is_active", True):
                 continue
                 
+            if cond not in condition_baselines:
+                # Calculate pre-update baseline once per condition using the base model
+                print(f"    Evaluating baseline metrics for condition: {cond}...")
+                b_acc, b_miou = test_hdc_model(model_base, val_loader_for_cond)
+                condition_baselines[cond] = (b_acc, b_miou)
+                
+            acc_pre, miou_pre = condition_baselines[cond]
+            print(f"    Pre  - acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
+
             model = ActiveModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous') if cfg["method"] != "inference_update" else DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
             model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device), strict=False)
             model.to(device)
-
-            acc_pre, miou_pre = test_hdc_model(model, val_loader_for_cond)
-            print(f"    Pre  - acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
-
             model.train()
             
             update_fn = getattr(model, cfg["method"])
