@@ -379,9 +379,9 @@ class ActiveModel(DensityModel):
             return full_predictions
 
     def inference_update_fcsr(self, x, oracle_labels=None, proj_xyz=None, learning_rate=0.001, distance_sensitivity=3.0, thresholds=[0.45, 0.80], beta=0.2, max_updates_per_class=-1):
-        num_total_samples = x.shape[0]
         with torch.no_grad():
             enc, indices, is_wrong_left = self.encode(x, PERCENTAGE=None, is_wrong=None)
+            num_total_samples = enc.shape[0]
             valid_enc_mask = (enc.abs().sum(dim=1) > 0)
             enc_norm = F.normalize(enc[valid_enc_mask])
             
@@ -497,9 +497,9 @@ class ActiveModel(DensityModel):
             return full_predictions
 
     def inference_update_owmp(self, x, oracle_labels=None, proj_xyz=None, learning_rate=0.001, distance_sensitivity=3.0, thresholds=[0.45, 0.80], beta=0.2, max_updates_per_class=-1):
-        num_total_samples = x.shape[0]
         with torch.no_grad():
             enc, indices, is_wrong_left = self.encode(x, PERCENTAGE=None, is_wrong=None)
+            num_total_samples = enc.shape[0]
             valid_enc_mask = (enc.abs().sum(dim=1) > 0)
             enc_norm = F.normalize(enc[valid_enc_mask])
             
@@ -599,9 +599,9 @@ class ActiveModel(DensityModel):
             return full_predictions
 
     def inference_update_mgoa(self, x, oracle_labels=None, proj_xyz=None, learning_rate=0.001, distance_sensitivity=3.0, thresholds=[0.45, 0.80], beta=0.2, max_updates_per_class=-1):
-        num_total_samples = x.shape[0]
         with torch.no_grad():
             enc, indices, is_wrong_left = self.encode(x, PERCENTAGE=None, is_wrong=None)
+            num_total_samples = enc.shape[0]
             valid_enc_mask = (enc.abs().sum(dim=1) > 0)
             enc_norm = F.normalize(enc[valid_enc_mask])
             
@@ -699,9 +699,9 @@ class ActiveModel(DensityModel):
             return full_predictions
 
     def inference_update_vgo(self, x, oracle_labels=None, proj_xyz=None, learning_rate=0.001, distance_sensitivity=3.0, thresholds=[0.45, 0.80], beta=0.2, max_updates_per_class=-1):
-        num_total_samples = x.shape[0]
         with torch.no_grad():
             enc, indices, is_wrong_left = self.encode(x, PERCENTAGE=None, is_wrong=None)
+            num_total_samples = enc.shape[0]
             valid_enc_mask = (enc.abs().sum(dim=1) > 0)
             enc_norm = F.normalize(enc[valid_enc_mask])
             
