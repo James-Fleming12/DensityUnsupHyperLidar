@@ -1,5 +1,4 @@
 import argparse
-import copy
 import os
 import numpy as np
 import torch
@@ -11,19 +10,26 @@ import time
 from dataset.kitti.parser import Parser
 from modules.HDC_utils import DensityModel
 from modules.aug_model import AugModel, AugTrainer
+from torch.utils.data import DataLoader
 
 from tqdm import tqdm
 
 from unsup_main import test_hdc_model
-from unsup_ugw import get_condition_loaders, save_ablation_dumbbell
+from unsup_ugw import save_ablation_dumbbell
+
+import importlib.util
+spec = importlib.util.spec_from_file_location("unsup_kitti_c", "unsup_kitti-c.py")
+unsup_kitti_c = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(unsup_kitti_c)
+LiDARCorruptionWrapper = unsup_kitti_c.LiDARCorruptionWrapper
 
 MODEL_DIR = "logs"
-DATA_DIR = "/mnt/bravo/jmfleming/waymo_skitti"
-NUM_CLASSES = 13
+DATA_DIR = "/mnt/alpha/jmfleming/KITTI"
+NUM_CLASSES = 20
 HDC_SUB_PATH = "logs/hdc_sub_aug.pth"
 LOG_DIR = "logs"
 
-ALL_CONDITIONS = ["sunny", "rain", "night"]
+ALL_CONDITIONS = ["sunny", "snow", "fog", "motion"]
 ADVERSE_CONDITIONS = [c for c in ALL_CONDITIONS if c != "sunny"]
 
 def train_aug_hdc(ARCH, DATA, epochs=10, data_dir=None) -> AugModel:
@@ -68,7 +74,7 @@ def main():
         print(f"Error opening arch yaml file. {e}")
         quit()
     try:
-        DATA = yaml.safe_load(open("config/labels/waymo.yaml", 'r'))
+        DATA = yaml.safe_load(open("config/labels/semantic-kitti-all.yaml", 'r'))
     except Exception as e:
         print(f"Error opening data yaml file. {e}")
         quit()
@@ -77,25 +83,33 @@ def main():
     train_seqs = DATA["split"]["train"]
     valid_seqs = DATA["split"]["valid"]
 
-    print("Building per-condition validation loaders...")
-    val_loaders = get_condition_loaders(
-        ARCH, DATA, valid_seqs,
-        batch_size=1, shuffle=False,
-        conditions=ALL_CONDITIONS)
+    print("Building SemanticKITTI clean baseline parser...")
+    baseline_parser = Parser(root=DATA_DIR,
+                    train_sequences=train_seqs,
+                    valid_sequences=valid_seqs,
+                    test_sequences=None,
+                    labels=DATA["labels"],
+                    color_map=DATA["color_map"],
+                    learning_map=DATA["learning_map"],
+                    learning_map_inv=DATA["learning_map_inv"],
+                    sensor=ARCH["dataset"]["sensor"],
+                    max_points=ARCH["dataset"]["max_points"],
+                    batch_size=1,
+                    workers=ARCH["train"]["workers"],
+                    gt=True,
+                    shuffle_train=False)
 
-    if not val_loaders:
-        raise RuntimeError("No validation frames found for any condition.")
-
+    val_loaders = {"sunny": DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])}
+    train_loaders = {}
+    
     ARCH["train"]["workers"] = 0 
-    print("Building per-condition training loaders (for adaptation)...")
-    train_loaders = get_condition_loaders(
-        ARCH, DATA, train_seqs,
-        batch_size=1, shuffle=True,
-        conditions=ADVERSE_CONDITIONS)
-
-    if not train_loaders:
-        print("No adverse condition frames found - skipping.")
-        return
+    print("Building SemanticKITTI-C per-condition loaders (Severity 3)...")
+    for cond in ADVERSE_CONDITIONS:
+        train_wrapper = LiDARCorruptionWrapper(baseline_parser.get_train_set().dataset, corruption_type=cond, severity=3)
+        train_loaders[cond] = DataLoader(train_wrapper, batch_size=1, shuffle=True, num_workers=0)
+        
+        val_wrapper = LiDARCorruptionWrapper(baseline_parser.validloader.dataset, corruption_type=cond, severity=3)
+        val_loaders[cond] = DataLoader(val_wrapper, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
 
     update_methods = [
         {"name": "Baseline", "method": "inference_update", "is_active": False},
@@ -123,11 +137,9 @@ def main():
     
     if args.reinit_subclusters:
         print("\nReinitializing subclusters with Symmetric Bundled method...")
-        PRE_DATA = copy.deepcopy(DATA)
-        PRE_DATA["weather_filter"] = ["sunny"]
-        sunny_loaders = get_condition_loaders(ARCH, PRE_DATA, train_seqs, batch_size=6, shuffle=True, conditions=["sunny"])
+        sunny_train_loader = DataLoader(baseline_parser.get_train_set().dataset, batch_size=6, shuffle=True, num_workers=ARCH["train"]["workers"])
         model_base.eval()
-        model_base.init_subclusters(sunny_loaders["sunny"])
+        model_base.init_subclusters(sunny_train_loader)
         
         print(f"Saving updated model weights to {HDC_SUB_PATH}...")
         torch.save(model_base.state_dict(), HDC_SUB_PATH)
