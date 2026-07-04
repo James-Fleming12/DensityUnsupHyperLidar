@@ -25,7 +25,7 @@ LiDARCorruptionWrapper = unsup_kitti_c.LiDARCorruptionWrapper
 
 MODEL_DIR = "logs/kitti_pretrain"
 DATA_DIR = "/mnt/alpha/jmfleming/KITTI"
-NUM_CLASSES = 20
+NUM_CLASSES = 17
 HDC_SUB_PATH = "logs/kitti_pretrain/hdc_sub_aug.pth"
 LOG_DIR = "logs"
 
