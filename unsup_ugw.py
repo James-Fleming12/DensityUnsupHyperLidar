@@ -378,8 +378,9 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, max(6, n_cond * 1.8 + 3)), sharey=True)
     fig.subplots_adjust(wspace=0.08)
 
-    LINESTYLES = ['-', '--', ':', '-.', '-']
-    ABLATION_COLORS = ['#555555', '#2266CC', '#CC6622', '#999999', '#9b59b6']
+    LINESTYLES = ['-', '--', ':', '-.', '-', '--', ':', '-.', '-', '--']
+    ABLATION_COLORS = ['#555555', '#2266CC', '#CC6622', '#999999', '#9b59b6', '#1abc9c', '#e74c3c', '#34495e', '#f1c40f', '#8e44ad']
+    MARKERS = ['o','^','s','D','v','p','*','h','<','>']
     COLOR_PRE = '#4C9BE8'
     COLOR_POST = '#E8574C'
 
@@ -394,10 +395,13 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
                     continue
                 pre, post = hist[pairs_key][ci]
                 y = y_center + (ai - (n_abl - 1) / 2) * y_spread
+                
+                c_idx = ai % len(ABLATION_COLORS)
+                m_idx = ai % len(MARKERS)
 
-                ax.hlines(y, pre, post, color=ABLATION_COLORS[ai], linestyle=LINESTYLES[ai], linewidth=1.6, alpha=0.75, zorder=1)
-                ax.scatter(pre,  y, color=COLOR_PRE,  s=70, zorder=3, edgecolors='white', linewidths=0.6, marker=['o','^','s','D','v'][ai])
-                ax.scatter(post, y, color=COLOR_POST, s=70, zorder=3, edgecolors='white', linewidths=0.6, marker=['o','^','s','D','v'][ai])
+                ax.hlines(y, pre, post, color=ABLATION_COLORS[c_idx], linestyle=LINESTYLES[c_idx], linewidth=1.6, alpha=0.75, zorder=1)
+                ax.scatter(pre,  y, color=COLOR_PRE,  s=70, zorder=3, edgecolors='white', linewidths=0.6, marker=MARKERS[m_idx])
+                ax.scatter(post, y, color=COLOR_POST, s=70, zorder=3, edgecolors='white', linewidths=0.6, marker=MARKERS[m_idx])
 
                 delta = post - pre
                 x_mid = (pre + post) / 2
@@ -420,7 +424,7 @@ def save_ablation_dumbbell(ablation_histories, sunny_baseline=None, file_suffix=
         tick.set_color(CONDITION_COLORS.get(cond, 'black'))
     ax2.tick_params(labelleft=False)
 
-    abl_handles = [plt.Line2D([0], [0], color=ABLATION_COLORS[i], linestyle=LINESTYLES[i], linewidth=1.8, marker=['o','^','s','D','v'][i], markersize=6, markerfacecolor='white', markeredgecolor=ABLATION_COLORS[i], label=hist['name']) for i, hist in enumerate(ablation_histories)]
+    abl_handles = [plt.Line2D([0], [0], color=ABLATION_COLORS[i % len(ABLATION_COLORS)], linestyle=LINESTYLES[i % len(LINESTYLES)], linewidth=1.8, marker=MARKERS[i % len(MARKERS)], markersize=6, markerfacecolor='white', markeredgecolor=ABLATION_COLORS[i % len(ABLATION_COLORS)], label=hist['name']) for i, hist in enumerate(ablation_histories)]
     ax1.legend(handles=abl_handles, title='Ablation config', fontsize=8, title_fontsize=8, loc='lower left', bbox_to_anchor=(0, -0.18), ncol=2, frameon=True, framealpha=0.9)
 
     pre_post = [plt.scatter([], [], color=COLOR_PRE,  s=60, label='Pre-update'), plt.scatter([], [], color=COLOR_POST, s=60, label='Post-update'),]
