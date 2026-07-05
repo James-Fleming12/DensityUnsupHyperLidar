@@ -268,147 +268,6 @@ class AugModel(DensityModel):
             return full_predictions
 
 
-class AugTrainer(DensityTrainer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Override the model created by DensityTrainer
-        self.model = AugModel(self.ARCH, self.modeldir, 'rp', 0, 0, self.num_classes, self.device, subcluster_type='continuous')
-        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
-            self.model.cuda()
-
-    def train(self, train_loader, model, logger):
-        if self.gpu:
-            torch.cuda.empty_cache()
-        with torch.no_grad():
-            self.is_wrong_list = [None] * len(train_loader)
-            for i, batch in enumerate(tqdm(train_loader, desc="Training (Symmetric)")):
-                proj_in = batch[0]
-                proj_labels = batch[2]
-                
-                if self.gpu:
-                    proj_in = proj_in.cuda()
-                    
-                enc_base, _, _ = self.model.encode(proj_in)
-                
-                valid_mask = (enc_base.abs().sum(dim=1) > 0)
-                num_total_samples = enc_base.shape[0]
-                hd_dim = enc_base.shape[1]
-                
-                bundled = F.normalize(enc_base[valid_mask])
-                del enc_base
-                
-                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
-                enc_yaw, _, _ = self.model.encode(x_yaw)
-                del x_yaw
-                bundled.add_(F.normalize(enc_yaw[valid_mask]))
-                del enc_yaw
-                
-                x_scale = proj_in * 0.95
-                enc_scale, _, _ = self.model.encode(x_scale)
-                del x_scale
-                bundled.add_(F.normalize(enc_scale[valid_mask]))
-                del enc_scale
-                
-                bundled = F.normalize(bundled).to(model.classify_weights.dtype)
-                samples_hv = torch.zeros((num_total_samples, hd_dim), device=self.device, dtype=model.classify_weights.dtype)
-                samples_hv[valid_mask] = bundled
-                del bundled
-                
-                proj_labels = proj_labels.view(-1).to(self.device)
-                
-                model.classify_weights.index_add_(0, proj_labels, samples_hv)
-                
-                predictions = self.model.get_predictions(samples_hv)
-                argmax = predictions.argmax(dim=1)
-                
-                is_wrong = proj_labels != argmax
-                proj_labels = proj_labels[is_wrong]
-                argmax = argmax[is_wrong]
-                samples_hv = samples_hv[is_wrong]
-                
-                true_scores = predictions[is_wrong, proj_labels]
-                wrong_scores = predictions[is_wrong, argmax]
-                losses = wrong_scores - true_scores
-                
-                self.is_wrong_list[i] = is_wrong
-
-            if self.bipolar_prototypes:
-                with torch.no_grad():
-                    model.classify_weights.data = torch.sign(model.classify_weights.data)
-                    zero_mask = model.classify_weights.data == 0
-                    if torch.any(zero_mask):
-                        model.classify_weights.data[zero_mask] = -1.0
-                    model.classify.weight.data = model.classify_weights.data.clone()
-            else:
-                model.classify.weight[:] = F.normalize(model.classify_weights)
-
-    def retrain(self, train_loader, model, epoch, logger):
-        if self.gpu:
-            torch.cuda.empty_cache()
-        with torch.no_grad():
-            for i, batch in enumerate(tqdm(train_loader, desc=f"Retraining Epoch {epoch}")):
-                proj_in = batch[0]
-                proj_labels = batch[2]
-                
-                if self.gpu:
-                    proj_in = proj_in.cuda()
-                    
-                enc_base, _, _ = self.model.encode(proj_in)
-                
-                valid_mask = (enc_base.abs().sum(dim=1) > 0)
-                num_total_samples = enc_base.shape[0]
-                hd_dim = enc_base.shape[1]
-                
-                bundled = F.normalize(enc_base[valid_mask])
-                del enc_base
-                
-                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
-                enc_yaw, _, _ = self.model.encode(x_yaw)
-                del x_yaw
-                bundled.add_(F.normalize(enc_yaw[valid_mask]))
-                del enc_yaw
-                
-                x_scale = proj_in * 0.95
-                enc_scale, _, _ = self.model.encode(x_scale)
-                del x_scale
-                bundled.add_(F.normalize(enc_scale[valid_mask]))
-                del enc_scale
-                
-                bundled = F.normalize(bundled).to(model.classify_weights.dtype)
-                samples_hv = torch.zeros((num_total_samples, hd_dim), device=self.device, dtype=model.classify_weights.dtype)
-                samples_hv[valid_mask] = bundled
-                del bundled
-                
-                proj_labels = proj_labels.view(-1).to(self.device)
-                
-                predictions = self.model.get_predictions(samples_hv)
-                argmax = predictions.argmax(dim=1)
-                
-                is_wrong = proj_labels != argmax
-                proj_labels = proj_labels[is_wrong]
-                argmax = argmax[is_wrong]
-                samples_hv = samples_hv[is_wrong]
-                
-                true_scores = predictions[is_wrong, proj_labels]
-                wrong_scores = predictions[is_wrong, argmax]
-                losses = wrong_scores - true_scores
-                
-                lr = max(0.001, 1.0 - (epoch / self.epochs))
-                
-                if samples_hv.shape[0] > 0:
-                    model.classify_weights.index_add_(0, proj_labels, samples_hv, alpha=lr)
-                    model.classify_weights.index_add_(0, argmax, samples_hv, alpha=-lr)
-                    
-            if self.bipolar_prototypes:
-                with torch.no_grad():
-                    model.classify_weights.data = torch.sign(model.classify_weights.data)
-                    zero_mask = model.classify_weights.data == 0
-                    if torch.any(zero_mask):
-                        model.classify_weights.data[zero_mask] = -1.0
-                    model.classify.weight.data = model.classify_weights.data.clone()
-            else:
-                model.classify.weight[:] = F.normalize(model.classify_weights)
-
     def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
         """Soft Multi-View Consensus (Experiment A)"""
         if not hasattr(self, 'source_prototypes'):
@@ -881,3 +740,145 @@ class AugTrainer(DensityTrainer):
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
                 
             return full_predictions
+
+class AugTrainer(DensityTrainer):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Override the model created by DensityTrainer
+        self.model = AugModel(self.ARCH, self.modeldir, 'rp', 0, 0, self.num_classes, self.device, subcluster_type='continuous')
+        if torch.cuda.is_available() and torch.cuda.device_count() > 0:
+            self.model.cuda()
+
+    def train(self, train_loader, model, logger):
+        if self.gpu:
+            torch.cuda.empty_cache()
+        with torch.no_grad():
+            self.is_wrong_list = [None] * len(train_loader)
+            for i, batch in enumerate(tqdm(train_loader, desc="Training (Symmetric)")):
+                proj_in = batch[0]
+                proj_labels = batch[2]
+                
+                if self.gpu:
+                    proj_in = proj_in.cuda()
+                    
+                enc_base, _, _ = self.model.encode(proj_in)
+                
+                valid_mask = (enc_base.abs().sum(dim=1) > 0)
+                num_total_samples = enc_base.shape[0]
+                hd_dim = enc_base.shape[1]
+                
+                bundled = F.normalize(enc_base[valid_mask])
+                del enc_base
+                
+                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
+                enc_yaw, _, _ = self.model.encode(x_yaw)
+                del x_yaw
+                bundled.add_(F.normalize(enc_yaw[valid_mask]))
+                del enc_yaw
+                
+                x_scale = proj_in * 0.95
+                enc_scale, _, _ = self.model.encode(x_scale)
+                del x_scale
+                bundled.add_(F.normalize(enc_scale[valid_mask]))
+                del enc_scale
+                
+                bundled = F.normalize(bundled).to(model.classify_weights.dtype)
+                samples_hv = torch.zeros((num_total_samples, hd_dim), device=self.device, dtype=model.classify_weights.dtype)
+                samples_hv[valid_mask] = bundled
+                del bundled
+                
+                proj_labels = proj_labels.view(-1).to(self.device)
+                
+                model.classify_weights.index_add_(0, proj_labels, samples_hv)
+                
+                predictions = self.model.get_predictions(samples_hv)
+                argmax = predictions.argmax(dim=1)
+                
+                is_wrong = proj_labels != argmax
+                proj_labels = proj_labels[is_wrong]
+                argmax = argmax[is_wrong]
+                samples_hv = samples_hv[is_wrong]
+                
+                true_scores = predictions[is_wrong, proj_labels]
+                wrong_scores = predictions[is_wrong, argmax]
+                losses = wrong_scores - true_scores
+                
+                self.is_wrong_list[i] = is_wrong
+
+            if self.bipolar_prototypes:
+                with torch.no_grad():
+                    model.classify_weights.data = torch.sign(model.classify_weights.data)
+                    zero_mask = model.classify_weights.data == 0
+                    if torch.any(zero_mask):
+                        model.classify_weights.data[zero_mask] = -1.0
+                    model.classify.weight.data = model.classify_weights.data.clone()
+            else:
+                model.classify.weight[:] = F.normalize(model.classify_weights)
+
+    def retrain(self, train_loader, model, epoch, logger):
+        if self.gpu:
+            torch.cuda.empty_cache()
+        with torch.no_grad():
+            for i, batch in enumerate(tqdm(train_loader, desc=f"Retraining Epoch {epoch}")):
+                proj_in = batch[0]
+                proj_labels = batch[2]
+                
+                if self.gpu:
+                    proj_in = proj_in.cuda()
+                    
+                enc_base, _, _ = self.model.encode(proj_in)
+                
+                valid_mask = (enc_base.abs().sum(dim=1) > 0)
+                num_total_samples = enc_base.shape[0]
+                hd_dim = enc_base.shape[1]
+                
+                bundled = F.normalize(enc_base[valid_mask])
+                del enc_base
+                
+                x_yaw = torch.roll(proj_in, shifts=14, dims=3)
+                enc_yaw, _, _ = self.model.encode(x_yaw)
+                del x_yaw
+                bundled.add_(F.normalize(enc_yaw[valid_mask]))
+                del enc_yaw
+                
+                x_scale = proj_in * 0.95
+                enc_scale, _, _ = self.model.encode(x_scale)
+                del x_scale
+                bundled.add_(F.normalize(enc_scale[valid_mask]))
+                del enc_scale
+                
+                bundled = F.normalize(bundled).to(model.classify_weights.dtype)
+                samples_hv = torch.zeros((num_total_samples, hd_dim), device=self.device, dtype=model.classify_weights.dtype)
+                samples_hv[valid_mask] = bundled
+                del bundled
+                
+                proj_labels = proj_labels.view(-1).to(self.device)
+                
+                predictions = self.model.get_predictions(samples_hv)
+                argmax = predictions.argmax(dim=1)
+                
+                is_wrong = proj_labels != argmax
+                proj_labels = proj_labels[is_wrong]
+                argmax = argmax[is_wrong]
+                samples_hv = samples_hv[is_wrong]
+                
+                true_scores = predictions[is_wrong, proj_labels]
+                wrong_scores = predictions[is_wrong, argmax]
+                losses = wrong_scores - true_scores
+                
+                lr = max(0.001, 1.0 - (epoch / self.epochs))
+                
+                if samples_hv.shape[0] > 0:
+                    model.classify_weights.index_add_(0, proj_labels, samples_hv, alpha=lr)
+                    model.classify_weights.index_add_(0, argmax, samples_hv, alpha=-lr)
+                    
+            if self.bipolar_prototypes:
+                with torch.no_grad():
+                    model.classify_weights.data = torch.sign(model.classify_weights.data)
+                    zero_mask = model.classify_weights.data == 0
+                    if torch.any(zero_mask):
+                        model.classify_weights.data[zero_mask] = -1.0
+                    model.classify.weight.data = model.classify_weights.data.clone()
+            else:
+                model.classify.weight[:] = F.normalize(model.classify_weights)
+

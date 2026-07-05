@@ -32,6 +32,7 @@ ALL_CONDITIONS = ["snow", "fog"]
 
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Update Methods")
+    parser.add_argument('--dry-run', action='store_true', help='Test methods with a single sample')
     args = parser.parse_args()
     
     os.makedirs(SAVE_DIR, exist_ok=True)
@@ -137,7 +138,8 @@ def main():
             val_loader = DataLoader(val_target_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
             
             if cond not in condition_baselines:
-                b_acc, b_miou = test_hdc_model(model_base, val_loader)
+                eval_loader = [next(iter(val_loader))] if args.dry_run else val_loader
+                b_acc, b_miou = test_hdc_model(model_base, eval_loader)
                 condition_baselines[cond] = (b_acc, b_miou)
             
             b_acc, b_miou = condition_baselines[cond]
@@ -160,9 +162,15 @@ def main():
                         thresholds=[0.40, 0.65], 
                         learning_rate=0.001
                     )
+                    if args.dry_run:
+                        break
             
             # Evaluate on valid set
             print(f"Evaluating {cfg['name']} on {cond}...")
+            
+            if args.dry_run:
+                val_loader = [next(iter(val_loader))]
+                
             acc, miou = test_hdc_model(model, val_loader)
             print(f"Result - acc: {acc:.4f} mIoU: {miou:.4f}")
             
