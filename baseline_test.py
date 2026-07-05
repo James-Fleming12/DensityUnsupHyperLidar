@@ -101,8 +101,11 @@ def run_diagnostics():
             _prev_protos = source_prototypes.clone()
             _prev_deltas = {c: None for c in range(NUM_CLASSES)}
             
-            import copy
-            model = copy.deepcopy(model_base)
+            model = DensityModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+            if model.subclusters.shape[0] != model_base.subclusters.shape[0]:
+                model.subclusters = torch.nn.Parameter(torch.zeros(model_base.subclusters.shape[0], model.hd_dim, device=device))
+            model.load_state_dict(model_base.state_dict(), strict=False)
+            model.to(device)
             model.train() if adapt_active else model.eval()
             
             for step, batch in enumerate(tqdm(data_loader, desc=f"Diagnostics [{cond} | {mode_str}]")):
