@@ -16,7 +16,7 @@ unsup_kitti_c = importlib.import_module("unsup_kitti-c")
 LiDARCorruptionWrapper = unsup_kitti_c.LiDARCorruptionWrapper
 
 # Configuration
-DATA_DIR = "/mnt/alpha/jmfleming/KITTI/sequences"
+DATA_DIR = "/mnt/alpha/jmfleming/KITTI"
 NUM_CLASSES = 17
 CONFIG_PATH = "config/arch/senet-2048p.yml"
 LABELS_PATH = "config/labels/semantic-kitti-all.yaml"
