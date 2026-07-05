@@ -144,11 +144,19 @@ def main():
     model_base = AugModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
     
     loaded_obj = torch.load(HDC_SUB_PATH, map_location=device, weights_only=False)
+    state_dict = loaded_obj.state_dict() if isinstance(loaded_obj, torch.nn.Module) else loaded_obj
+    
+    # Dynamically resize subclusters to match the checkpoint to avoid size mismatch
+    if "subclusters" in state_dict:
+        new_size = state_dict["subclusters"].shape[0]
+        if model_base.subclusters.shape[0] != new_size:
+            model_base.subclusters = torch.nn.Parameter(torch.zeros(new_size, model_base.hd_dim, device=device))
+            model_base.register_buffer("subcluster_classes", torch.zeros(new_size, dtype=torch.long, device=device))
+            model_base.register_buffer("subcluster_to_class", torch.zeros(new_size, dtype=torch.long, device=device))
+
+    model_base.load_state_dict(state_dict, strict=False)
     if isinstance(loaded_obj, torch.nn.Module):
-        model_base.load_state_dict(loaded_obj.state_dict(), strict=False)
-        torch.save(loaded_obj.state_dict(), HDC_SUB_PATH)
-    else:
-        model_base.load_state_dict(loaded_obj, strict=False)
+        torch.save(state_dict, HDC_SUB_PATH)
     model_base.to(device)
     
     if args.reinit_subclusters:
@@ -196,9 +204,8 @@ def main():
             acc_pre, miou_pre, stats_pre = condition_baselines[cond]
             print(f"    Pre  - acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
-            model = AugModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
-            model.load_state_dict(torch.load(HDC_SUB_PATH, map_location=device), strict=False)
-            model.to(device)
+            import copy
+            model = copy.deepcopy(model_base)
             model.train()
             
             update_fn = getattr(model, cfg["method"]) if hasattr(model, cfg["method"]) else getattr(model, "inference_update")
