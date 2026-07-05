@@ -646,9 +646,8 @@ class AugModel(DensityModel):
                 starvation_weight = 1.0 / (self.subcluster_activation_counts[global_topk_idx] + 10.0)
                 combined_weight = topk_sims.clamp(min=0) * starvation_weight
                 
-                for b in range(global_topk_idx.shape[0]):
-                    for k in range(k_to_use):
-                        self.subcluster_activation_counts[global_topk_idx[b, k]] += 1
+                unique_idx, counts = torch.unique(global_topk_idx, return_counts=True)
+                self.subcluster_activation_counts[unique_idx] += counts.to(self.subcluster_activation_counts.dtype)
                         
                 sub_sims = combined_weight.sum(dim=1)
                 
