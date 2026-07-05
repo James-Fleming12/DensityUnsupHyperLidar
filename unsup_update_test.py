@@ -28,12 +28,12 @@ LABELS_PATH = "config/labels/semantic-kitti-all.yaml"
 HDC_SUB_PATH = os.path.join(MODEL_DIR, "hdc_sub.pth")
 SAVE_DIR = "logs/diagnostics"
 
-ALL_CONDITIONS = ["snow", "fog"]
+ALL_CONDITIONS = ["snow", "fog", "cross_sensor"]
 
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Update Methods")
     parser.add_argument('--dry-run', action='store_true', help='Test methods with a single sample')
-    parser.add_argument('--skip-to-cwsa', action='store_true', help='Skip methods prior to CWSA and append to existing logs')
+    parser.add_argument('--resume', action='store_true', help='Resume testing by skipping methods already in the JSON log')
     args = parser.parse_args()
     
     os.makedirs(SAVE_DIR, exist_ok=True)
@@ -86,10 +86,9 @@ def main():
     update_methods = [
         {"name": "Frozen Baseline", "method": None, "is_active": False},
         {"name": "Soft Multi-View Consensus (Exp A)", "method": "inference_update_soft_consensus"},
-        {"name": "Soft Multi-View Consensus + Density Weighting (Exp B)", "method": "inference_update_soft_dcsp"},
+        {"name": "Variance-Gated Purification (VGP)", "method": "inference_update_vgp"},
         {"name": "Multi-Scale Spatial Bundling (MSSB)", "method": "inference_update_mssb"},
-        {"name": "Orthogonalized Prototype Pull (OPP)", "method": "inference_update_opp"},
-        {"name": "Coverage-Weighted Subcluster Allocation (CWSA)", "method": "inference_update_cwsa"},
+        {"name": "Orthogonalized Prototype Pull (C-OPP)", "method": "inference_update_opp"},
         {"name": "Low-Threshold Consensus Gating (LTCG)", "method": "inference_update_ltcg"}
     ]
 
@@ -111,19 +110,21 @@ def main():
     print(f"Baseline Sunny - acc: {acc_sunny:.4f} mIoU: {miou_sunny:.4f}")
     
     history_logs = []
+    completed_methods = []
     
-    if args.skip_to_cwsa:
+    if args.resume:
         json_path = os.path.join(SAVE_DIR, "hypothesis_testing_results.json")
         if os.path.exists(json_path):
             with open(json_path, "r") as f:
                 history_logs = json.load(f)
-            print(f"Loaded {len(history_logs)} previous method logs from JSON.")
+            completed_methods = [log["name"] for log in history_logs]
+            print(f"Loaded {len(history_logs)} previous method logs from JSON: {completed_methods}")
     
     condition_baselines = {}
     
     for cfg in update_methods:
-        if args.skip_to_cwsa and cfg["name"] not in ["Coverage-Weighted Subcluster Allocation (CWSA)", "Low-Threshold Consensus Gating (LTCG)"]:
-            print(f"Skipping {cfg['name']} (--skip-to-cwsa)...")
+        if args.resume and cfg["name"] in completed_methods:
+            print(f"Skipping {cfg['name']} (--resume)...")
             continue
         history = {
             "name": cfg["name"],

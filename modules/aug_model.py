@@ -357,6 +357,101 @@ class AugModel(DensityModel):
                 
             return full_predictions
 
+    def inference_update_vgp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, view_variance_scale=10.0, **kwargs):
+        """Variance-Gated Purification (VGP)"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+            
+            # Generate augmentations
+            x_yaw = torch.roll(x, shifts=14, dims=3)
+            enc_yaw, _, _ = self.encode(x_yaw)
+            raw_jitter = F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype)
+            del x_yaw, enc_yaw
+            
+            x_drop = F.dropout2d(x, p=0.15)
+            enc_drop, _, _ = self.encode(x_drop)
+            raw_drop = F.normalize(enc_drop[valid_enc_mask]).to(prototypes.dtype)
+            del x_drop, enc_drop
+            
+            # Independent predictions for soft consensus
+            S_base = raw_base @ prototypes.T
+            pred_base = S_base.argmax(dim=1)
+            sim_base = S_base.max(dim=1).values
+            
+            S_jitter = raw_jitter @ prototypes.T
+            pred_jitter = S_jitter.argmax(dim=1)
+            sim_jitter = S_jitter.max(dim=1).values
+            
+            S_drop = raw_drop @ prototypes.T
+            pred_drop = S_drop.argmax(dim=1)
+            sim_drop = S_drop.max(dim=1).values
+            
+            # Soft agreement weight: 1.0 if all 3 match, 0.5 if 2 match, 0.0 if none match
+            agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_drop).float()
+            agreement_weight = agreement_count / 2.0
+
+            # VGP: variance gating based on max similarities across views
+            sims_per_view = torch.stack([sim_base, sim_jitter, sim_drop])
+            variance_weight = torch.exp(-view_variance_scale * sims_per_view.var(dim=0))
+            
+            bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
+            del raw_jitter, raw_drop
+            S_bundled = bundled_target @ prototypes.T
+            top2_S = S_bundled.topk(2, dim=1).values
+            preds = S_bundled.argmax(dim=1)
+            sims = top2_S[:, 0]
+            sims_top2 = top2_S[:, 1]
+            margin = sims - sims_top2
+            
+            update_mask = (margin > 0.08) & (sims > thresholds[0]) & (agreement_weight > 0)
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                
+                sample_encs = bundled_target[class_mask] 
+                sample_sims = sims[class_mask]
+                sample_agreement = agreement_weight[class_mask]
+                sample_var_weight = variance_weight[class_mask]
+                
+                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = conf_weights * sample_agreement * sample_var_weight * depth_scale[class_mask]
+                
+                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
+                
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
     def inference_update_soft_dcsp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
         """Soft Multi-View Consensus + Density Weighting (Experiment B)"""
         if not hasattr(self, 'source_prototypes'):
@@ -570,12 +665,16 @@ class AugModel(DensityModel):
                 pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
                 other_protos = prototypes[torch.arange(prototypes.shape[0]) != c_id]
-                sims_to_others = other_protos @ F.normalize(pull_vector, dim=0)
-                nearest_k = sims_to_others.topk(min(3, other_protos.shape[0])).indices
+                target_proto = prototypes[c_id]
+                proto_sims = other_protos @ target_proto
                 
-                for k in nearest_k:
-                    component = torch.dot(pull_vector, other_protos[k]) * other_protos[k]
-                    pull_vector = pull_vector - component.clamp(min=0) * 1.0
+                if proto_sims.max() > 0.70:
+                    sims_to_others = other_protos @ F.normalize(pull_vector, dim=0)
+                    nearest_k = sims_to_others.topk(min(3, other_protos.shape[0])).indices
+                    
+                    for k in nearest_k:
+                        component = torch.dot(pull_vector, other_protos[k]) * other_protos[k]
+                        pull_vector = pull_vector - component.clamp(min=0) * 1.0
                 
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
