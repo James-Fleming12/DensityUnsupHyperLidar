@@ -178,9 +178,10 @@ class LiDARCorruptionWrapper(Dataset):
             
         return data
 
-def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
+def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density'):
     miou_history = []
     acc_history = []
+    iou_per_class_history = []
     num_classes = model.num_classes
     cumulative_confusion_matrix = torch.zeros((num_classes, num_classes), dtype=torch.int64, device=device)
 
@@ -204,27 +205,35 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
                     ).reshape(num_classes, num_classes)
                     cumulative_confusion_matrix += hist
                 
-            cumulative_miou, cumulative_acc = extract_metrics_from_conf_matrix(cumulative_confusion_matrix)
+            cumulative_miou, cumulative_acc, cumulative_iou_per_class = extract_metrics_from_conf_matrix(cumulative_confusion_matrix)
             miou_history.append(cumulative_miou)
             acc_history.append(cumulative_acc)
+            iou_per_class_history.append(cumulative_iou_per_class)
             # Adapt: Inference Update
             if not eval_only:
                 model.eval()
-                if hasattr(model, 'G_d'):  # Duck typing for D3CTTA
+                if update_method == 'd3ctta':  # Duck typing for D3CTTA
                     model.inference_update(
                         h=h,
                         predictions=predictions,
                         xyz=proj_xyz
                     )
-                else:
+                elif update_method == 'density':
                     model.inference_update(
                         proj_in,
                         learning_rate=0.001,
                         distance_sensitivity=3.0,
                         thresholds=[0.45, 0.80]
                     )
+                elif update_method == 'exp_a':
+                    model.inference_update_soft_consensus(
+                        proj_in,
+                        learning_rate=0.001,
+                        use_consensus_gate=True,
+                        use_volume_weight=True
+                    )
             
-    return {"mIoU": miou_history, "Accuracy": acc_history}
+    return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history}
 
 def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=10):
     import unsup_main
@@ -317,7 +326,11 @@ def load_hdc_model(path):
     else:
         NUM_CLASSES = 20 # Fallback for KITTI
     modeldir = os.path.dirname(path)
-    model = DensityModel(ARCH, modeldir, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+    
+    # If we might need Exp A, load AugModel instead of base DensityModel
+    from modules.aug_model import AugModel
+    model = AugModel(ARCH, modeldir, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+    
     model.load_state_dict(torch.load(path, map_location=device))
     model.to(device)
     return model
@@ -352,7 +365,7 @@ def main():
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
-    parser.add_argument('--compare', action='store_true', help='Use D3CTTA with pretrained feature extractor instead of HDC')
+    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'd3ctta'], default='density', help='Method to test')
     parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
     parser.add_argument('--hdc_epochs', type=int, default=30, help='Number of epochs to train the HDC density model')
     args = parser.parse_args()
@@ -379,11 +392,11 @@ def main():
             torch.save(trainer.optimizer.state_dict(), opt_path)
             logger.info(f"Successfully pretrained model on KITTI. Optimizer state saved to {opt_path}")
         
-        if args.compare:
-            logger.info("Compare flag enabled. Loading D3CTTA model...")
+        if args.method == 'd3ctta':
+            logger.info("D3CTTA method selected. Loading D3CTTA model...")
             model = load_d3ctta_model(args.pretrained_path)
     else:
-        if args.compare:
+        if args.method == 'd3ctta':
             logger.info(f"Loading pretrained feature extractor for D3CTTA from {args.pretrained_path}...")
             model = load_d3ctta_model(args.pretrained_path)
         else:
@@ -393,7 +406,7 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     corruptions = ['beam', 'cross_sensor', 'crosstalk', 'fog', 'echo', 'motion', 'snow']
-    severities = [1, 2, 3, 4, 5]
+    severities = [2, 3]
 
     results_miou = {c: {} for c in corruptions}
     results_acc = {c: {} for c in corruptions}
@@ -442,12 +455,12 @@ def main():
             corrupted_dataset = LiDARCorruptionWrapper(target_dataset, corruption_type=ctype, severity=sev)
             target_dataloader = DataLoader(corrupted_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
             
-            if args.compare:
+            if args.method == 'd3ctta':
                 model = load_d3ctta_model(args.pretrained_path)
             else:
                 model = load_hdc_model(args.pretrained_path)
             
-            metrics = evaluate_and_adapt(model, target_dataloader, device)
+            metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(args.method == 'frozen'), update_method=args.method)
             
             if len(metrics["mIoU"]) > 0:
                 initial_miou = metrics["mIoU"][0]
@@ -459,7 +472,7 @@ def main():
                 results_acc[ctype][sev] = (initial_acc, final_acc)
                 
                 logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
-                suffix = "_d3ctta" if args.compare else ""
+                suffix = f"_{args.method}"
                 
                 traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
                 with open(traj_json_path, 'w') as f:
@@ -469,7 +482,7 @@ def main():
             else:
                 logger.info(f"No valid frames evaluated for {ctype}-{sev}")
 
-    suffix = "_d3ctta" if args.compare else ""
+    suffix = f"_{args.method}"
     
     baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
     baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None

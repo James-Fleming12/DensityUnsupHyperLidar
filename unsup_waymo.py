@@ -82,7 +82,7 @@ def extract_metrics_from_conf_matrix(conf_matrix):
     total_samples_valid = conf_matrix[1:, :].sum().item()
     overall_acc = total_correct_valid / (total_samples_valid + 1e-6)
     
-    return miou, overall_acc
+    return miou, overall_acc, iou_per_class.cpu().tolist()
 
 def evaluate_and_adapt(model, target_dataloader, device):
     """Helper method executing the forward/eval/adapt cycle."""
@@ -113,7 +113,7 @@ def evaluate_and_adapt(model, target_dataloader, device):
                     ).reshape(num_classes, num_classes)
                     cumulative_confusion_matrix += hist
                 
-            cumulative_miou, cumulative_acc = extract_metrics_from_conf_matrix(cumulative_confusion_matrix)
+            cumulative_miou, cumulative_acc, _ = extract_metrics_from_conf_matrix(cumulative_confusion_matrix)
             miou_history.append(cumulative_miou)
             acc_history.append(cumulative_acc)
             

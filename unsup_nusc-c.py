@@ -205,7 +205,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False):
                     ).reshape(num_classes, num_classes)
                     cumulative_confusion_matrix += hist
                 
-            cumulative_miou, cumulative_acc = extract_metrics_from_conf_matrix(cumulative_confusion_matrix)
+            cumulative_miou, cumulative_acc, _ = extract_metrics_from_conf_matrix(cumulative_confusion_matrix)
             miou_history.append(cumulative_miou)
             acc_history.append(cumulative_acc)
             # Adapt: Inference Update
