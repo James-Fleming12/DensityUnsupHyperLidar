@@ -202,8 +202,19 @@ def main():
             acc_pre, miou_pre, stats_pre = condition_baselines[cond]
             print(f"    Pre  - acc: {acc_pre:.4f}  mIoU: {miou_pre:.4f}")
 
-            import copy
-            model = copy.deepcopy(model_base)
+            model = AugModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+            new_size = model_base.subclusters.shape[0]
+            if model.subclusters.shape[0] != new_size:
+                model.subclusters = torch.nn.Parameter(torch.zeros(new_size, model.hd_dim, device=device))
+            model.load_state_dict(model_base.state_dict(), strict=False)
+            
+            # Manually copy over non-parameter tensors that state_dict might miss
+            if hasattr(model_base, "subcluster_classes"):
+                model.subcluster_classes = model_base.subcluster_classes.clone()
+            if hasattr(model_base, "subcluster_to_class"):
+                model.subcluster_to_class = model_base.subcluster_to_class.clone()
+                
+            model.to(device)
             model.train()
             
             update_fn = getattr(model, cfg["method"]) if hasattr(model, cfg["method"]) else getattr(model, "inference_update")
