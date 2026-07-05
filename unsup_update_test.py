@@ -33,6 +33,7 @@ ALL_CONDITIONS = ["snow", "fog"]
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Update Methods")
     parser.add_argument('--dry-run', action='store_true', help='Test methods with a single sample')
+    parser.add_argument('--skip-to-cwsa', action='store_true', help='Skip methods prior to CWSA and append to existing logs')
     args = parser.parse_args()
     
     os.makedirs(SAVE_DIR, exist_ok=True)
@@ -110,9 +111,20 @@ def main():
     print(f"Baseline Sunny - acc: {acc_sunny:.4f} mIoU: {miou_sunny:.4f}")
     
     history_logs = []
+    
+    if args.skip_to_cwsa:
+        json_path = os.path.join(SAVE_DIR, "hypothesis_testing_results.json")
+        if os.path.exists(json_path):
+            with open(json_path, "r") as f:
+                history_logs = json.load(f)
+            print(f"Loaded {len(history_logs)} previous method logs from JSON.")
+    
     condition_baselines = {}
     
     for cfg in update_methods:
+        if args.skip_to_cwsa and cfg["name"] not in ["Coverage-Weighted Subcluster Allocation (CWSA)", "Low-Threshold Consensus Gating (LTCG)"]:
+            print(f"Skipping {cfg['name']} (--skip-to-cwsa)...")
+            continue
         history = {
             "name": cfg["name"],
             "conditions": [],
