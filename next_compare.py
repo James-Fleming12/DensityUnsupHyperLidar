@@ -83,7 +83,7 @@ def main():
     DATA = yaml.safe_load(open(LABELS_PATH))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    train_seqs = DATA["split"]["train"][:4]
+    train_seqs = DATA["split"]["train"][:1]
     valid_seqs = DATA["split"]["valid"]
 
     baseline_parser = Parser(
