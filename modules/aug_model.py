@@ -611,7 +611,74 @@ class AugModel(DensityModel):
             return full_predictions
 
     def inference_update_opp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
-        """Orthogonalized Prototype Pull (OPP)"""
+        """Orthogonalized Prototype Pull (OPP) - Plain"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+            
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
+            
+            S = raw_base @ prototypes.T
+            top2_S = S.topk(2, dim=1).values
+            preds = S.argmax(dim=1)
+            sims = top2_S[:, 0]
+            sims_top2 = top2_S[:, 1]
+            margin = sims - sims_top2
+            
+            update_mask = (margin > 0.08) & (sims > thresholds[0])
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                
+                sample_encs = raw_base[class_mask] 
+                sample_sims = sims[class_mask]
+                
+                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = conf_weights * depth_scale[class_mask]
+                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
+                
+                other_protos = prototypes[torch.arange(prototypes.shape[0]) != c_id]
+                sims_to_others = other_protos @ F.normalize(pull_vector, dim=0)
+                nearest_k = sims_to_others.topk(min(3, other_protos.shape[0])).indices
+                
+                for k in nearest_k:
+                    component = torch.dot(pull_vector, other_protos[k]) * other_protos[k]
+                    pull_vector = pull_vector - component.clamp(min=0) * 1.0
+                
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
+    def inference_update_conditional_opp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
+        """Conditional Orthogonalized Prototype Pull (C-OPP)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
             
