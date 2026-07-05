@@ -131,21 +131,22 @@ def main():
 
     if "broad_exp_a" in tests_to_run:
         # Note: Added realistic KITTI-C corruption names
-        all_conditions = ["snow", "fog", "cross_sensor", "motion_blur", "beam_missing", "crosstalk", "incomplete_echo"]
+        all_conditions = ["snow", "fog", "cross_sensor", "motion", "beam", "crosstalk", "echo"]
         for cond in all_conditions:
-            for method_name, label in [(None, "Frozen Baseline"),
-                                        ("inference_update_soft_consensus", "Exp A"),
-                                        ("inference_update_safe_consensus", "Safe Exp A")]:
-                b_acc, b_miou, acc, miou = run_condition(
-                    model_base, ARCH, device, raw_train_dataset, valid_dataset,
-                    cond=cond, severity=3, method_name=method_name,
-                )
-                print(f"[{cond} sev3 | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
-                      f"(delta {miou - b_miou:+.4f})")
-                results.append({
-                    "test": "broad_exp_a", "condition": cond, "method": label,
-                    "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
-                })
+            for severity in [2, 3, 4]:
+                for method_name, label in [(None, "Frozen Baseline"),
+                                            ("inference_update_soft_consensus", "Exp A"),
+                                            ("inference_update_safe_consensus", "Safe Exp A")]:
+                    b_acc, b_miou, acc, miou = run_condition(
+                        model_base, ARCH, device, raw_train_dataset, valid_dataset,
+                        cond=cond, severity=severity, method_name=method_name,
+                    )
+                    print(f"[{cond} sev{severity} | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
+                          f"(delta {miou - b_miou:+.4f})")
+                    results.append({
+                        "test": "broad_exp_a", "condition": cond, "severity": severity, "method": label,
+                        "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
+                    })
 
     out_path = os.path.join(SAVE_DIR, f"next_round_{args.test}.json")
     with open(out_path, "w") as f:

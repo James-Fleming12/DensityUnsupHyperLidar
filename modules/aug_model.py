@@ -177,7 +177,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
 
@@ -288,9 +288,9 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
-                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+                depth_scale = torch.clamp(15.0 / (depth + 1e-3), min=1.0/distance_sensitivity, max=1.0)
 
             
             # Generate augmentations
@@ -327,7 +327,7 @@ class AugModel(DensityModel):
             sims_top2 = top2_S[:, 1]
             margin = sims - sims_top2
             
-            update_mask = (margin > 0.08) & (sims > thresholds[0]) & (agreement_weight > 0)
+            update_mask = (margin > 0) & (sims > thresholds[0]) & (agreement_weight > 0)
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -377,9 +377,9 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
-                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+                depth_scale = torch.clamp(15.0 / (depth + 1e-3), min=1.0/distance_sensitivity, max=1.0)
 
             x_yaw = torch.roll(x, shifts=14, dims=3)
             enc_yaw, _, _ = self.encode(x_yaw)
@@ -414,7 +414,7 @@ class AugModel(DensityModel):
             sims_top2 = top2_S[:, 1]
             margin = sims - sims_top2
             
-            update_mask = (margin > 0.08) & (sims > thresholds[0]) & (agreement_weight > 0)
+            update_mask = (margin > 0) & (sims > thresholds[0]) & (agreement_weight > 0)
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -475,7 +475,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
             
@@ -520,7 +520,7 @@ class AugModel(DensityModel):
             sims_top2 = top2_S[:, 1]
             margin = sims - sims_top2
             
-            update_mask = (margin > 0.08) & (sims > thresholds[0]) & (agreement_weight > 0)
+            update_mask = (margin > 0) & (sims > thresholds[0]) & (agreement_weight > 0)
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -570,7 +570,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
 
@@ -663,7 +663,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
 
@@ -728,7 +728,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
 
@@ -795,7 +795,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
 
@@ -869,7 +869,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
 
@@ -946,7 +946,7 @@ class AugModel(DensityModel):
 
             depth_scale = torch.ones(raw_base.shape[0], device=self.device)
             if proj_xyz is not None and distance_sensitivity > 0:
-                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
                 depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
 
