@@ -129,21 +129,16 @@ def main():
 
     update_methods = [
         {"name": "Baseline", "method": "inference_update", "is_active": False},
-        {"name": "Symmetric TTAug", "method": "inference_update_symmetric"}
+        {"name": "Symmetric TTAug", "method": "inference_update_symmetric", "is_active": False},
+        {"name": "Asymmetric Pipeline", "method": "inference_update_asymmetric"}
     ]
 
     ablation_histories = []
     
-    if args.hdc_epochs > 0:
-        print(f"\nRetraining Symmetric HDC prototypes for {args.hdc_epochs} epochs...")
-        ARCH["train"]["batch_size"] = 6
-        model_retrained = train_aug_hdc(ARCH, DATA, epochs=args.hdc_epochs, data_dir=DATA_DIR)
-        torch.save(model_retrained.state_dict(), HDC_SUB_PATH)
-        args.reinit_subclusters = True 
-
+    # Step 3: Load original hdc_sub.pth weights directly
     model_base = AugModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
     
-    loaded_obj = torch.load(HDC_SUB_PATH, map_location=device, weights_only=False)
+    loaded_obj = torch.load("logs/kitti_pretrain/hdc_sub.pth", map_location=device, weights_only=False)
     state_dict = loaded_obj.state_dict() if isinstance(loaded_obj, torch.nn.Module) else loaded_obj
     
     # Dynamically resize subclusters to match the checkpoint to avoid size mismatch
@@ -153,18 +148,7 @@ def main():
             model_base.subclusters = torch.nn.Parameter(torch.zeros(new_size, model_base.hd_dim, device=device))
 
     model_base.load_state_dict(state_dict, strict=False)
-    if isinstance(loaded_obj, torch.nn.Module):
-        torch.save(state_dict, HDC_SUB_PATH)
     model_base.to(device)
-    
-    if args.reinit_subclusters:
-        print("\nReinitializing subclusters with Symmetric Bundled method...")
-        sunny_train_loader = DataLoader(baseline_parser.get_train_set().dataset, batch_size=6, shuffle=True, num_workers=ARCH["train"]["workers"])
-        model_base.eval()
-        model_base.init_subclusters(sunny_train_loader)
-        
-        print(f"Saving updated model weights to {HDC_SUB_PATH}...")
-        torch.save(model_base.state_dict(), HDC_SUB_PATH)
     
     print("\nEvaluating baseline on sunny...")
     acc_sunny, miou_sunny = test_hdc_model(model_base, val_loaders["sunny"])
@@ -181,7 +165,7 @@ def main():
             "miou_pairs": [],
             "stats": {}
         }
-
+        
         for cond in ADVERSE_CONDITIONS:
             if cond not in train_loaders:
                 continue
@@ -235,6 +219,9 @@ def main():
                 proj_in = batch[0]
                 
                 kwargs = {}
+                # Ensure proj_xyz is passed for distance sensitivity scaling
+                if len(batch) > 10:
+                    kwargs["proj_xyz"] = batch[10].to(device)
                 
                 if proj_in.shape[1] > 0:
                     update_fn(

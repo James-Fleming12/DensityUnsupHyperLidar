@@ -154,6 +154,79 @@ class AugModel(DensityModel):
                 
             return full_predictions
 
+    def inference_update_asymmetric(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], distance_sensitivity=1.0, proj_xyz=None, **kwargs):
+        """Asymmetric Pipeline: Decouples decision (bundled features) from update (raw features)"""
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+            bundled_target = raw_base.clone()
+            
+            x_yaw = torch.roll(x, shifts=14, dims=3)
+            enc_yaw, _, _ = self.encode(x_yaw)
+            del x_yaw
+            bundled_target.add_(F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype))
+            del enc_yaw
+            
+            x_scale = x * 0.95
+            enc_scale, _, _ = self.encode(x_scale)
+            del x_scale
+            bundled_target.add_(F.normalize(enc_scale[valid_enc_mask]).to(prototypes.dtype))
+            del enc_scale
+            
+            bundled_target = F.normalize(bundled_target)
+            
+            # The Decision: Calculate cosine similarity against prototypes using bundled features
+            S = bundled_target @ prototypes.T
+            preds = S.argmax(dim=1)
+            
+            selected_proto = prototypes[preds]
+            sims = torch.sum(bundled_target * selected_proto, dim=1)
+            
+            # The Filter: Check if similarities fall within safety thresholds
+            if isinstance(thresholds, float):
+                thresholds = [thresholds, 1.0]
+            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            # The Update: For points that pass, calculate pull vector using raw base features
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                
+                # Use RAW features for the pull
+                sample_encs = raw_base[class_mask]
+                
+                # Apply distance/density sensitivity scaling to the raw features
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+                
+                weights = sub_sims / (sub_sims.sum() + 1e-8)
+                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                
+                # Apply the mean pull vector to the class prototype
+                updated_weight = self.classify.weight[c_id] + learning_rate * weighted_pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
 
 class AugTrainer(DensityTrainer):
     def __init__(self, *args, **kwargs):
