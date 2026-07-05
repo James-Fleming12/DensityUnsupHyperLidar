@@ -154,7 +154,8 @@ def run_diagnostics():
                                 c_encs = raw_base[c_mask]
                                 # Updated distance_sensitivity to 3.0 to match the actual update
                                 _, sub_idx = model.get_max_subcluster_similarity(c_encs, c_id, distance_sensitivity=3.0)
-                                hist = torch.bincount(sub_idx, minlength=model.subclusters.shape[0])
+                                rel_idx = sub_idx % model.num_subclusters
+                                hist = torch.bincount(rel_idx, minlength=model.num_subclusters)
                                 T5_subcluster_hist[c_id].append(hist.cpu().numpy().tolist())
                                 
                     correct_mask = (preds == active_labels)
