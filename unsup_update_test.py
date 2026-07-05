@@ -49,7 +49,7 @@ def main():
         quit()
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    train_seqs = DATA["split"]["train"][:1]
+    train_seqs = DATA["split"]["train"][:4]
     valid_seqs = DATA["split"]["valid"]
 
     print("Building SemanticKITTI clean baseline parser...")
