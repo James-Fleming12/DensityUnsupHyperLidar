@@ -35,14 +35,17 @@ def build_model(ARCH, device, state_dict):
 
 
 def run_condition(model_base, ARCH, device, raw_train_dataset, valid_dataset,
-                   cond, severity, method_name):
+                   cond, severity, method_name, cached_b_acc=None, cached_b_miou=None):
     model = build_model(ARCH, device, model_base.state_dict())
     model.eval()  # IMPORTANT: always eval, never .train() -- see BN-contamination note
 
     val_target = LiDARCorruptionWrapper(valid_dataset, corruption_type=cond, severity=severity)
     val_loader = DataLoader(val_target, batch_size=1, shuffle=False, num_workers=0)
 
-    b_acc, b_miou = test_hdc_model(model_base, val_loader)
+    if cached_b_acc is not None and cached_b_miou is not None:
+        b_acc, b_miou = cached_b_acc, cached_b_miou
+    else:
+        b_acc, b_miou = test_hdc_model(model_base, val_loader)
 
     if method_name is not None:
         target = LiDARCorruptionWrapper(raw_train_dataset, corruption_type=cond, severity=severity)
@@ -56,7 +59,9 @@ def run_condition(model_base, ARCH, device, raw_train_dataset, valid_dataset,
             method_func(proj_in, proj_xyz=proj_xyz)
 
     acc, miou = test_hdc_model(model, val_loader)
-    return b_acc, b_miou, acc, miou
+    
+    firing_log = getattr(model, '_firing_log', None)
+    return b_acc, b_miou, acc, miou, firing_log
 
 
 def main():
@@ -100,53 +105,80 @@ def main():
 
     if "cross_sensor_sweep" in tests_to_run:
         for severity in [3, 4, 5]:
+            cached_b_acc, cached_b_miou = None, None
             for method_name, label in [(None, "Frozen Baseline"),
                                         ("inference_update_soft_consensus", "Exp A")]:
-                b_acc, b_miou, acc, miou = run_condition(
+                b_acc, b_miou, acc, miou, firing_log = run_condition(
                     model_base, ARCH, device, raw_train_dataset, valid_dataset,
                     cond="cross_sensor", severity=severity, method_name=method_name,
+                    cached_b_acc=cached_b_acc, cached_b_miou=cached_b_miou
                 )
+                cached_b_acc, cached_b_miou = b_acc, b_miou
+                
+                avg_fire = sum(firing_log)/len(firing_log) if firing_log else 0.0
                 print(f"[sev {severity} | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
-                      f"(delta {miou - b_miou:+.4f})")
-                results.append({
+                      f"(delta {miou - b_miou:+.4f}) | fire_rate={avg_fire:.2%}")
+                
+                result_entry = {
                     "test": "cross_sensor_sweep", "severity": severity, "method": label,
                     "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
-                })
+                }
+                if firing_log:
+                    result_entry["firing_rate"] = avg_fire
+                results.append(result_entry)
 
     if "conditional_opp" in tests_to_run:
         for cond in ["snow", "fog"]:
+            cached_b_acc, cached_b_miou = None, None
             for method_name, label in [(None, "Frozen Baseline"),
                                         ("inference_update_opp", "Plain OPP"),
                                         ("inference_update_conditional_opp", "Conditional OPP")]:
-                b_acc, b_miou, acc, miou = run_condition(
+                b_acc, b_miou, acc, miou, firing_log = run_condition(
                     model_base, ARCH, device, raw_train_dataset, valid_dataset,
                     cond=cond, severity=3, method_name=method_name,
+                    cached_b_acc=cached_b_acc, cached_b_miou=cached_b_miou
                 )
+                cached_b_acc, cached_b_miou = b_acc, b_miou
+                
+                avg_fire = sum(firing_log)/len(firing_log) if firing_log else 0.0
                 print(f"[{cond} | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
-                      f"(delta {miou - b_miou:+.4f})")
-                results.append({
+                      f"(delta {miou - b_miou:+.4f}) | fire_rate={avg_fire:.2%}")
+                
+                result_entry = {
                     "test": "conditional_opp", "condition": cond, "method": label,
                     "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
-                })
+                }
+                if firing_log:
+                    result_entry["firing_rate"] = avg_fire
+                results.append(result_entry)
 
     if "broad_exp_a" in tests_to_run:
         # Note: Added realistic KITTI-C corruption names
         all_conditions = ["snow", "fog", "cross_sensor", "motion", "beam", "crosstalk", "echo"]
         for cond in all_conditions:
             for severity in [2, 3, 4]:
+                cached_b_acc, cached_b_miou = None, None
                 for method_name, label in [(None, "Frozen Baseline"),
                                             ("inference_update_soft_consensus", "Exp A"),
                                             ("inference_update_safe_consensus", "Safe Exp A")]:
-                    b_acc, b_miou, acc, miou = run_condition(
+                    b_acc, b_miou, acc, miou, firing_log = run_condition(
                         model_base, ARCH, device, raw_train_dataset, valid_dataset,
                         cond=cond, severity=severity, method_name=method_name,
+                        cached_b_acc=cached_b_acc, cached_b_miou=cached_b_miou
                     )
+                    cached_b_acc, cached_b_miou = b_acc, b_miou
+                    
+                    avg_fire = sum(firing_log)/len(firing_log) if firing_log else 0.0
                     print(f"[{cond} sev{severity} | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
-                          f"(delta {miou - b_miou:+.4f})")
-                    results.append({
+                          f"(delta {miou - b_miou:+.4f}) | fire_rate={avg_fire:.2%}")
+                    
+                    result_entry = {
                         "test": "broad_exp_a", "condition": cond, "severity": severity, "method": label,
                         "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
-                    })
+                    }
+                    if firing_log:
+                        result_entry["firing_rate"] = avg_fire
+                    results.append(result_entry)
 
     out_path = os.path.join(SAVE_DIR, f"next_round_{args.test}.json")
     with open(out_path, "w") as f:

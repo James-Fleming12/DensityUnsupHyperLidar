@@ -332,9 +332,15 @@ class AugModel(DensityModel):
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
             
+            num_valid = valid_enc_mask.sum().float()
+            firing_rate = update_mask.sum().float() / (num_valid + 1e-6)
+            
+            if not hasattr(self, '_firing_log'):
+                self._firing_log = []
+            self._firing_log.append(firing_rate.item())
+            
             if not torch.any(update_mask):
                 return full_predictions
-                
             valid_indices = torch.nonzero(update_mask).squeeze(1)
             unique_classes = torch.unique(preds[valid_indices])
             
@@ -425,6 +431,10 @@ class AugModel(DensityModel):
             # --- SAFETY CHECK ---
             num_valid = valid_enc_mask.sum().float()
             firing_rate = update_mask.sum().float() / (num_valid + 1e-6)
+            
+            if not hasattr(self, '_firing_log'):
+                self._firing_log = []
+            self._firing_log.append(firing_rate.item())
             
             safe_rate_threshold = 0.20
             if firing_rate > safe_rate_threshold:
