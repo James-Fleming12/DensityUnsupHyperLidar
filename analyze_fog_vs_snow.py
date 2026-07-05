@@ -37,16 +37,34 @@ def analyze():
                 
     print("\n=== TEST 2: CONFIDENT-BUT-WRONG ARTIFACTS ===")
     for condition, data in [("SNOW", snow_data), ("FOG", fog_data)]:
-        t2 = data["T2_confusion_hists"]
-        # High confidence incorrect predictions are in bins 15-19 (0.75 - 1.0 confidence)
+        t2 = data.get("T2_confusion_hists", {})
         high_conf_wrong = 0
         total_wrong = 0
         for pair, hist in t2.items():
             total_wrong += sum(hist)
-            high_conf_wrong += sum(hist[15:]) # Conf >= 0.75
+            high_conf_wrong += sum(hist[15:])
             
         pct_high_conf = high_conf_wrong / max(1, total_wrong)
         print(f"{condition}: {high_conf_wrong} out of {total_wrong} false positives ({pct_high_conf:.2%}) were highly confident (>0.75).")
+        
+    print("\n=== TEST 2b: CROSS-VIEW VARIANCE (VGP PRE-CHECK) ===")
+    for condition, data in [("SNOW", snow_data), ("FOG", fog_data)]:
+        t8 = data.get("T8_variance_stats", None)
+        if t8 is None:
+            print(f"{condition}: No T8_variance_stats found in logs.")
+            continue
+            
+        corr_vars = t8["var_high_conf_correct"]
+        wrong_vars = t8["var_high_conf_wrong"]
+        
+        mean_corr = sum(corr_vars) / max(1, len(corr_vars))
+        mean_wrong = sum(wrong_vars) / max(1, len(wrong_vars))
+        
+        print(f"{condition}:")
+        print(f"  Mean Variance (High-Conf Correct): {mean_corr:.6f} (N={len(corr_vars)})")
+        print(f"  Mean Variance (High-Conf Wrong):   {mean_wrong:.6f} (N={len(wrong_vars)})")
+        if mean_corr > 0:
+            print(f"  Ratio (Wrong / Correct):           {mean_wrong / mean_corr:.2f}x")
 
 if __name__ == "__main__":
     analyze()

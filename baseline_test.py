@@ -24,6 +24,39 @@ MODEL_DIR = "logs/kitti_pretrain"
 HDC_SUB_PATH = os.path.join(MODEL_DIR, "hdc_sub.pth")
 SAVE_DIR = "logs/diagnostics"
 
+def compute_cross_view_variance_stats(model, proj_in, oracle_labels, valid_enc_mask, conf_threshold=0.75):
+    with torch.no_grad():
+        enc_base, _, _ = model.encode(proj_in)
+        raw_base = F.normalize(enc_base[valid_enc_mask])
+        prototypes = F.normalize(model.classify.weight)
+
+        x_yaw = torch.roll(proj_in, shifts=14, dims=3)
+        enc_yaw, _, _ = model.encode(x_yaw)
+        raw_yaw = F.normalize(enc_yaw[valid_enc_mask])
+
+        x_drop = F.dropout2d(proj_in, p=0.15, training=True)
+        enc_drop, _, _ = model.encode(x_drop)
+        raw_drop = F.normalize(enc_drop[valid_enc_mask])
+
+        S_base = raw_base @ prototypes.T
+        preds = S_base.argmax(dim=1)
+        sims_base = S_base.max(dim=1).values
+
+        sims_yaw = (raw_yaw @ prototypes.T).gather(1, preds.unsqueeze(1)).squeeze(1)
+        sims_drop = (raw_drop @ prototypes.T).gather(1, preds.unsqueeze(1)).squeeze(1)
+
+        stacked = torch.stack([sims_base, sims_yaw, sims_drop], dim=0)
+        view_variance = stacked.var(dim=0)
+
+        active_labels = oracle_labels.view(-1)[valid_enc_mask.view(-1)]
+        correct_mask = (preds == active_labels)
+        high_conf_mask = sims_base > conf_threshold
+
+        return {
+            "var_high_conf_correct": view_variance[high_conf_mask & correct_mask].tolist(),
+            "var_high_conf_wrong": view_variance[high_conf_mask & ~correct_mask].tolist(),
+        }
+
 def run_diagnostics():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     os.makedirs(SAVE_DIR, exist_ok=True)
@@ -96,6 +129,7 @@ def run_diagnostics():
             T5_subcluster_hist = {c: [] for c in range(NUM_CLASSES)}
             T6_drift = {c: {"cos_to_origin": [], "delta_consistency": []} for c in range(NUM_CLASSES)}
             T7_calibration = {rz: {"conf_bins": [0]*10, "correct_bins": [0]*10, "total_bins": [0]*10} for rz in range(3)}
+            T8_variance_stats = {"var_high_conf_correct": [], "var_high_conf_wrong": []}
             
             source_prototypes = model_base.classify.weight.detach().clone()
             _prev_protos = source_prototypes.clone()
@@ -207,6 +241,11 @@ def run_diagnostics():
                                 T2_confusion_hists[pair] = [0]*20
                             T2_confusion_hists[pair][b] += 1
                             
+                    # Add Test 2b: Cross-View Variance Discrimination
+                    var_stats = compute_cross_view_variance_stats(model, proj_in, oracle_labels, valid_mask_3d, conf_threshold=0.75)
+                    T8_variance_stats["var_high_conf_correct"].extend(var_stats["var_high_conf_correct"])
+                    T8_variance_stats["var_high_conf_wrong"].extend(var_stats["var_high_conf_wrong"])
+                            
                 # Apply the unsupervised update if adapting
                 if adapt_active:
                     model.inference_update(
@@ -240,7 +279,8 @@ def run_diagnostics():
                 "T4_prototype_snapshots": T4_prototype_snapshots,
                 "T5_subcluster_hist": T5_subcluster_hist,
                 "T6_drift": T6_drift,
-                "T7_calibration": T7_calibration
+                "T7_calibration": T7_calibration,
+                "T8_variance_stats": T8_variance_stats
             }
             
             out_path = os.path.join(SAVE_DIR, f"baseline_diagnostics_{cond}_{mode_str.lower()}.json")
