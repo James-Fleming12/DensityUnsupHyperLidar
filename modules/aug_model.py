@@ -401,3 +401,376 @@ class AugTrainer(DensityTrainer):
                     model.classify.weight.data = model.classify_weights.data.clone()
             else:
                 model.classify.weight[:] = F.normalize(model.classify_weights)
+
+    def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+        """Soft Multi-View Consensus (Experiment A)"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+            
+            # Generate augmentations
+            x_yaw = torch.roll(x, shifts=14, dims=3)
+            enc_yaw, _, _ = self.encode(x_yaw)
+            raw_jitter = F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype)
+            del x_yaw, enc_yaw
+            
+            x_drop = F.dropout2d(x, p=0.15)
+            enc_drop, _, _ = self.encode(x_drop)
+            raw_drop = F.normalize(enc_drop[valid_enc_mask]).to(prototypes.dtype)
+            del x_drop, enc_drop
+            
+            # Independent predictions for soft consensus
+            S_base = raw_base @ prototypes.T
+            pred_base = S_base.argmax(dim=1)
+            
+            S_jitter = raw_jitter @ prototypes.T
+            pred_jitter = S_jitter.argmax(dim=1)
+            
+            S_drop = raw_drop @ prototypes.T
+            pred_drop = S_drop.argmax(dim=1)
+            
+            # Soft agreement weight: 1.0 if all 3 match, 0.5 if 2 match, 0.0 if none match
+            agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_drop).float()
+            agreement_weight = agreement_count / 2.0
+            
+            bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
+            S_bundled = bundled_target @ prototypes.T
+            preds = S_bundled.argmax(dim=1)
+            sims = S_bundled.max(dim=1).values
+            
+            update_mask = (sims > thresholds[0]) & (sims < thresholds[1]) & (agreement_weight > 0)
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                
+                # Pull with bundled target (purified), weighted by soft consensus
+                sample_encs = bundled_target[class_mask] 
+                sample_agreement = agreement_weight[class_mask]
+                
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
+                sub_sims = sub_sims * sample_agreement
+                
+                sum_evidence = sub_sims.sum()
+                normalized_weights = sub_sims / (sum_evidence + 1e-8)
+                volume_scale = torch.log1p(sum_evidence)
+                
+                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                
+                # Drift anchor
+                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                pull_vector = pull_vector + 0.1 * anchor_pull
+                
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
+    def inference_update_soft_dcsp(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], proj_xyz=None, **kwargs):
+        """Soft Multi-View Consensus + Density Weighting (Experiment B)"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+            
+            x_yaw = torch.roll(x, shifts=14, dims=3)
+            enc_yaw, _, _ = self.encode(x_yaw)
+            raw_jitter = F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype)
+            del x_yaw, enc_yaw
+            
+            x_drop = F.dropout2d(x, p=0.15)
+            enc_drop, _, _ = self.encode(x_drop)
+            raw_drop = F.normalize(enc_drop[valid_enc_mask]).to(prototypes.dtype)
+            del x_drop, enc_drop
+            
+            S_base = raw_base @ prototypes.T
+            pred_base = S_base.argmax(dim=1)
+            
+            S_jitter = raw_jitter @ prototypes.T
+            pred_jitter = S_jitter.argmax(dim=1)
+            
+            S_drop = raw_drop @ prototypes.T
+            pred_drop = S_drop.argmax(dim=1)
+            
+            agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_drop).float()
+            agreement_weight = agreement_count / 2.0
+            
+            bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
+            S_bundled = bundled_target @ prototypes.T
+            preds = S_bundled.argmax(dim=1)
+            sims = S_bundled.max(dim=1).values
+            
+            density_weights = None
+            if proj_xyz is not None:
+                xyz_flat = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)
+                active_xyz = xyz_flat[valid_enc_mask]
+                radial_dists = torch.norm(active_xyz, dim=1)
+                batch_median = radial_dists.median().clamp(min=1e-5)
+                density_weights = (radial_dists / batch_median).clamp(max=1.5)
+            
+            update_mask = (sims > thresholds[0]) & (sims < thresholds[1]) & (agreement_weight > 0)
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                
+                sample_encs = bundled_target[class_mask] 
+                sample_agreement = agreement_weight[class_mask]
+                
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
+                
+                if density_weights is not None:
+                    sub_sims = sub_sims * sample_agreement * density_weights[class_mask]
+                else:
+                    sub_sims = sub_sims * sample_agreement
+                    
+                sum_evidence = sub_sims.sum()
+                normalized_weights = sub_sims / (sum_evidence + 1e-8)
+                volume_scale = torch.log1p(sum_evidence)
+                
+                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                
+                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                pull_vector = pull_vector + 0.1 * anchor_pull
+                
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
+    def inference_update_mssb(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+        """Multi-Scale Spatial Bundling (MSSB)"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+            
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+            
+            x_coarse = F.avg_pool2d(x, kernel_size=3, stride=1, padding=1)
+            enc_coarse, _, _ = self.encode(x_coarse)
+            raw_coarse = F.normalize(enc_coarse[valid_enc_mask]).to(prototypes.dtype)
+            del x_coarse, enc_coarse
+            
+            bundled_target = F.normalize(raw_base + raw_coarse)
+            S = bundled_target @ prototypes.T
+            preds = S.argmax(dim=1)
+            sims = S.max(dim=1).values
+            
+            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                
+                sample_encs = bundled_target[class_mask] 
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
+                
+                sum_evidence = sub_sims.sum()
+                normalized_weights = sub_sims / (sum_evidence + 1e-8)
+                volume_scale = torch.log1p(sum_evidence)
+                
+                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                
+                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                pull_vector = pull_vector + 0.1 * anchor_pull
+                
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
+    def inference_update_opp(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+        """Orthogonalized Prototype Pull (OPP)"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+            
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+            
+            S = raw_base @ prototypes.T
+            preds = S.argmax(dim=1)
+            sims = S.max(dim=1).values
+            
+            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                
+                sample_encs = raw_base[class_mask] 
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
+                
+                sum_evidence = sub_sims.sum()
+                normalized_weights = sub_sims / (sum_evidence + 1e-8)
+                volume_scale = torch.log1p(sum_evidence)
+                
+                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                
+                other_protos = prototypes[torch.arange(prototypes.shape[0]) != c_id]
+                sims_to_others = other_protos @ F.normalize(pull_vector, dim=0)
+                nearest_k = sims_to_others.topk(min(3, other_protos.shape[0])).indices
+                
+                for k in nearest_k:
+                    component = torch.dot(pull_vector, other_protos[k]) * other_protos[k]
+                    pull_vector = pull_vector - component.clamp(min=0) * 1.0
+                
+                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                pull_vector = pull_vector + 0.1 * anchor_pull
+                
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
+    def inference_update_cwsa(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+        """Coverage-Weighted Subcluster Allocation (CWSA)"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+            
+        if not hasattr(self, 'subcluster_activation_counts') or self.subcluster_activation_counts.shape[0] != self.subclusters.shape[0]:
+            self.subcluster_activation_counts = torch.zeros(self.subclusters.shape[0], device=self.device)
+
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+            
+            S = raw_base @ prototypes.T
+            preds = S.argmax(dim=1)
+            sims = S.max(dim=1).values
+            
+            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = preds
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(preds[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (preds == c_id) & update_mask
+                sample_encs = raw_base[class_mask] 
+                
+                class_subcluster_ids = torch.nonzero(self.subcluster_to_class == c_id).squeeze(1)
+                if len(class_subcluster_ids) == 0:
+                    continue
+                    
+                all_sub_sims = sample_encs @ F.normalize(self.subclusters[class_subcluster_ids]).T
+                k_to_use = min(3, all_sub_sims.shape[1])
+                topk_sims, topk_idx = all_sub_sims.topk(k_to_use, dim=1)
+                
+                global_topk_idx = class_subcluster_ids[topk_idx]
+                
+                starvation_weight = 1.0 / (self.subcluster_activation_counts[global_topk_idx] + 10.0)
+                combined_weight = topk_sims.clamp(min=0) * starvation_weight
+                
+                for b in range(global_topk_idx.shape[0]):
+                    for k in range(k_to_use):
+                        self.subcluster_activation_counts[global_topk_idx[b, k]] += 1
+                        
+                sub_sims = combined_weight.sum(dim=1)
+                
+                sum_evidence = sub_sims.sum()
+                normalized_weights = sub_sims / (sum_evidence + 1e-8)
+                volume_scale = torch.log1p(sum_evidence)
+                
+                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                
+                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                pull_vector = pull_vector + 0.1 * anchor_pull
+                
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
