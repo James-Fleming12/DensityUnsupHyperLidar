@@ -222,6 +222,9 @@ def main():
                 # Ensure proj_xyz is passed for distance sensitivity scaling
                 if len(batch) > 10:
                     kwargs["proj_xyz"] = batch[10].to(device)
+                    
+                if len(batch) > 2:
+                    kwargs["oracle_labels"] = batch[2].to(device)
                 
                 if proj_in.shape[1] > 0:
                     update_fn(

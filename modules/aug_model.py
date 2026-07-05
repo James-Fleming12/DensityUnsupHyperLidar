@@ -154,8 +154,12 @@ class AugModel(DensityModel):
                 
             return full_predictions
 
-    def inference_update_asymmetric(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], distance_sensitivity=1.0, proj_xyz=None, **kwargs):
-        """Asymmetric Pipeline: Decouples decision (bundled features) from update (raw features)"""
+    def inference_update_asymmetric(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], distance_sensitivity=1.0, proj_xyz=None, oracle_labels=None, **kwargs):
+        """Asymmetric Pipeline: Decouples decision from update with combined stability fixes."""
+        # Fix D (Drift anchor): capture the source prototypes on the first pass
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+
         with torch.no_grad():
             enc_base, _, _ = self.encode(x)
             
@@ -193,10 +197,28 @@ class AugModel(DensityModel):
             selected_proto = prototypes[preds]
             sims = torch.sum(bundled_target * selected_proto, dim=1)
             
+            # Fix C (Real DCSP wiring): Build density weights if proj_xyz is available
+            density_weights = None
+            if proj_xyz is not None:
+                xyz_flat = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)
+                active_xyz = xyz_flat[valid_enc_mask]
+                radial_dists = torch.norm(active_xyz, dim=1)
+                batch_median = radial_dists.median().clamp(min=1e-5)
+                # Upweight sparse/far points relative to batch median density
+                density_weights = (radial_dists / batch_median) ** distance_sensitivity
+            
             # The Filter: Check if similarities fall within safety thresholds
             if isinstance(thresholds, float):
                 thresholds = [thresholds, 1.0]
             update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            
+            # Fix E (Diagnostic logging, opt-in): check pseudo-label accuracy within the band
+            if oracle_labels is not None:
+                active_oracle = oracle_labels.reshape(-1)[valid_enc_mask]
+                if update_mask.sum() > 0:
+                    correct = (preds[update_mask] == active_oracle[update_mask]).sum().item()
+                    total = update_mask.sum().item()
+                    print(f"    [Diagnostic] Band Accuracy: {correct/total:.2%} ({correct}/{total})")
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -207,22 +229,33 @@ class AugModel(DensityModel):
             valid_indices = torch.nonzero(update_mask).squeeze(1)
             unique_classes = torch.unique(preds[valid_indices])
             
-            # The Update: For points that pass, calculate pull vector using raw base features
+            # The Update:
             for class_id in unique_classes:
                 c_id = class_id.item()
                 class_mask = (preds == c_id) & update_mask
                 
-                # Use RAW features for the pull
-                sample_encs = raw_base[class_mask]
+                # Fix B (Purified pull vector): pull with bundled_target instead of raw_base
+                sample_encs = bundled_target[class_mask]
                 
-                # Apply distance/density sensitivity scaling to the raw features
-                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, distance_sensitivity)
+                # Base similarity to subclusters (distance_sensitivity=1.0 since we scale manually next)
+                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
                 
-                weights = sub_sims / (sub_sims.sum() + 1e-8)
-                weighted_pull_vector = (sample_encs * weights.unsqueeze(1)).sum(dim=0)
+                if density_weights is not None:
+                    sub_sims = sub_sims * density_weights[class_mask]
                 
-                # Apply the mean pull vector to the class prototype
-                updated_weight = self.classify.weight[c_id] + learning_rate * weighted_pull_vector
+                # Fix A (Volume Normalization Trap)
+                sum_evidence = sub_sims.sum()
+                normalized_weights = sub_sims / (sum_evidence + 1e-8)
+                volume_scale = torch.log1p(sum_evidence)  # scales magnitude by total evidence without blowing up
+                
+                weighted_pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                
+                # Fix D (Drift anchor): Blend with a small pull back toward the frozen source prototype
+                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                anchor_strength = 0.1 * learning_rate  # small constant restoring force
+                
+                # Apply the composite update to the class prototype
+                updated_weight = self.classify.weight[c_id] + learning_rate * weighted_pull_vector + anchor_strength * anchor_pull
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
                 
             return full_predictions
