@@ -154,7 +154,7 @@ class AugModel(DensityModel):
                 
             return full_predictions
 
-    def inference_update_asymmetric(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], distance_sensitivity=1.0, proj_xyz=None, oracle_labels=None, **kwargs):
+    def inference_update_asymmetric(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], distance_sensitivity=1.0, proj_xyz=None, oracle_labels=None, **kwargs):
         """Asymmetric Pipeline: Decouples decision from update with combined stability fixes."""
         # Fix D (Drift anchor): capture the source prototypes on the first pass
         if not hasattr(self, 'source_prototypes'):
@@ -174,6 +174,13 @@ class AugModel(DensityModel):
                 
             prototypes = F.normalize(self.classify.weight)
             raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
             bundled_target = raw_base.clone()
             
             x_yaw = torch.roll(x, shifts=14, dims=3)
@@ -210,7 +217,7 @@ class AugModel(DensityModel):
             # The Filter: Check if similarities fall within safety thresholds
             if isinstance(thresholds, float):
                 thresholds = [thresholds, 1.0]
-            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            update_mask = (sims > thresholds[0]) & (sims > thresholds[0])
             
             # Fix E (Diagnostic logging, opt-in): check pseudo-label accuracy within the band
             if oracle_labels is not None:
@@ -402,7 +409,7 @@ class AugTrainer(DensityTrainer):
             else:
                 model.classify.weight[:] = F.normalize(model.classify_weights)
 
-    def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+    def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
         """Soft Multi-View Consensus (Experiment A)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
@@ -419,6 +426,13 @@ class AugTrainer(DensityTrainer):
                 
             prototypes = F.normalize(self.classify.weight)
             raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
             
             # Generate augmentations
             x_yaw = torch.roll(x, shifts=14, dims=3)
@@ -446,11 +460,15 @@ class AugTrainer(DensityTrainer):
             agreement_weight = agreement_count / 2.0
             
             bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
+            del raw_jitter, raw_drop
             S_bundled = bundled_target @ prototypes.T
+            top2_S = S_bundled.topk(2, dim=1).values
             preds = S_bundled.argmax(dim=1)
-            sims = S_bundled.max(dim=1).values
+            sims = top2_S[:, 0]
+            sims_top2 = top2_S[:, 1]
+            margin = sims - sims_top2
             
-            update_mask = (sims > thresholds[0]) & (sims < thresholds[1]) & (agreement_weight > 0)
+            update_mask = (margin > 0.08) & (sims > thresholds[0]) & (agreement_weight > 0)
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -467,27 +485,20 @@ class AugTrainer(DensityTrainer):
                 
                 # Pull with bundled target (purified), weighted by soft consensus
                 sample_encs = bundled_target[class_mask] 
+                sample_sims = sims[class_mask]
                 sample_agreement = agreement_weight[class_mask]
                 
-                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
-                sub_sims = sub_sims * sample_agreement
+                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = conf_weights * sample_agreement * depth_scale[class_mask]
                 
-                sum_evidence = sub_sims.sum()
-                normalized_weights = sub_sims / (sum_evidence + 1e-8)
-                volume_scale = torch.log1p(sum_evidence)
-                
-                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
-                
-                # Drift anchor
-                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
-                pull_vector = pull_vector + 0.1 * anchor_pull
+                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
                 
             return full_predictions
 
-    def inference_update_soft_dcsp(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], proj_xyz=None, **kwargs):
+    def inference_update_soft_dcsp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, **kwargs):
         """Soft Multi-View Consensus + Density Weighting (Experiment B)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
@@ -504,6 +515,13 @@ class AugTrainer(DensityTrainer):
                 
             prototypes = F.normalize(self.classify.weight)
             raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
             
             x_yaw = torch.roll(x, shifts=14, dims=3)
             enc_yaw, _, _ = self.encode(x_yaw)
@@ -528,6 +546,7 @@ class AugTrainer(DensityTrainer):
             agreement_weight = agreement_count / 2.0
             
             bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
+            del raw_jitter, raw_drop
             S_bundled = bundled_target @ prototypes.T
             preds = S_bundled.argmax(dim=1)
             sims = S_bundled.max(dim=1).values
@@ -540,7 +559,7 @@ class AugTrainer(DensityTrainer):
                 batch_median = radial_dists.median().clamp(min=1e-5)
                 density_weights = (radial_dists / batch_median).clamp(max=1.5)
             
-            update_mask = (sims > thresholds[0]) & (sims < thresholds[1]) & (agreement_weight > 0)
+            update_mask = (sims > thresholds[0]) & (sims > thresholds[0]) & (agreement_weight > 0)
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -565,21 +584,14 @@ class AugTrainer(DensityTrainer):
                 else:
                     sub_sims = sub_sims * sample_agreement
                     
-                sum_evidence = sub_sims.sum()
-                normalized_weights = sub_sims / (sum_evidence + 1e-8)
-                volume_scale = torch.log1p(sum_evidence)
-                
-                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
-                
-                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
-                pull_vector = pull_vector + 0.1 * anchor_pull
+                pull_vector = (sample_encs * sub_sims.unsqueeze(1)).mean(dim=0)
                 
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
                 
             return full_predictions
 
-    def inference_update_mssb(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+    def inference_update_mssb(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
         """Multi-Scale Spatial Bundling (MSSB)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
@@ -596,6 +608,13 @@ class AugTrainer(DensityTrainer):
                 
             prototypes = F.normalize(self.classify.weight)
             raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
             
             x_coarse = F.avg_pool2d(x, kernel_size=3, stride=1, padding=1)
             enc_coarse, _, _ = self.encode(x_coarse)
@@ -604,10 +623,13 @@ class AugTrainer(DensityTrainer):
             
             bundled_target = F.normalize(raw_base + raw_coarse)
             S = bundled_target @ prototypes.T
+            top2_S = S.topk(2, dim=1).values
             preds = S.argmax(dim=1)
-            sims = S.max(dim=1).values
+            sims = top2_S[:, 0]
+            sims_top2 = top2_S[:, 1]
+            margin = sims - sims_top2
             
-            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            update_mask = (margin > 0.08) & (sims > thresholds[0])
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -623,23 +645,18 @@ class AugTrainer(DensityTrainer):
                 class_mask = (preds == c_id) & update_mask
                 
                 sample_encs = bundled_target[class_mask] 
-                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
+                sample_sims = sims[class_mask]
                 
-                sum_evidence = sub_sims.sum()
-                normalized_weights = sub_sims / (sum_evidence + 1e-8)
-                volume_scale = torch.log1p(sum_evidence)
-                
-                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
-                
-                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
-                pull_vector = pull_vector + 0.1 * anchor_pull
+                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = conf_weights * depth_scale[class_mask]
+                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
                 
             return full_predictions
 
-    def inference_update_opp(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+    def inference_update_opp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
         """Orthogonalized Prototype Pull (OPP)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
@@ -656,12 +673,22 @@ class AugTrainer(DensityTrainer):
                 
             prototypes = F.normalize(self.classify.weight)
             raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
             
             S = raw_base @ prototypes.T
+            top2_S = S.topk(2, dim=1).values
             preds = S.argmax(dim=1)
-            sims = S.max(dim=1).values
+            sims = top2_S[:, 0]
+            sims_top2 = top2_S[:, 1]
+            margin = sims - sims_top2
             
-            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            update_mask = (margin > 0.08) & (sims > thresholds[0])
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -677,13 +704,11 @@ class AugTrainer(DensityTrainer):
                 class_mask = (preds == c_id) & update_mask
                 
                 sample_encs = raw_base[class_mask] 
-                sub_sims, _ = self.get_max_subcluster_similarity(sample_encs, c_id, 1.0)
+                sample_sims = sims[class_mask]
                 
-                sum_evidence = sub_sims.sum()
-                normalized_weights = sub_sims / (sum_evidence + 1e-8)
-                volume_scale = torch.log1p(sum_evidence)
-                
-                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = conf_weights * depth_scale[class_mask]
+                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
                 other_protos = prototypes[torch.arange(prototypes.shape[0]) != c_id]
                 sims_to_others = other_protos @ F.normalize(pull_vector, dim=0)
@@ -693,15 +718,12 @@ class AugTrainer(DensityTrainer):
                     component = torch.dot(pull_vector, other_protos[k]) * other_protos[k]
                     pull_vector = pull_vector - component.clamp(min=0) * 1.0
                 
-                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
-                pull_vector = pull_vector + 0.1 * anchor_pull
-                
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
                 
             return full_predictions
 
-    def inference_update_cwsa(self, x, learning_rate=0.001, thresholds=[0.45, 0.80], **kwargs):
+    def inference_update_cwsa(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
         """Coverage-Weighted Subcluster Allocation (CWSA)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
@@ -721,12 +743,22 @@ class AugTrainer(DensityTrainer):
                 
             prototypes = F.normalize(self.classify.weight)
             raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
             
             S = raw_base @ prototypes.T
+            top2_S = S.topk(2, dim=1).values
             preds = S.argmax(dim=1)
-            sims = S.max(dim=1).values
+            sims = top2_S[:, 0]
+            sims_top2 = top2_S[:, 1]
+            margin = sims - sims_top2
             
-            update_mask = (sims > thresholds[0]) & (sims < thresholds[1])
+            update_mask = (margin > 0.08) & (sims > thresholds[0])
             
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -761,14 +793,89 @@ class AugTrainer(DensityTrainer):
                         
                 sub_sims = combined_weight.sum(dim=1)
                 
-                sum_evidence = sub_sims.sum()
-                normalized_weights = sub_sims / (sum_evidence + 1e-8)
-                volume_scale = torch.log1p(sum_evidence)
+                sample_sims = sims[class_mask]
+                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = sub_sims * conf_weights * depth_scale[class_mask]
                 
-                pull_vector = (sample_encs * normalized_weights.unsqueeze(1)).sum(dim=0) * volume_scale
+                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
-                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
-                pull_vector = pull_vector + 0.1 * anchor_pull
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+            return full_predictions
+
+    def inference_update_ltcg(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
+        """Low-Threshold Consensus Gating (LTCG)"""
+        if not hasattr(self, 'source_prototypes'):
+            self.source_prototypes = self.classify.weight.detach().clone()
+            
+        with torch.no_grad():
+            enc_base, _, _ = self.encode(x)
+            num_total_samples = enc_base.shape[0]
+            valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
+            
+            raw_base = F.normalize(enc_base[valid_enc_mask])
+            del enc_base
+            if raw_base.shape[0] == 0:
+                return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+                
+            prototypes = F.normalize(self.classify.weight)
+            raw_base = raw_base.to(prototypes.dtype)
+
+            depth_scale = torch.ones(raw_base.shape[0], device=self.device)
+            if proj_xyz is not None and distance_sensitivity > 0:
+                flat_xyz = proj_xyz.view(-1, 3)[valid_enc_mask]
+                depth = torch.norm(flat_xyz, dim=1)
+                depth_scale = torch.clamp(depth / 10.0, min=1.0, max=distance_sensitivity)
+
+            
+            S_base = raw_base @ prototypes.T
+            top2_S = S_base.topk(2, dim=1).values
+            pred_base = S_base.argmax(dim=1)
+            sim_base = top2_S[:, 0]
+            sims_top2 = top2_S[:, 1]
+            margin = sim_base - sims_top2
+            
+            # Yaw Jitter
+            x_jitter = x.roll(shifts=3, dims=3)
+            enc_jitter, _, _ = self.encode(x_jitter)
+            raw_jitter = F.normalize(enc_jitter[valid_enc_mask]).to(prototypes.dtype)
+            del x_jitter, enc_jitter
+            pred_jitter = (raw_jitter @ prototypes.T).argmax(dim=1)
+            
+            # Spatial Dropout
+            dropout_mask = torch.rand(x.shape, device=x.device) > 0.1
+            x_drop = x * dropout_mask
+            enc_drop, _, _ = self.encode(x_drop)
+            raw_drop = F.normalize(enc_drop[valid_enc_mask]).to(prototypes.dtype)
+            del x_drop, enc_drop
+            pred_drop = (raw_drop @ prototypes.T).argmax(dim=1)
+            del raw_jitter, raw_drop
+            
+            # LTCG Logic
+            # Require consensus from all 3 views AND a lower similarity threshold
+            update_mask = (margin > 0.04) & (sim_base > thresholds[0]) & (pred_base == pred_jitter) & (pred_base == pred_drop)
+            
+            full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
+            full_predictions[valid_enc_mask] = pred_base
+            
+            if not torch.any(update_mask):
+                return full_predictions
+                
+            valid_indices = torch.nonzero(update_mask).squeeze(1)
+            unique_classes = torch.unique(pred_base[valid_indices])
+            
+            for class_id in unique_classes:
+                c_id = class_id.item()
+                class_mask = (pred_base == c_id) & update_mask
+                
+                # Apply Standard Pull using ONLY the raw H_base
+                sample_encs = raw_base[class_mask] 
+                sample_sims = sim_base[class_mask]
+                
+                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = conf_weights * depth_scale[class_mask]
+                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)

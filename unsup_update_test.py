@@ -87,7 +87,8 @@ def main():
         {"name": "Soft Multi-View Consensus + Density Weighting (Exp B)", "method": "inference_update_soft_dcsp"},
         {"name": "Multi-Scale Spatial Bundling (MSSB)", "method": "inference_update_mssb"},
         {"name": "Orthogonalized Prototype Pull (OPP)", "method": "inference_update_opp"},
-        {"name": "Coverage-Weighted Subcluster Allocation (CWSA)", "method": "inference_update_cwsa"}
+        {"name": "Coverage-Weighted Subcluster Allocation (CWSA)", "method": "inference_update_cwsa"},
+        {"name": "Low-Threshold Consensus Gating (LTCG)", "method": "inference_update_ltcg"}
     ]
 
     model_base = AugModel(ARCH, MODEL_DIR, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
@@ -153,7 +154,12 @@ def main():
                         continue
                         
                     method_func = getattr(model, cfg["method"])
-                    method_func(proj_in, proj_xyz=proj_xyz)
+                    method_func(
+                        proj_in, 
+                        proj_xyz=proj_xyz, 
+                        thresholds=[0.40, 0.65], 
+                        learning_rate=0.001
+                    )
             
             # Evaluate on valid set
             print(f"Evaluating {cfg['name']} on {cond}...")
