@@ -959,6 +959,11 @@ class DensityModel(nn.Module):
 
             predictions = torch.cat(all_predictions)
             update_mask = torch.cat(all_update_masks)
+            
+            if not hasattr(self, '_firing_log'):
+                self._firing_log = []
+            if len(valid_enc_mask) > 0:
+                self._firing_log.append(update_mask.float().mean().item())
 
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = predictions

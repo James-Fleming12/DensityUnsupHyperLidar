@@ -405,7 +405,11 @@ class AugModel(DensityModel):
                 else:
                     pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
 
-                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                # Drift anchor: Blend with a small pull back toward the frozen source prototype
+                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                anchor_strength = 0.1 * learning_rate  # small constant restoring force
+
+                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector + anchor_strength * anchor_pull
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
 
             return full_predictions
