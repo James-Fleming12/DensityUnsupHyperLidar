@@ -357,7 +357,7 @@ class AugModel(DensityModel):
                 
             return full_predictions
 
-    def inference_update_soft_dcsp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, **kwargs):
+    def inference_update_soft_dcsp(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
         """Soft Multi-View Consensus + Density Weighting (Experiment B)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
