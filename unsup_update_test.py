@@ -131,7 +131,8 @@ def main():
             model.to(device)
             
             is_active = cfg.get("is_active", True)
-            model.train() if is_active else model.eval()
+            model.eval()  # always eval — F.dropout2d applies regardless via training=True default,
+                          # and this keeps BatchNorm on frozen running stats throughout adaptation
 
             # Baseline for pairs
             val_target_dataset = LiDARCorruptionWrapper(valid_dataset, corruption_type=cond, severity=3)
