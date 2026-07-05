@@ -115,7 +115,8 @@ def main():
         
         methods_to_test = [
             (None, "Frozen Baseline", {}),
-            ("inference_update_soft_consensus", "Exp A (Full)", {"learning_rate": 0.001}),
+            ("inference_update_soft_consensus", "Exp A (Prototype Gated)", {"learning_rate": 0.001, "use_subcluster_gate": False}),
+            ("inference_update_soft_consensus", "Exp A (Subcluster Gated)", {"learning_rate": 0.001, "use_subcluster_gate": True}),
             ("inference_update_soft_consensus", "Exp A (No Consensus)", {"learning_rate": 0.001, "use_consensus_gate": False}),
             ("inference_update_soft_consensus", "Exp A (Bundle Only)", {"learning_rate": 0.001, "use_consensus_gate": False, "use_volume_weight": False}),
         ]

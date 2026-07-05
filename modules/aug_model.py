@@ -268,8 +268,20 @@ class AugModel(DensityModel):
             return full_predictions
 
 
-    def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, use_consensus_gate=True, use_volume_weight=True, **kwargs):
-        """Soft Multi-View Consensus (Experiment A)"""
+    def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65],
+                                         proj_xyz=None, distance_sensitivity=1.5,
+                                         use_consensus_gate=True, use_volume_weight=True,
+                                         use_subcluster_gate=True, **kwargs):
+        """Soft Multi-View Consensus (Experiment A), subcluster-gauged.
+
+        Restores the paper's core mechanism: the confidence used to gate each
+        incoming sample is measured against the SUBCLUSTERS (the stored modes
+        of the training distribution), not just the averaged class prototype.
+        A point that is close to its class prototype but far from every genuine
+        training subcluster (a hallmark of a confident-but-wrong corruption
+        artifact) is now correctly down-weighted, which class-prototype
+        similarity alone could not catch.
+        """
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
 
@@ -277,12 +289,12 @@ class AugModel(DensityModel):
             enc_base, _, _ = self.encode(x)
             num_total_samples = enc_base.shape[0]
             valid_enc_mask = (enc_base.abs().sum(dim=1) > 0)
-            
+
             raw_base = F.normalize(enc_base[valid_enc_mask])
             del enc_base
             if raw_base.shape[0] == 0:
                 return torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
-                
+
             prototypes = F.normalize(self.classify.weight)
             raw_base = raw_base.to(prototypes.dtype)
 
@@ -290,83 +302,112 @@ class AugModel(DensityModel):
             if proj_xyz is not None and distance_sensitivity > 0:
                 flat_xyz = proj_xyz.permute(0, 2, 3, 1).reshape(-1, 3)[valid_enc_mask]
                 depth = torch.norm(flat_xyz, dim=1)
-                depth_scale = torch.clamp(15.0 / (depth + 1e-3), min=1.0/distance_sensitivity, max=1.0)
+                depth_scale = torch.clamp(15.0 / (depth + 1e-3), min=1.0 / distance_sensitivity, max=1.0)
 
-            
             # Generate augmentations
             x_yaw = torch.roll(x, shifts=14, dims=3)
             enc_yaw, _, _ = self.encode(x_yaw)
             raw_jitter = F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype)
             del x_yaw, enc_yaw
-            
+
             x_drop = F.dropout2d(x, p=0.15)
             enc_drop, _, _ = self.encode(x_drop)
             raw_drop = F.normalize(enc_drop[valid_enc_mask]).to(prototypes.dtype)
             del x_drop, enc_drop
-            
-            # Independent predictions for soft consensus
-            S_base = raw_base @ prototypes.T
-            pred_base = S_base.argmax(dim=1)
-            
-            S_jitter = raw_jitter @ prototypes.T
-            pred_jitter = S_jitter.argmax(dim=1)
-            
-            S_drop = raw_drop @ prototypes.T
-            pred_drop = S_drop.argmax(dim=1)
-            
-            # Soft agreement weight: 1.0 if all 3 match, 0.5 if 2 match, 0.0 if none match
-            agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_drop).float()
+
+            # Per-view predictions come from class prototypes (cheap, only used
+            # to decide which class each point belongs to, not to gauge confidence).
+            pred_base = (raw_base @ prototypes.T).argmax(dim=1)
             if use_consensus_gate:
+                pred_jitter = (raw_jitter @ prototypes.T).argmax(dim=1)
+                pred_drop = (raw_drop @ prototypes.T).argmax(dim=1)
+                agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_drop).float()
                 agreement_weight = agreement_count / 2.0
             else:
-                agreement_weight = torch.ones_like(agreement_count)
-            
+                agreement_weight = torch.ones(raw_base.shape[0], device=self.device)
+
             bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
             del raw_jitter, raw_drop
+
             S_bundled = bundled_target @ prototypes.T
-            top2_S = S_bundled.topk(2, dim=1).values
             preds = S_bundled.argmax(dim=1)
-            sims = top2_S[:, 0]
-            sims_top2 = top2_S[:, 1]
-            margin = sims - sims_top2
-            
-            update_mask = (margin > 0) & (sims > thresholds[0]) & (agreement_weight > 0)
-            
+
+            # --- THESIS-CRITICAL: confidence gauged against subclusters ---
+            # For each point, similarity to the nearest subcluster of its
+            # predicted class. This is the "distance to training distribution"
+            # gauge the paper is built on. get_max_subcluster_similarity is the
+            # same routine the density baseline uses, so the two methods now
+            # gate on the same underlying signal.
+            if use_subcluster_gate:
+                sub_sims = torch.zeros(bundled_target.shape[0], device=self.device, dtype=bundled_target.dtype)
+                
+                # Vectorized chunked computation to avoid per-class Python loop overhead
+                sub_norm = F.normalize(self.subclusters.float(), dim=1)
+                chunk_size = 10000
+                for i in range(0, bundled_target.shape[0], chunk_size):
+                    chunk_target = bundled_target[i:i+chunk_size]
+                    chunk_preds = preds[i:i+chunk_size]
+                    
+                    cosine_sim = chunk_target @ sub_norm.T
+                    base_similarity = (cosine_sim + 1) / 2
+                    
+                    valid_mask = (self.subcluster_to_class.unsqueeze(0) == chunk_preds.unsqueeze(1))
+                    masked_similarity = torch.where(valid_mask, base_similarity, torch.tensor(0.0, device=self.device))
+                    
+                    max_sims, _ = torch.max(masked_similarity, dim=1)
+                    
+                    if distance_sensitivity == 0.0:
+                        scaled = torch.where(max_sims > 0.5, torch.tensor(1.0, device=self.device), max_sims * 2.0)
+                    elif distance_sensitivity == 1.0:
+                        scaled = max_sims
+                    else:
+                        scaled = max_sims ** distance_sensitivity
+                        
+                    sub_sims[i:i+chunk_size] = scaled.to(sub_sims.dtype)
+                    
+                gate_sims = sub_sims
+            else:
+                # fall back to class-prototype similarity (the old behavior)
+                gate_sims = S_bundled.gather(1, preds.unsqueeze(1)).squeeze(1)
+
+            update_mask = (gate_sims > thresholds[0]) & (agreement_weight > 0)
+
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
-            
-            num_valid = valid_enc_mask.sum().float()
-            firing_rate = update_mask.sum().float() / (num_valid + 1e-6)
-            
-            if not hasattr(self, '_firing_log'):
-                self._firing_log = []
-            self._firing_log.append(firing_rate.item())
-            
             if not torch.any(update_mask):
                 return full_predictions
-            valid_indices = torch.nonzero(update_mask).squeeze(1)
-            unique_classes = torch.unique(preds[valid_indices])
-            
+
+            # firing-rate logging (kept outside the gating branches so it's
+            # always populated regardless of which components are on)
+            if not hasattr(self, '_firing_log'):
+                self._firing_log = []
+            self._firing_log.append(update_mask.float().mean().item())
+
+            unique_classes = torch.unique(preds[torch.nonzero(update_mask).squeeze(1)])
             for class_id in unique_classes:
                 c_id = class_id.item()
                 class_mask = (preds == c_id) & update_mask
-                
-                # Pull with bundled target (purified), weighted by soft consensus
-                sample_encs = bundled_target[class_mask] 
-                sample_sims = sims[class_mask]
+
+                sample_encs = bundled_target[class_mask]
+                sample_gate = gate_sims[class_mask]
                 sample_agreement = agreement_weight[class_mask]
-                
+
+                # Confidence weight now ramps over the subcluster-similarity band.
+                conf_weights = torch.clamp(
+                    (sample_gate - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                final_weights = conf_weights * sample_agreement * depth_scale[class_mask]
+
                 if use_volume_weight:
-                    conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
-                    final_weights = conf_weights * sample_agreement * depth_scale[class_mask]
+                    weight_sum = final_weights.sum().clamp(min=1e-8)
+                    direction = (sample_encs * final_weights.unsqueeze(1)).sum(dim=0) / weight_sum
+                    volume_scale = torch.log1p(final_weights.sum())
+                    pull_vector = direction * volume_scale
                 else:
-                    final_weights = torch.ones_like(sample_sims)
-                
-                pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
-                
+                    pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
+
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
-                
+
             return full_predictions
 
     def inference_update_safe_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
