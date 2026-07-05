@@ -41,7 +41,7 @@ def build_model(ARCH, device, state_dict):
     return model
 
 def run_condition(model_base, ARCH, device, raw_train_dataset, valid_dataset,
-                   cond, severity, method_name, method_kwargs={}, cached_b_acc=None, cached_b_miou=None):
+                   cond, severity, method_name, method_kwargs={}, cached_b_acc=None, cached_b_miou=None, cached_b_detailed=None):
     model = build_model(ARCH, device, model_base.state_dict())
     model.eval()
 
@@ -49,9 +49,10 @@ def run_condition(model_base, ARCH, device, raw_train_dataset, valid_dataset,
     val_loader = DataLoader(val_target, batch_size=1, shuffle=False, num_workers=0)
 
     if cached_b_acc is not None and cached_b_miou is not None:
-        b_acc, b_miou = cached_b_acc, cached_b_miou
+        b_acc, b_miou, b_detailed = cached_b_acc, cached_b_miou, cached_b_detailed
     else:
-        b_acc, b_miou = test_hdc_model(model_base, val_loader)
+        b_acc, b_miou, b_detailed = test_hdc_model(model_base, val_loader, return_detailed=True)
+        cached_b_detailed = b_detailed
 
     if method_name is not None:
         target = LiDARCorruptionWrapper(raw_train_dataset, corruption_type=cond, severity=severity)
@@ -72,10 +73,10 @@ def run_condition(model_base, ARCH, device, raw_train_dataset, valid_dataset,
             else:
                 method_func(proj_in, **method_kwargs)
 
-    acc, miou = test_hdc_model(model, val_loader)
+    acc, miou, detailed = test_hdc_model(model, val_loader, return_detailed=True)
     
     firing_log = getattr(model, '_firing_log', None)
-    return b_acc, b_miou, acc, miou, firing_log
+    return b_acc, b_miou, b_detailed, acc, miou, firing_log, detailed
 
 def main():
     os.makedirs(SAVE_DIR, exist_ok=True)
@@ -83,7 +84,7 @@ def main():
     DATA = yaml.safe_load(open(LABELS_PATH))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    train_seqs = DATA["split"]["train"][:1]
+    train_seqs = DATA["split"]["train"][:4]
     valid_seqs = DATA["split"]["valid"]
 
     baseline_parser = Parser(
@@ -108,41 +109,40 @@ def main():
 
     results = []
     
-    conditions = ["snow", "fog", "motion"]
+    conditions = ['snow', 'fog', 'motion']
     for cond in conditions:
-        severity = 2
-        cached_b_acc, cached_b_miou = None, None
-        
-        methods_to_test = [
-            (None, "Frozen Baseline", {}),
-            ("inference_update", "Density Baseline", {"learning_rate": 0.001, "distance_sensitivity": 3.0, "thresholds": [0.45, 0.80]}),
-            ("inference_update_soft_consensus", "Exp A (Prototype Gated)", {"learning_rate": 0.001, "use_subcluster_gate": False}),
-            ("inference_update_soft_consensus", "Exp A (Subcluster Gated)", {"learning_rate": 0.001, "use_subcluster_gate": True}),
-            ("inference_update_soft_consensus", "Exp A (No Consensus)", {"learning_rate": 0.001, "use_consensus_gate": False}),
-            ("inference_update_soft_consensus", "Exp A (Bundle Only)", {"learning_rate": 0.001, "use_consensus_gate": False, "use_volume_weight": False}),
-        ]
-        
-        for method_name, label, method_kwargs in methods_to_test:
-            b_acc, b_miou, acc, miou, firing_log = run_condition(
-                model_base, ARCH, device, raw_train_dataset, valid_dataset,
-                cond=cond, severity=severity, method_name=method_name, method_kwargs=method_kwargs,
-                cached_b_acc=cached_b_acc, cached_b_miou=cached_b_miou
-            )
-            cached_b_acc, cached_b_miou = b_acc, b_miou
+        for severity in [2]:
+            cached_b_acc, cached_b_miou, cached_b_detailed = None, None, None
             
-            avg_fire = sum(firing_log)/len(firing_log) if firing_log else 0.0
-            print(f"[{cond} sev{severity} | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
-                  f"(delta {miou - b_miou:+.4f}) | fire_rate={avg_fire:.2%}")
+            methods_to_test = [
+                (None, "Frozen Baseline", {}),
+                ("inference_update", "Density Baseline", {"learning_rate": 0.001, "distance_sensitivity": 3.0, "thresholds": [0.45, 0.80]}),
+                ("inference_update_soft_consensus", "Exp A (Subcluster Gated)", {"learning_rate": 0.001, "use_subcluster_gate": True}),
+            ]
             
-            result_entry = {
-                "test": "test_1_ablation", "condition": cond, "severity": severity, "method": label,
-                "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
-            }
-            if firing_log:
-                result_entry["firing_rate"] = avg_fire
-            results.append(result_entry)
+            for method_name, label, method_kwargs in methods_to_test:
+                b_acc, b_miou, b_detailed, acc, miou, firing_log, detailed = run_condition(
+                    model_base, ARCH, device, raw_train_dataset, valid_dataset,
+                    cond=cond, severity=severity, method_name=method_name, method_kwargs=method_kwargs,
+                    cached_b_acc=cached_b_acc, cached_b_miou=cached_b_miou, cached_b_detailed=cached_b_detailed
+                )
+                cached_b_acc, cached_b_miou, cached_b_detailed = b_acc, b_miou, b_detailed
+                
+                avg_fire = sum(firing_log)/len(firing_log) if firing_log else 0.0
+                print(f"[{cond} sev{severity} | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
+                      f"(delta {miou - b_miou:+.4f}) | fire_rate={avg_fire:.2%}")
+                
+                result_entry = {
+                    "test": "test_2_full", "condition": cond, "severity": severity, "method": label,
+                    "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
+                    "iou": miou,
+                    "delta": miou - b_miou,
+                    "firing_rate": avg_fire,
+                    "detailed_iou": detailed["per_class_iou"]
+                }
+                results.append(result_entry)
 
-    out_path = os.path.join(SAVE_DIR, "test_1_ablation.json")
+    out_path = os.path.join(SAVE_DIR, "test_2_full.json")
     with open(out_path, "w") as f:
         json.dump(results, f, indent=4)
     print(f"\nSaved to {out_path}")
