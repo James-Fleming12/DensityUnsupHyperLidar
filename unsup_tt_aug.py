@@ -151,10 +151,6 @@ def main():
         new_size = state_dict["subclusters"].shape[0]
         if model_base.subclusters.shape[0] != new_size:
             model_base.subclusters = torch.nn.Parameter(torch.zeros(new_size, model_base.hd_dim, device=device))
-            del model_base.subcluster_classes
-            del model_base.subcluster_to_class
-            model_base.register_buffer("subcluster_classes", torch.zeros(new_size, dtype=torch.long, device=device))
-            model_base.register_buffer("subcluster_to_class", torch.zeros(new_size, dtype=torch.long, device=device))
 
     model_base.load_state_dict(state_dict, strict=False)
     if isinstance(loaded_obj, torch.nn.Module):
