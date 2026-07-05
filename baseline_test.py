@@ -223,6 +223,9 @@ def run_diagnostics():
                     del x_drop, enc_drop
                     
                     prototypes_norm = F.normalize(model.classify.weight)
+                    raw_yaw = raw_yaw.to(prototypes_norm.dtype)
+                    raw_drop = raw_drop.to(prototypes_norm.dtype)
+                    
                     sims_yaw = (raw_yaw @ prototypes_norm.T).gather(1, preds.unsqueeze(1)).squeeze(1)
                     sims_drop = (raw_drop @ prototypes_norm.T).gather(1, preds.unsqueeze(1)).squeeze(1)
                     
