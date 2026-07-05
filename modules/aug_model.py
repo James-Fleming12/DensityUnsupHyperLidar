@@ -268,7 +268,7 @@ class AugModel(DensityModel):
             return full_predictions
 
 
-    def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, **kwargs):
+    def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65], proj_xyz=None, distance_sensitivity=1.5, use_consensus_gate=True, use_volume_weight=True, **kwargs):
         """Soft Multi-View Consensus (Experiment A)"""
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
@@ -316,7 +316,10 @@ class AugModel(DensityModel):
             
             # Soft agreement weight: 1.0 if all 3 match, 0.5 if 2 match, 0.0 if none match
             agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_drop).float()
-            agreement_weight = agreement_count / 2.0
+            if use_consensus_gate:
+                agreement_weight = agreement_count / 2.0
+            else:
+                agreement_weight = torch.ones_like(agreement_count)
             
             bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
             del raw_jitter, raw_drop
@@ -353,8 +356,11 @@ class AugModel(DensityModel):
                 sample_sims = sims[class_mask]
                 sample_agreement = agreement_weight[class_mask]
                 
-                conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
-                final_weights = conf_weights * sample_agreement * depth_scale[class_mask]
+                if use_volume_weight:
+                    conf_weights = torch.clamp((sample_sims - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                    final_weights = conf_weights * sample_agreement * depth_scale[class_mask]
+                else:
+                    final_weights = torch.ones_like(sample_sims)
                 
                 pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
