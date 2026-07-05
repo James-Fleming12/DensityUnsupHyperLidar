@@ -61,7 +61,7 @@ def run_condition(model_base, ARCH, device, raw_train_dataset, valid_dataset,
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--test", choices=["cross_sensor_sweep", "conditional_opp", "both"], required=True)
+    parser.add_argument("--test", choices=["cross_sensor_sweep", "conditional_opp", "broad_exp_a", "all"], required=True)
     args = parser.parse_args()
 
     os.makedirs(SAVE_DIR, exist_ok=True)
@@ -93,7 +93,10 @@ def main():
     model_base.eval()
 
     results = []
-    tests_to_run = ["cross_sensor_sweep", "conditional_opp"] if args.test == "both" else [args.test]
+    if args.test == "all":
+        tests_to_run = ["cross_sensor_sweep", "conditional_opp", "broad_exp_a"]
+    else:
+        tests_to_run = [args.test]
 
     if "cross_sensor_sweep" in tests_to_run:
         for severity in [3, 4, 5]:
@@ -123,6 +126,24 @@ def main():
                       f"(delta {miou - b_miou:+.4f})")
                 results.append({
                     "test": "conditional_opp", "condition": cond, "method": label,
+                    "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
+                })
+
+    if "broad_exp_a" in tests_to_run:
+        # Note: Added realistic KITTI-C corruption names
+        all_conditions = ["snow", "fog", "cross_sensor", "motion_blur", "beam_missing", "crosstalk", "incomplete_echo"]
+        for cond in all_conditions:
+            for method_name, label in [(None, "Frozen Baseline"),
+                                        ("inference_update_soft_consensus", "Exp A"),
+                                        ("inference_update_safe_consensus", "Safe Exp A")]:
+                b_acc, b_miou, acc, miou = run_condition(
+                    model_base, ARCH, device, raw_train_dataset, valid_dataset,
+                    cond=cond, severity=3, method_name=method_name,
+                )
+                print(f"[{cond} sev3 | {label}] baseline mIoU={b_miou:.4f} -> {miou:.4f} "
+                      f"(delta {miou - b_miou:+.4f})")
+                results.append({
+                    "test": "broad_exp_a", "condition": cond, "method": label,
                     "acc_pair": [b_acc, acc], "miou_pair": [b_miou, miou],
                 })
 
