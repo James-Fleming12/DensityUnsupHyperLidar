@@ -18,7 +18,7 @@ LiDARCorruptionWrapper = unsup_kitti_c.LiDARCorruptionWrapper
 # Configuration
 DATA_DIR = "/mnt/alpha/jmfleming/KITTI/sequences"
 NUM_CLASSES = 17
-CONFIG_PATH = "config/semantickitti.yaml"
+CONFIG_PATH = "config/arch/senet-2048p.yml"
 LABELS_PATH = "config/labels/semantic-kitti-all.yaml"
 MODEL_DIR = "logs/kitti_pretrain"
 HDC_SUB_PATH = os.path.join(MODEL_DIR, "hdc_sub.pth")
