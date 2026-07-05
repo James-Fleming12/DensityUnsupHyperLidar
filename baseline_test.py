@@ -86,7 +86,7 @@ def run_diagnostics():
             print(f"Running Diagnostic on {cond.upper()} (Severity 3) - Mode: {mode_str}")
             
             target_dataset = LiDARCorruptionWrapper(raw_train_dataset, corruption_type=cond, severity=3)
-            data_loader = DataLoader(target_dataset, batch_size=ARCH["train"]["batch_size"], shuffle=False, num_workers=ARCH["train"]["workers"], drop_last=False)
+            data_loader = DataLoader(target_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"], drop_last=False)
             
             # Initialize trackers
             T1_stats = {rz: {dz: {"correct": [0]*NUM_CLASSES, "total": [0]*NUM_CLASSES} for dz in range(3)} for rz in range(3)}
