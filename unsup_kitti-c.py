@@ -153,15 +153,15 @@ class LiDARCorruptionWrapper(Dataset):
             label = np.fromfile(filename, dtype=np.int32)
             label = label.reshape((-1))
             
-            if scan_self.drop_points is not False:
-                label = np.delete(label, scan_self.points_to_drop)
-                
             if getattr(scan_self, 'corruption_mask', None) is not None:
                 label = label[scan_self.corruption_mask]
                 
             if getattr(scan_self, 'corruption_added', 0) > 0:
                 fake_label = np.zeros(scan_self.corruption_added, dtype=label.dtype)
                 label = np.concatenate([label, fake_label])
+                
+            if scan_self.drop_points is not False:
+                label = np.delete(label, scan_self.points_to_drop)
                 
             scan_self.set_label(label)
 
