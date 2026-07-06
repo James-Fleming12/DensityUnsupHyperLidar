@@ -55,7 +55,7 @@ def run_condition(model_base, ARCH, device, raw_train_dataset, valid_dataset,
         cached_b_detailed = b_detailed
 
     if method_name is not None:
-        target = LiDARCorruptionWrapper(raw_train_dataset, corruption_type=cond, severity=severity)
+        target = LiDARCorruptionWrapper(valid_dataset, corruption_type=cond, severity=severity)
         train_loader = DataLoader(target, batch_size=1, shuffle=False, num_workers=0)
         method_func = getattr(model, method_name)
         for batch in tqdm(train_loader, desc=f"Adapting [{cond} sev{severity} | {method_name}]"):
@@ -84,7 +84,7 @@ def main():
     DATA = yaml.safe_load(open(LABELS_PATH))
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    train_seqs = DATA["split"]["train"][:1]
+    train_seqs = DATA["split"]["train"][:4]
     valid_seqs = DATA["split"]["valid"]
 
     baseline_parser = Parser(
@@ -116,8 +116,8 @@ def main():
             
             methods_to_test = [
                 (None, "Frozen Baseline", {}),
-                ("inference_update", "Density Baseline", {"learning_rate": 0.001, "distance_sensitivity": 3.0, "thresholds": [0.45, 0.80]}),
-                ("inference_update_soft_consensus", "Exp A (Subcluster Gated)", {"learning_rate": 0.001, "use_subcluster_gate": True}),
+                ("inference_update_soft_consensus", "Exp A (Anchor Off)", {"learning_rate": 0.001, "use_subcluster_gate": True, "use_anchor": False}),
+                ("inference_update_soft_consensus", "Exp A (Anchor On)", {"learning_rate": 0.001, "use_subcluster_gate": True, "use_anchor": True}),
             ]
             
             for method_name, label, method_kwargs in methods_to_test:

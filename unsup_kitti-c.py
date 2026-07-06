@@ -230,7 +230,26 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                         proj_in,
                         learning_rate=0.001,
                         use_consensus_gate=True,
-                        use_volume_weight=True
+                        use_volume_weight=True,
+                        use_subcluster_gate=True
+                    )
+                elif update_method == 'exp_a_anchor_off':
+                    model.inference_update_soft_consensus(
+                        proj_in,
+                        learning_rate=0.001,
+                        use_consensus_gate=True,
+                        use_volume_weight=True,
+                        use_subcluster_gate=True,
+                        use_anchor=False
+                    )
+                elif update_method == 'exp_a_anchor_on':
+                    model.inference_update_soft_consensus(
+                        proj_in,
+                        learning_rate=0.001,
+                        use_consensus_gate=True,
+                        use_volume_weight=True,
+                        use_subcluster_gate=True,
+                        use_anchor=True
                     )
             
     return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history}
@@ -365,7 +384,7 @@ def main():
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
-    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'd3ctta'], default='density', help='Method to test')
+    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'd3ctta'], default='density', help='Method to test')
     parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
     parser.add_argument('--hdc_epochs', type=int, default=30, help='Number of epochs to train the HDC density model')
     args = parser.parse_args()

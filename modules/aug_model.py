@@ -271,7 +271,7 @@ class AugModel(DensityModel):
     def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65],
                                          proj_xyz=None, distance_sensitivity=1.5,
                                          use_consensus_gate=True, use_volume_weight=True,
-                                         use_subcluster_gate=True, **kwargs):
+                                         use_subcluster_gate=True, use_anchor=True, **kwargs):
         """Soft Multi-View Consensus (Experiment A), subcluster-gauged.
 
         Restores the paper's core mechanism: the confidence used to gate each
@@ -405,11 +405,14 @@ class AugModel(DensityModel):
                 else:
                     pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
 
-                # Drift anchor: Blend with a small pull back toward the frozen source prototype
-                anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
-                anchor_strength = 0.1 * learning_rate  # small constant restoring force
-
-                updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector + anchor_strength * anchor_pull
+                if use_anchor:
+                    # Drift anchor: Blend with a small pull back toward the frozen source prototype
+                    anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
+                    anchor_strength = 0.1 * learning_rate  # small constant restoring force
+                    updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector + anchor_strength * anchor_pull
+                else:
+                    updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
+                
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
 
             return full_predictions
