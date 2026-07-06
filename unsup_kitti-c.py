@@ -178,14 +178,17 @@ class LiDARCorruptionWrapper(Dataset):
             
         return data
 
-def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density'):
+def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density', dry_run=False):
     miou_history = []
     acc_history = []
     iou_per_class_history = []
     num_classes = model.num_classes
     cumulative_confusion_matrix = torch.zeros((num_classes, num_classes), dtype=torch.int64, device=device)
 
-    for batch_data in tqdm(target_dataloader, desc="Adapting", leave=False):
+    for batch_idx, batch_data in enumerate(tqdm(target_dataloader, desc="Adapting", leave=False)):
+        if dry_run and batch_idx >= 2:
+            break
+        
         proj_in = batch_data[0].to(device)
         proj_labels = batch_data[2].to(device).view(-1)
         proj_xyz = batch_data[10].to(device) if len(batch_data) > 10 else None
@@ -252,6 +255,31 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                         use_anchor=True
                     )
             
+    clean_confusion_matrix = torch.zeros((num_classes, num_classes), dtype=torch.int64, device=device)
+    for batch_idx, batch_data in enumerate(tqdm(target_dataloader, desc="Clean Final Eval", leave=False)):
+        if dry_run and batch_idx >= 2:
+            break
+            
+        proj_in = batch_data[0].to(device)
+        proj_labels = batch_data[2].to(device).view(-1)
+        if proj_in.shape[1] > 0:
+            model.eval()
+            with torch.no_grad():
+                logits, _, indices, _ = model(proj_in)
+                predictions = torch.argmax(logits, dim=1)
+                selected_labels = proj_labels[indices]
+                mask = (selected_labels >= 0) & (selected_labels < num_classes)
+                if mask.any():
+                    hist = torch.bincount(
+                        num_classes * selected_labels[mask] + predictions[mask], 
+                        minlength=num_classes ** 2
+                    ).reshape(num_classes, num_classes)
+                    clean_confusion_matrix += hist
+    
+    clean_miou, clean_acc, clean_iou_per_class = extract_metrics_from_conf_matrix(clean_confusion_matrix)
+    miou_history.append(clean_miou)
+    acc_history.append(clean_acc)
+    iou_per_class_history.append(clean_iou_per_class)
     return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history}
 
 def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=10):
@@ -384,7 +412,8 @@ def main():
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
-    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'd3ctta'], default='density', help='Method to test')
+    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'd3ctta', 'all'], default='density', help='Method to test. Use "all" to run frozen, density, and exp_a_anchor_off sequentially.')
+    parser.add_argument('--dry_run', action='store_true', help='Run only 2 batches per condition to quickly verify no crashes will occur.')
     parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
     parser.add_argument('--hdc_epochs', type=int, default=30, help='Number of epochs to train the HDC density model')
     args = parser.parse_args()
@@ -427,90 +456,102 @@ def main():
     corruptions = ['beam', 'cross_sensor', 'crosstalk', 'fog', 'echo', 'motion', 'snow']
     severities = [2, 3]
 
-    results_miou = {c: {} for c in corruptions}
-    results_acc = {c: {} for c in corruptions}
+    methods_to_run = ['frozen', 'density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
+    
+    for current_method in methods_to_run:
+        logger.info(f"\n=========================================")
+        logger.info(f"Starting Evaluation for Method: {current_method}")
+        logger.info(f"=========================================\n")
+        
+        results_miou = {c: {} for c in corruptions}
+        results_acc = {c: {} for c in corruptions}
 
-    logger.info("Evaluating on clean baseline (Sunny/Original) dataset...")
-    baseline_parser = Parser(root=data_dir,
-                    train_sequences=DATA["split"]["train"],
-                    valid_sequences=DATA["split"]["valid"],
-                    test_sequences=None,
-                    labels=DATA["labels"],
-                    color_map=DATA["color_map"],
-                    learning_map=DATA["learning_map"],
-                    learning_map_inv=DATA["learning_map_inv"],
-                    sensor=ARCH["dataset"]["sensor"],
-                    max_points=ARCH["dataset"]["max_points"],
-                    batch_size=1,
-                    workers=ARCH["train"]["workers"],
-                    gt=True,
-                    shuffle_train=False)
-    baseline_loader = DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
+        logger.info("Evaluating on clean baseline (Sunny/Original) dataset...")
+        baseline_parser = Parser(root=data_dir,
+                        train_sequences=DATA["split"]["train"],
+                        valid_sequences=DATA["split"]["valid"],
+                        test_sequences=None,
+                        labels=DATA["labels"],
+                        color_map=DATA["color_map"],
+                        learning_map=DATA["learning_map"],
+                        learning_map_inv=DATA["learning_map_inv"],
+                        sensor=ARCH["dataset"]["sensor"],
+                        max_points=ARCH["dataset"]["max_points"],
+                        batch_size=1,
+                        workers=ARCH["train"]["workers"],
+                        gt=True,
+                        shuffle_train=False)
+        baseline_loader = DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
+        
+        if current_method == 'd3ctta':
+            base_model = load_d3ctta_model(args.pretrained_path)
+        else:
+            base_model = load_hdc_model(args.pretrained_path)
+            
+        baseline_metrics = evaluate_and_adapt(base_model, baseline_loader, device, eval_only=True, dry_run=args.dry_run)
+        if len(baseline_metrics["mIoU"]) > 0:
+            logger.info(f"Clean Baseline: mIoU={baseline_metrics['mIoU'][-1]:.4f}, Acc={baseline_metrics['Accuracy'][-1]:.4f}")
     
-    baseline_metrics = evaluate_and_adapt(model, baseline_loader, device, eval_only=True)
-    if len(baseline_metrics["mIoU"]) > 0:
-        logger.info(f"Clean Baseline: mIoU={baseline_metrics['mIoU'][-1]:.4f}, Acc={baseline_metrics['Accuracy'][-1]:.4f}")
-    
-    for ctype in corruptions:
-        for sev in severities:
-            logger.info(f"Testing {ctype} severity {sev}")
-            
-            parser_obj = Parser(root=data_dir,
-                            train_sequences=DATA["split"]["train"],
-                            valid_sequences=DATA["split"]["valid"],
-                            test_sequences=None,
-                            labels=DATA["labels"],
-                            color_map=DATA["color_map"],
-                            learning_map=DATA["learning_map"],
-                            learning_map_inv=DATA["learning_map_inv"],
-                            sensor=ARCH["dataset"]["sensor"],
-                            max_points=ARCH["dataset"]["max_points"],
-                            batch_size=1,
-                            workers=ARCH["train"]["workers"],
-                            gt=True,
-                            shuffle_train=False)
-            
-            target_dataset = parser_obj.validloader.dataset
-            corrupted_dataset = LiDARCorruptionWrapper(target_dataset, corruption_type=ctype, severity=sev)
-            target_dataloader = DataLoader(corrupted_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
-            
-            if args.method == 'd3ctta':
-                model = load_d3ctta_model(args.pretrained_path)
-            else:
-                model = load_hdc_model(args.pretrained_path)
-            
-            metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(args.method == 'frozen'), update_method=args.method)
-            
-            if len(metrics["mIoU"]) > 0:
-                initial_miou = metrics["mIoU"][0]
-                final_miou = metrics["mIoU"][-1]
-                initial_acc = metrics["Accuracy"][0]
-                final_acc = metrics["Accuracy"][-1]
+        for ctype in corruptions:
+            for sev in severities:
+                logger.info(f"Testing {ctype} severity {sev}")
                 
-                results_miou[ctype][sev] = (initial_miou, final_miou)
-                results_acc[ctype][sev] = (initial_acc, final_acc)
+                parser_obj = Parser(root=data_dir,
+                                train_sequences=DATA["split"]["train"],
+                                valid_sequences=DATA["split"]["valid"],
+                                test_sequences=None,
+                                labels=DATA["labels"],
+                                color_map=DATA["color_map"],
+                                learning_map=DATA["learning_map"],
+                                learning_map_inv=DATA["learning_map_inv"],
+                                sensor=ARCH["dataset"]["sensor"],
+                                max_points=ARCH["dataset"]["max_points"],
+                                batch_size=1,
+                                workers=ARCH["train"]["workers"],
+                                gt=True,
+                                shuffle_train=False)
                 
-                logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
-                suffix = f"_{args.method}"
+                target_dataset = parser_obj.validloader.dataset
+                corrupted_dataset = LiDARCorruptionWrapper(target_dataset, corruption_type=ctype, severity=sev)
+                target_dataloader = DataLoader(corrupted_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
                 
-                traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
-                with open(traj_json_path, 'w') as f:
-                    json.dump(metrics, f, indent=4)
+                if current_method == 'd3ctta':
+                    model = load_d3ctta_model(args.pretrained_path)
+                else:
+                    model = load_hdc_model(args.pretrained_path)
+                
+                metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
+                
+                if len(metrics["mIoU"]) > 0:
+                    initial_miou = metrics["mIoU"][0]
+                    final_miou = metrics["mIoU"][-1]
+                    initial_acc = metrics["Accuracy"][0]
+                    final_acc = metrics["Accuracy"][-1]
                     
-                save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.png'), f'{ctype} Sev {sev}', metrics)
-            else:
-                logger.info(f"No valid frames evaluated for {ctype}-{sev}")
+                    results_miou[ctype][sev] = (initial_miou, final_miou)
+                    results_acc[ctype][sev] = (initial_acc, final_acc)
+                    
+                    logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
+                    suffix = f"_{current_method}"
+                    
+                    traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
+                    with open(traj_json_path, 'w') as f:
+                        json.dump(metrics, f, indent=4)
+                        
+                    save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.png'), f'{ctype} Sev {sev}', metrics)
+                else:
+                    logger.info(f"No valid frames evaluated for {ctype}-{sev}")
 
-    suffix = f"_{args.method}"
-    
-    baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
-    baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
-    
-    save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'KITTI-C', results_miou, metric='mIoU', baseline_val=baseline_miou)
-    save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'KITTI-C', results_acc, metric='Accuracy', baseline_val=baseline_acc)
-    
-    with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
-        json.dump({'mIoU': results_miou, 'Accuracy': results_acc, 'Baseline_mIoU': baseline_miou, 'Baseline_Acc': baseline_acc}, f, indent=4)
+        suffix = f"_{current_method}"
+        
+        baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
+        baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
+        
+        save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'KITTI-C', results_miou, metric='mIoU', baseline_val=baseline_miou)
+        save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'KITTI-C', results_acc, metric='Accuracy', baseline_val=baseline_acc)
+        
+        with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
+            json.dump({'mIoU': results_miou, 'Accuracy': results_acc, 'Baseline_mIoU': baseline_miou, 'Baseline_Acc': baseline_acc}, f, indent=4)
 
 if __name__ == "__main__":
     main()
