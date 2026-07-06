@@ -456,7 +456,7 @@ def main():
     corruptions = ['beam', 'cross_sensor', 'crosstalk', 'fog', 'echo', 'motion', 'snow']
     severities = [2, 3]
 
-    methods_to_run = ['frozen', 'density', 'exp_a_anchor_off', 'exp_a_anchor_on'] if args.method == 'all' else [args.method]
+    methods_to_run = ['frozen', 'density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
     
     global_results = {
         'mIoU': {m: {c: {} for c in corruptions} for m in methods_to_run},
@@ -465,6 +465,38 @@ def main():
         'Baseline_Acc': {}
     }
     
+    logger.info("Evaluating on clean baseline (Sunny/Original) dataset once...")
+    baseline_parser = Parser(root=data_dir,
+                    train_sequences=DATA["split"]["train"],
+                    valid_sequences=DATA["split"]["valid"],
+                    test_sequences=None,
+                    labels=DATA["labels"],
+                    color_map=DATA["color_map"],
+                    learning_map=DATA["learning_map"],
+                    learning_map_inv=DATA["learning_map_inv"],
+                    sensor=ARCH["dataset"]["sensor"],
+                    max_points=ARCH["dataset"]["max_points"],
+                    batch_size=1,
+                    workers=ARCH["train"]["workers"],
+                    gt=True,
+                    shuffle_train=False)
+    baseline_loader = DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
+    
+    # Load model just once for the sunny baseline
+    if args.method == 'd3ctta':
+        base_model = load_d3ctta_model(args.pretrained_path)
+    else:
+        base_model = load_hdc_model(args.pretrained_path)
+        
+    baseline_metrics = evaluate_and_adapt(base_model, baseline_loader, device, eval_only=True, dry_run=args.dry_run)
+    if len(baseline_metrics["mIoU"]) > 0:
+        global_b_miou = baseline_metrics['mIoU'][-1]
+        global_b_acc = baseline_metrics['Accuracy'][-1]
+        logger.info(f"Clean Baseline (Sunny): mIoU={global_b_miou:.4f}, Acc={global_b_acc:.4f}")
+    else:
+        global_b_miou = None
+        global_b_acc = None
+
     for current_method in methods_to_run:
         logger.info(f"\n=========================================")
         logger.info(f"Starting Evaluation for Method: {current_method}")
@@ -472,36 +504,10 @@ def main():
         
         results_miou = {c: {} for c in corruptions}
         results_acc = {c: {} for c in corruptions}
-
-        logger.info("Evaluating on clean baseline (Sunny/Original) dataset...")
-        baseline_parser = Parser(root=data_dir,
-                        train_sequences=DATA["split"]["train"],
-                        valid_sequences=DATA["split"]["valid"],
-                        test_sequences=None,
-                        labels=DATA["labels"],
-                        color_map=DATA["color_map"],
-                        learning_map=DATA["learning_map"],
-                        learning_map_inv=DATA["learning_map_inv"],
-                        sensor=ARCH["dataset"]["sensor"],
-                        max_points=ARCH["dataset"]["max_points"],
-                        batch_size=1,
-                        workers=ARCH["train"]["workers"],
-                        gt=True,
-                        shuffle_train=False)
-        baseline_loader = DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
         
-        if current_method == 'd3ctta':
-            base_model = load_d3ctta_model(args.pretrained_path)
-        else:
-            base_model = load_hdc_model(args.pretrained_path)
-            
-        baseline_metrics = evaluate_and_adapt(base_model, baseline_loader, device, eval_only=True, dry_run=args.dry_run)
-        if len(baseline_metrics["mIoU"]) > 0:
-            b_miou = baseline_metrics['mIoU'][-1]
-            b_acc = baseline_metrics['Accuracy'][-1]
-            global_results['Baseline_mIoU'][current_method] = b_miou
-            global_results['Baseline_Acc'][current_method] = b_acc
-            logger.info(f"Clean Baseline: mIoU={b_miou:.4f}, Acc={b_acc:.4f}")
+        if global_b_miou is not None:
+            global_results['Baseline_mIoU'][current_method] = global_b_miou
+            global_results['Baseline_Acc'][current_method] = global_b_acc
     
         for ctype in corruptions:
             for sev in severities:
