@@ -356,14 +356,7 @@ class AugModel(DensityModel):
                     
                     max_sims, _ = torch.max(masked_similarity, dim=1)
                     
-                    if distance_sensitivity == 0.0:
-                        scaled = torch.where(max_sims > 0.5, torch.tensor(1.0, device=self.device), max_sims * 2.0)
-                    elif distance_sensitivity == 1.0:
-                        scaled = max_sims
-                    else:
-                        scaled = max_sims ** distance_sensitivity
-                        
-                    sub_sims[i:i+chunk_size] = scaled.to(sub_sims.dtype)
+                    sub_sims[i:i+chunk_size] = max_sims.to(sub_sims.dtype)
                     
                 gate_sims = sub_sims
             else:
@@ -379,9 +372,14 @@ class AugModel(DensityModel):
 
             # firing-rate logging (kept outside the gating branches so it's
             # always populated regardless of which components are on)
+            firing_rate = update_mask.float().mean().item()
             if not hasattr(self, '_firing_log'):
                 self._firing_log = []
-            self._firing_log.append(update_mask.float().mean().item())
+            self._firing_log.append(firing_rate)
+            
+            # Print if firing rate is surprisingly low, to catch scale-mismatches early
+            if firing_rate < 0.10:
+                print(f"Warning: Firing rate is {firing_rate*100:.2f}%. Gate threshold may be mismatched with similarity scale.")
 
             unique_classes = torch.unique(preds[torch.nonzero(update_mask).squeeze(1)])
             for class_id in unique_classes:
@@ -395,6 +393,12 @@ class AugModel(DensityModel):
                 # Confidence weight now ramps over the subcluster-similarity band.
                 conf_weights = torch.clamp(
                     (sample_gate - thresholds[0]) / (thresholds[1] - thresholds[0]), 0.0, 1.0)
+                    
+                # Apply distance sensitivity to the [0,1] confidence weight ramp
+                if distance_sensitivity == 0.0:
+                    conf_weights = torch.where(conf_weights > 0.5, torch.tensor(1.0, device=self.device), conf_weights * 2.0)
+                elif distance_sensitivity != 1.0:
+                    conf_weights = conf_weights ** distance_sensitivity
                 final_weights = conf_weights * sample_agreement * depth_scale[class_mask]
 
                 if use_volume_weight:
