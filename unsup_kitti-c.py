@@ -412,7 +412,7 @@ def main():
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
-    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'd3ctta', 'all'], default='density', help='Method to test. Use "all" to run frozen, density, and exp_a_anchor_off sequentially.')
+    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'd3ctta', 'all'], default='density', help='Method to test. Use "all" to run frozen, density, exp_a_anchor_off, and exp_a_anchor_on sequentially.')
     parser.add_argument('--dry_run', action='store_true', help='Run only 2 batches per condition to quickly verify no crashes will occur.')
     parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
     parser.add_argument('--hdc_epochs', type=int, default=30, help='Number of epochs to train the HDC density model')
@@ -456,7 +456,14 @@ def main():
     corruptions = ['beam', 'cross_sensor', 'crosstalk', 'fog', 'echo', 'motion', 'snow']
     severities = [2, 3]
 
-    methods_to_run = ['frozen', 'density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
+    methods_to_run = ['frozen', 'density', 'exp_a_anchor_off', 'exp_a_anchor_on'] if args.method == 'all' else [args.method]
+    
+    global_results = {
+        'mIoU': {m: {c: {} for c in corruptions} for m in methods_to_run},
+        'Accuracy': {m: {c: {} for c in corruptions} for m in methods_to_run},
+        'Baseline_mIoU': {},
+        'Baseline_Acc': {}
+    }
     
     for current_method in methods_to_run:
         logger.info(f"\n=========================================")
@@ -490,7 +497,11 @@ def main():
             
         baseline_metrics = evaluate_and_adapt(base_model, baseline_loader, device, eval_only=True, dry_run=args.dry_run)
         if len(baseline_metrics["mIoU"]) > 0:
-            logger.info(f"Clean Baseline: mIoU={baseline_metrics['mIoU'][-1]:.4f}, Acc={baseline_metrics['Accuracy'][-1]:.4f}")
+            b_miou = baseline_metrics['mIoU'][-1]
+            b_acc = baseline_metrics['Accuracy'][-1]
+            global_results['Baseline_mIoU'][current_method] = b_miou
+            global_results['Baseline_Acc'][current_method] = b_acc
+            logger.info(f"Clean Baseline: mIoU={b_miou:.4f}, Acc={b_acc:.4f}")
     
         for ctype in corruptions:
             for sev in severities:
@@ -520,7 +531,12 @@ def main():
                 else:
                     model = load_hdc_model(args.pretrained_path)
                 
-                metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
+                try:
+                    metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
+                except Exception as e:
+                    logger.error(f"FATAL ERROR during {ctype} sev {sev} ({current_method}): {e}")
+                    logger.info("Skipping to next cell to protect the overnight run...")
+                    continue
                 
                 if len(metrics["mIoU"]) > 0:
                     initial_miou = metrics["mIoU"][0]
@@ -531,6 +547,9 @@ def main():
                     results_miou[ctype][sev] = (initial_miou, final_miou)
                     results_acc[ctype][sev] = (initial_acc, final_acc)
                     
+                    global_results['mIoU'][current_method][ctype][sev] = (initial_miou, final_miou)
+                    global_results['Accuracy'][current_method][ctype][sev] = (initial_acc, final_acc)
+                    
                     logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
                     suffix = f"_{current_method}"
                     
@@ -539,6 +558,16 @@ def main():
                         json.dump(metrics, f, indent=4)
                         
                     save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.png'), f'{ctype} Sev {sev}', metrics)
+                    
+                    # Incremental save of the method-specific results
+                    baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
+                    baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
+                    with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
+                        json.dump({'mIoU': results_miou, 'Accuracy': results_acc, 'Baseline_mIoU': baseline_miou, 'Baseline_Acc': baseline_acc}, f, indent=4)
+                        
+                    # Incremental save of the global master dictionary
+                    with open(os.path.join(args.log_dir, 'global_results.json'), 'w') as f:
+                        json.dump(global_results, f, indent=4)
                 else:
                     logger.info(f"No valid frames evaluated for {ctype}-{sev}")
 
@@ -547,11 +576,9 @@ def main():
         baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
         baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
         
+        
         save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'KITTI-C', results_miou, metric='mIoU', baseline_val=baseline_miou)
         save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'KITTI-C', results_acc, metric='Accuracy', baseline_val=baseline_acc)
-        
-        with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
-            json.dump({'mIoU': results_miou, 'Accuracy': results_acc, 'Baseline_mIoU': baseline_miou, 'Baseline_Acc': baseline_acc}, f, indent=4)
 
 if __name__ == "__main__":
     main()
