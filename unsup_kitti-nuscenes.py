@@ -184,6 +184,7 @@ def load_hdc_model(path, num_classes=NUM_CLASSES):
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates for KITTI to NuScenes Cross-Dataset Adaptation")
     parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on SemanticKITTI dataset')
+    parser.add_argument('--eval_kitti', action='store_true', help='Evaluate frozen model on KITTI validation set as a baseline check')
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_nuscenes_test', help='Directory to save logs and graphics')
@@ -239,12 +240,47 @@ def main():
         'Accuracy': {m: {} for m in methods_to_run},
     }
     
+    # Reload model for evaluation
+    model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
+
+    if args.eval_kitti:
+        logger.info("="*41)
+        logger.info("Evaluating Source Baseline on KITTI Validation Set...")
+        logger.info("="*41)
+        try:
+            kitti_parser = Parser(root=args.kitti_dir,
+                                  train_sequences=DATA_KITTI["split"]["valid"],
+                                  valid_sequences=DATA_KITTI["split"]["valid"],
+                                  test_sequences=None,
+                                  labels=DATA_KITTI["labels"],
+                                  color_map=DATA_KITTI.get("color_map", {}),
+                                  learning_map=DATA_KITTI["learning_map"],
+                                  learning_map_inv=DATA_KITTI["learning_map_inv"],
+                                  sensor=ARCH["dataset"]["sensor"],
+                                  max_points=ARCH["dataset"]["max_points"],
+                                  batch_size=1,
+                                  workers=ARCH["train"]["workers"],
+                                  gt=True,
+                                  shuffle_train=False)
+            kitti_dataloader = DataLoader(kitti_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
+            kitti_metrics = evaluate_and_adapt(model, kitti_dataloader, device, eval_only=True, update_method='frozen_kitti', dry_run=args.dry_run)
+            
+            kitti_miou = kitti_metrics["mIoU"][-1] if len(kitti_metrics["mIoU"]) > 0 else 0
+            kitti_acc = kitti_metrics["Accuracy"][-1] if len(kitti_metrics["Accuracy"]) > 0 else 0
+            logger.info(f"Source Baseline (KITTI) Final Results: mIoU={kitti_miou:.4f}, Accuracy={kitti_acc:.4f}")
+            global_results['KITTI_Baseline'] = {'mIoU': kitti_miou, 'Accuracy': kitti_acc}
+        except Exception as e:
+            logger.error(f"Failed to evaluate KITTI baseline: {e}")
+            print(f"\n[!] CRASH DETECTED in KITTI Eval. Traceback:")
+            traceback.print_exc()
+
     for current_method in methods_to_run:
         logger.info(f"=========================================")
         logger.info(f"Starting Cross-Dataset Evaluation for Method: {current_method}")
         logger.info(f"Target Domain: NuScenes ({args.nusc_dir})")
         logger.info(f"=========================================")
         
+        # Ensure we always use the fresh loaded model
         model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
 
         logger.info(f"Initializing NuScenes Target Dataset...")
