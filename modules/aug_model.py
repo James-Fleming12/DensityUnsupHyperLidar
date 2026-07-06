@@ -342,7 +342,7 @@ class AugModel(DensityModel):
                 sub_sims = torch.zeros(bundled_target.shape[0], device=self.device, dtype=bundled_target.dtype)
                 
                 # Vectorized chunked computation to avoid per-class Python loop overhead
-                sub_norm = F.normalize(self.subclusters.float(), dim=1)
+                sub_norm = F.normalize(self.subclusters.to(bundled_target.dtype), dim=1)
                 chunk_size = 10000
                 for i in range(0, bundled_target.shape[0], chunk_size):
                     chunk_target = bundled_target[i:i+chunk_size]
