@@ -7,6 +7,7 @@ import yaml
 import numpy as np
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+import traceback
 from torch.utils.data import Dataset, DataLoader
 
 from dataset.kitti.parser import Parser
@@ -19,7 +20,7 @@ from modules.aug_model import AugModel
 NUM_CLASSES = 17  # 16 shared cross-dataset classes + 1 ignored class (0)
 CONFIG_ARCH = "config/arch/senet-2048p.yml"
 CONFIG_LABELS_KITTI = "config/labels/semantic-kitti-all.yaml"  # 16-class mapping
-CONFIG_LABELS_NUSCENES = "config/labels/nuscenes.yaml"  # 16-class mapping
+CONFIG_LABELS_NUSCENES = "config/labels/nuscenes_new.yaml"  # 16-class mapping
 
 def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density', dry_run=False):
     miou_history = []
@@ -230,8 +231,8 @@ def main():
             torch.save(trainer.optimizer.state_dict(), opt_path)
             logger.info(f"Successfully pretrained model on KITTI. Optimizer state saved to {opt_path}")
             
-    # Include 'frozen' by default to establish the ~32.03 source baseline anchor
-    methods_to_run = ['frozen', 'density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
+    # The user can run 'frozen' explicitly if they want the baseline anchor
+    methods_to_run = ['density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
     
     global_results = {
         'mIoU': {m: {} for m in methods_to_run},
@@ -273,6 +274,8 @@ def main():
             metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
         except Exception as e:
             logger.error(f"FATAL ERROR during NuScenes adaptation ({current_method}): {e}")
+            print(f"\n[!] CRASH DETECTED in {current_method}. Traceback:")
+            traceback.print_exc()
             continue
         
         if len(metrics["mIoU"]) > 0:
