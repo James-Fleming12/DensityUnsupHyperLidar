@@ -343,7 +343,7 @@ def main():
             
             try:
                 parser_obj = Parser(root=corruption_root,
-                                    train_sequences=None,
+                                    train_sequences=DATA["split"]["valid"],
                                     valid_sequences=DATA["split"]["valid"],
                                     test_sequences=None,
                                     labels=DATA["labels"],

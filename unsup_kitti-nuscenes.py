@@ -249,7 +249,7 @@ def main():
         logger.info(f"Initializing NuScenes Target Dataset...")
         try:
             parser_obj = Parser(root=args.nusc_dir,
-                                train_sequences=None,
+                                train_sequences=DATA_NUSC["split"]["valid"],
                                 valid_sequences=DATA_NUSC["split"]["valid"],
                                 test_sequences=None,
                                 labels=DATA_NUSC["labels"],
