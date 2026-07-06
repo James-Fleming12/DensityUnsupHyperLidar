@@ -1,182 +1,43 @@
 import argparse
 import logging
 import os
+import json
 import torch
 import yaml
-import matplotlib.pyplot as plt
 import numpy as np
-import json
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from torch.utils.data import Dataset, DataLoader
 
 from common.laserscan import SemLaserScan, LaserScan
 from dataset.kitti.parser import Parser
+import unsup_main
 from unsup_main import train_extractor, train_hdc
-from unsup_waymo import extract_metrics_from_conf_matrix, setup_logger, save_graphic, load_hdc_model
+from unsup_waymo import extract_metrics_from_conf_matrix, setup_logger, save_graphic
+from modules.HDC_utils import DensityModel
+from modules.aug_model import AugModel
 
-def corrupt_beam(points, severity):
-    distances = np.linalg.norm(points[:, :3], axis=1)
-    pitch = np.arcsin(points[:, 2] / (distances + 1e-6))
-    bins = np.linspace(np.min(pitch), np.max(pitch), 65)
-    ring_ids = np.digitize(pitch, bins)
-    drop_fraction = 0.05 * severity 
-    unique_rings = np.unique(ring_ids)
-    num_drop = int(len(unique_rings) * drop_fraction)
-    dropped_rings = np.random.choice(unique_rings, num_drop, replace=False)
-    mask = ~np.isin(ring_ids, dropped_rings)
-    return points[mask], mask, 0
+NUM_CLASSES = 7
+KITTI_DATA_DIR = "/mnt/alpha/jmfleming/KITTI"
+CORRUPTIONS = [
+    'fog', 
+    'wet_ground', 
+    'snow', 
+    'motion_blur', 
+    'beam_missing', 
+    'crosstalk', 
+    'incomplete_echo', 
+    'cross_sensor'
+]
+# Note on Severity: D3CTTA evaluates on "moderate" severity. 
+# Depending on Robo3D version, this maps to severity 2 (light/moderate/heavy) or 3 (1-5 scale).
+# When comparing to D3CTTA, ensure you run with the severity integer that maps to 'moderate'.
+SEVERITY_MAP = {1: 'light', 2: 'moderate', 3: 'heavy', 4: 'extreme'}
 
-def corrupt_crosstalk(points, severity):
-    num_points = len(points)
-    noise_fraction = 0.02 * severity 
-    num_noise = int(num_points * noise_fraction)
-    min_bounds = np.min(points[:, :3], axis=0)
-    max_bounds = np.max(points[:, :3], axis=0)
-    noise_xyz = np.random.uniform(min_bounds, max_bounds, size=(num_noise, 3))
-    noise_intensity = np.random.uniform(0, 0.1, size=(num_noise, 1)) 
-    noise_points = np.hstack((noise_xyz, noise_intensity))
-    return np.vstack((points, noise_points)), np.ones(len(points), dtype=bool), num_noise
-
-def corrupt_fog(points, severity):
-    distances = np.linalg.norm(points[:, :3], axis=1)
-    beta = 0.005 * severity 
-    survival_prob = np.exp(-beta * distances)
-    random_draw = np.random.uniform(0, 1, size=len(points))
-    mask = random_draw < survival_prob
-    return points[mask], mask, 0
-
-def corrupt_echo(points, severity):
-    intensity_threshold = np.percentile(points[:, 3], 90)
-    high_ref_mask = points[:, 3] > intensity_threshold
-    echo_points = points[high_ref_mask].copy()
-    shift_multiplier = 1.0 + (0.1 * severity) 
-    echo_points[:, :3] = echo_points[:, :3] * shift_multiplier
-    echo_points[:, 3] = echo_points[:, 3] * 0.5 
-    return np.vstack((points, echo_points)), np.ones(len(points), dtype=bool), len(echo_points)
-
-def corrupt_motion(points, severity):
-    azimuth = np.arctan2(points[:, 1], points[:, 0])
-    timeline = (azimuth - np.min(azimuth)) / (np.max(azimuth) - np.min(azimuth) + 1e-6)
-    max_translation = 0.2 * severity 
-    blur_shift = np.outer(timeline, np.array([max_translation, 0, 0])) 
-    points[:, :3] += blur_shift
-    return points, np.ones(len(points), dtype=bool), 0
-
-def corrupt_snow(points, severity):
-    num_flakes = 1000 * severity
-    flake_xyz = np.random.uniform(-10, 10, size=(num_flakes, 3)) 
-    flake_intensity = np.random.uniform(0.5, 1.0, size=(num_flakes, 1)) 
-    snowflakes = np.hstack((flake_xyz, flake_intensity))
-    ground_mask = points[:, 2] < -1.0 
-    drop_prob = 0.1 * severity
-    survive_ground = np.random.uniform(0, 1, size=np.sum(ground_mask)) > drop_prob
-    final_points_mask = np.ones(len(points), dtype=bool)
-    final_points_mask[ground_mask] = survive_ground
-    filtered_points = points[final_points_mask]
-    return np.vstack((filtered_points, snowflakes)), final_points_mask, num_flakes
-
-def corrupt_cross_sensor(points, severity):
-    distances = np.linalg.norm(points[:, :3], axis=1)
-    pitch = np.arcsin(points[:, 2] / (distances + 1e-6))
-    
-    # 64 bins simulate the typical 64-beam sensor
-    bins = np.linspace(np.min(pitch), np.max(pitch), 65) 
-    ring_ids = np.digitize(pitch, bins)
-    
-    # Severity 1, 2, 3 maps to keeping 1/2, 1/4, or 1/8 of the beams
-    step = 2 ** severity 
-    
-    # Keep only beams where the ring ID aligns with the step size
-    mask = (ring_ids % step == 0)
-    
-    return points[mask], mask, 0
-
-def apply_corruption(points, corruption_type, severity):
-    if corruption_type == 'beam':
-        return corrupt_beam(points, severity)
-    elif corruption_type == 'cross_sensor':
-        return corrupt_cross_sensor(points, severity)
-    elif corruption_type == 'crosstalk':
-        return corrupt_crosstalk(points, severity)
-    elif corruption_type == 'fog':
-        return corrupt_fog(points, severity)
-    elif corruption_type == 'echo':
-        return corrupt_echo(points, severity)
-    elif corruption_type == 'motion':
-        return corrupt_motion(points, severity)
-    elif corruption_type == 'snow':
-        return corrupt_snow(points, severity)
-    return points, np.ones(len(points), dtype=bool), 0
-
-class LiDARCorruptionWrapper(Dataset):
-    def __init__(self, base_dataset, corruption_type=None, severity=1):
-        self.base_dataset = base_dataset
-        self.corruption_type = corruption_type
-        self.severity = severity
-
-    def __len__(self):
-        return len(self.base_dataset)
-
-    def __getitem__(self, idx):
-        original_open = SemLaserScan.open_scan
-        original_laser_open = LaserScan.open_scan
-        
-        wrapper_self = self
-        
-        original_label_open = SemLaserScan.open_label
-
-        def patched_open_scan(scan_self, filename):
-            scan = np.fromfile(filename, dtype=np.float32)
-            scan = scan.reshape((-1, 4))
-            
-            if wrapper_self.corruption_type:
-                scan, mask, added_count = apply_corruption(scan, wrapper_self.corruption_type, wrapper_self.severity)
-                scan_self.corruption_mask = mask
-                scan_self.corruption_added = added_count
-            else:
-                scan_self.corruption_mask = None
-                scan_self.corruption_added = 0
-                
-            points = scan[:, 0:3]
-            remissions = scan[:, 3]
-            
-            if scan_self.drop_points is not False:
-                scan_self.points_to_drop = np.random.randint(0, len(points)-1, int(len(points)*scan_self.drop_points))
-                points = np.delete(points, scan_self.points_to_drop, axis=0)
-                remissions = np.delete(remissions, scan_self.points_to_drop)
-
-            scan_self.set_points(points, remissions)
-
-        def patched_open_label(scan_self, filename):
-            if not any(filename.endswith(ext) for ext in scan_self.EXTENSIONS_LABEL):
-                raise RuntimeError("Filename extension is not valid label file.")
-            label = np.fromfile(filename, dtype=np.int32)
-            label = label.reshape((-1))
-            
-            if getattr(scan_self, 'corruption_mask', None) is not None:
-                label = label[scan_self.corruption_mask]
-                
-            if getattr(scan_self, 'corruption_added', 0) > 0:
-                fake_label = np.zeros(scan_self.corruption_added, dtype=label.dtype)
-                label = np.concatenate([label, fake_label])
-                
-            if scan_self.drop_points is not False:
-                label = np.delete(label, scan_self.points_to_drop)
-                
-            scan_self.set_label(label)
-
-        SemLaserScan.open_scan = patched_open_scan
-        LaserScan.open_scan = patched_open_scan
-        SemLaserScan.open_label = patched_open_label
-        
-        try:
-            data = self.base_dataset[idx]
-        finally:
-            SemLaserScan.open_scan = original_open
-            LaserScan.open_scan = original_laser_open
-            SemLaserScan.open_label = original_label_open
-            
-        return data
+CONFIG_ARCH = "config/arch/senet-2048p.yml"
+CONFIG_LABELS_KITTI = "thirdparty/D3CTTA/utils/_resources/semantic-kitti.yaml"
+CONFIG_LABELS_SYNTH = "thirdparty/D3CTTA/utils/_resources/synthetic.yaml"
+CONFIG_LABELS_KITTI_ALL = "config/labels/semantic-kitti-all.yaml"
 
 def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density', dry_run=False):
     miou_history = []
@@ -191,6 +52,10 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
         
         proj_in = batch_data[0].to(device)
         proj_labels = batch_data[2].to(device).view(-1)
+        if batch_idx == 0:
+            print(f"DEBUG: len(batch_data) = {len(batch_data)}")
+            if len(batch_data) > 10:
+                print(f"DEBUG: batch_data[10].shape = {batch_data[10].shape}")
         proj_xyz = batch_data[10].to(device) if len(batch_data) > 10 else None
         
         if proj_in.shape[1] > 0:
@@ -212,21 +77,17 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
             miou_history.append(cumulative_miou)
             acc_history.append(cumulative_acc)
             iou_per_class_history.append(cumulative_iou_per_class)
+            
             # Adapt: Inference Update
             if not eval_only:
                 model.eval()
-                if update_method == 'd3ctta':  # Duck typing for D3CTTA
-                    model.inference_update(
-                        h=h,
-                        predictions=predictions,
-                        xyz=proj_xyz
-                    )
-                elif update_method == 'density':
+                if update_method == 'density':
                     model.inference_update(
                         proj_in,
                         learning_rate=0.001,
                         distance_sensitivity=3.0,
-                        thresholds=[0.45, 0.80]
+                        thresholds=[0.45, 0.80],
+                        proj_xyz=proj_xyz
                     )
                 elif update_method == 'exp_a':
                     model.inference_update_soft_consensus(
@@ -234,7 +95,8 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                         learning_rate=0.001,
                         use_consensus_gate=True,
                         use_volume_weight=True,
-                        use_subcluster_gate=True
+                        use_subcluster_gate=True,
+                        proj_xyz=proj_xyz
                     )
                 elif update_method == 'exp_a_anchor_off':
                     model.inference_update_soft_consensus(
@@ -243,7 +105,8 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                         use_consensus_gate=True,
                         use_volume_weight=True,
                         use_subcluster_gate=True,
-                        use_anchor=False
+                        use_anchor=False,
+                        proj_xyz=proj_xyz
                     )
                 elif update_method == 'exp_a_anchor_on':
                     model.inference_update_soft_consensus(
@@ -252,38 +115,13 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                         use_consensus_gate=True,
                         use_volume_weight=True,
                         use_subcluster_gate=True,
-                        use_anchor=True
+                        use_anchor=True,
+                        proj_xyz=proj_xyz
                     )
-            
-    clean_confusion_matrix = torch.zeros((num_classes, num_classes), dtype=torch.int64, device=device)
-    for batch_idx, batch_data in enumerate(tqdm(target_dataloader, desc="Clean Final Eval", leave=False)):
-        if dry_run and batch_idx >= 2:
-            break
-            
-        proj_in = batch_data[0].to(device)
-        proj_labels = batch_data[2].to(device).view(-1)
-        if proj_in.shape[1] > 0:
-            model.eval()
-            with torch.no_grad():
-                logits, _, indices, _ = model(proj_in)
-                predictions = torch.argmax(logits, dim=1)
-                selected_labels = proj_labels[indices]
-                mask = (selected_labels >= 0) & (selected_labels < num_classes)
-                if mask.any():
-                    hist = torch.bincount(
-                        num_classes * selected_labels[mask] + predictions[mask], 
-                        minlength=num_classes ** 2
-                    ).reshape(num_classes, num_classes)
-                    clean_confusion_matrix += hist
-    
-    clean_miou, clean_acc, clean_iou_per_class = extract_metrics_from_conf_matrix(clean_confusion_matrix)
-    miou_history.append(clean_miou)
-    acc_history.append(clean_acc)
-    iou_per_class_history.append(clean_iou_per_class)
     return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history}
 
-def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=10):
-    import unsup_main
+
+def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=15, extractor_epochs=60):
     log_base = os.path.dirname(pretrained_path)
     os.makedirs(log_base, exist_ok=True)
     
@@ -295,7 +133,7 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
     if not skip_extractor:
         ARCH["train"]["batch_size"] = 24
         print(f"Pretraining feature extractor on {data_dir}...")
-        trainer = train_extractor(ARCH, DATA, data_dir=data_dir, return_trainer=True, resume_path=resume_path)
+        trainer = train_extractor(ARCH, DATA, epochs=extractor_epochs, data_dir=data_dir, return_trainer=True, resume_path=resume_path)
     else:
         print(f"Skipping feature extractor pretraining...")
         trainer = None
@@ -331,6 +169,7 @@ def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=Fals
         return model, trainer
     return model
 
+
 def save_degradation_plot(save_path, title, data_dict, metric="mIoU", baseline_val=None):
     os.makedirs(os.path.dirname(save_path), exist_ok=True)
     plt.figure(figsize=(10, 6))
@@ -359,119 +198,100 @@ def save_degradation_plot(save_path, title, data_dict, metric="mIoU", baseline_v
     plt.savefig(save_path)
     plt.close()
 
-def load_hdc_model(path):
+
+def load_hdc_model(path, num_classes=NUM_CLASSES):
     print(f"Loading pretrained HDC model from {path}...")
-    from modules.HDC_utils import DensityModel
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
-    import os
-    modeldir = os.path.dirname(path)
-    weights_path = os.path.join(modeldir, "SENet_valid_best")
-    if os.path.exists(weights_path):
-        tmp_dict = torch.load(weights_path, map_location='cpu')
-        NUM_CLASSES = tmp_dict['state_dict']['semantic_output.bias'].shape[0]
-    else:
-        NUM_CLASSES = 20 # Fallback for KITTI
+    ARCH = yaml.safe_load(open(CONFIG_ARCH, 'r'))
     modeldir = os.path.dirname(path)
     
     # If we might need Exp A, load AugModel instead of base DensityModel
-    from modules.aug_model import AugModel
-    model = AugModel(ARCH, modeldir, 'rp', 0, 0, NUM_CLASSES, device, subcluster_type='continuous')
+    model = AugModel(ARCH, modeldir, 'rp', 0, 0, num_classes, device, subcluster_type='continuous')
     
     model.load_state_dict(torch.load(path, map_location=device))
     model.to(device)
     return model
 
-def load_d3ctta_model(path):
-    print(f"Loading pretrained feature extractor for D3CTTA from {path}...")
-    from modules.network.ResNet import ResNet_34
-    from modules.D3CTTA import D3CTTA
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    se_path = os.path.join(os.path.dirname(path), "SENet_valid_best")
-    if os.path.exists(se_path):
-        tmp_dict = torch.load(se_path, map_location='cpu')
-        NUM_CLASSES = tmp_dict['state_dict']['semantic_output.bias'].shape[0]
-    else:
-        NUM_CLASSES = 20 # Fallback for KITTI
-    feature_extractor = ResNet_34(NUM_CLASSES, aux=False, use_adaptor=True)
-    
-    se_path = os.path.join(os.path.dirname(path), "SENet_valid_best")
-    if os.path.exists(se_path):
-        w_dict = torch.load(se_path, map_location=device)
-        feature_extractor.load_state_dict(w_dict['state_dict'], strict=False)
-    feature_extractor.to(device)
-    feature_extractor.eval()
-    
-    model = D3CTTA(feature_extractor, num_classes=NUM_CLASSES)
-    model.to(device)
-    return model
-
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates on KITTI-C")
-    parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on standard KITTI')
+    parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on Synth4D dataset')
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
-    parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
+    parser.add_argument('--pretrained_path', type=str, default='logs/synth4d_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
-    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'd3ctta', 'all'], default='density', help='Method to test. Use "all" to run frozen, density, exp_a_anchor_off, and exp_a_anchor_on sequentially.')
+    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'all'], default='density', help='Method to test.')
     parser.add_argument('--dry_run', action='store_true', help='Run only 2 batches per condition to quickly verify no crashes will occur.')
     parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
-    parser.add_argument('--hdc_epochs', type=int, default=30, help='Number of epochs to train the HDC density model')
+    parser.add_argument('--continue', dest='continue_epochs', type=int, default=0, help='Continue feature extractor training for this many epochs, reinitialize HDC, and perform adaptation')
+    parser.add_argument('--extractor_epochs', type=int, default=60, help='Number of epochs to train the feature extractor')
+    parser.add_argument('--hdc_epochs', type=int, default=15, help='Number of epochs to train the HDC density model')
+    parser.add_argument('--severity', type=int, default=3, help='Severity level for corruptions')
+    parser.add_argument('--synth_dir', type=str, default='/mnt/alpha/jmfleming/Synth4D', help='Path to Synth4D dataset for pretraining')
+    parser.add_argument('--kittic_dir', type=str, default='/mnt/alpha/jmfleming/SemanticKITTI-C', help='Path to real SemanticKITTI-C dataset')
     args = parser.parse_args()
+
+    if args.continue_epochs > 0:
+        args.pretrain = True
+        args.continue_pretrain = True
+        args.extractor_epochs = args.continue_epochs
 
     os.makedirs(args.log_dir, exist_ok=True)
     logger = setup_logger(os.path.join(args.log_dir, 'kitti_c.log'))
 
     try:
-        ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
-        DATA = yaml.safe_load(open("config/labels/semantic-kitti-all.yaml", 'r'))
+        ARCH = yaml.safe_load(open(CONFIG_ARCH, 'r'))
+        # Use D3CTTA mapping (7 classes)
+        DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI, 'r'))
     except Exception as e:
         logger.error(f"Error loading configs: {e}")
         return
 
-    data_dir = "/mnt/alpha/jmfleming/KITTI"
-
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
     if args.pretrain:
-        logger.info(f"Starting Pretraining on standard KITTI at {data_dir}...")
+        logger.info(f"Starting Pretraining on Synth4D at {args.synth_dir}...")
         resume_dir = os.path.dirname(args.pretrained_path) if args.continue_pretrain else None
-        model, trainer = pretrain_pipeline(ARCH, DATA, data_dir=data_dir, pretrained_path=args.pretrained_path, return_trainer=True, skip_extractor=args.skip_extractor, resume_path=resume_dir, hdc_epochs=args.hdc_epochs)
+        
+        try:
+            SYNTH_DATA = yaml.safe_load(open(CONFIG_LABELS_SYNTH, 'r'))
+            KITTI_ALL_DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI_ALL, 'r'))
+            SYNTH_DATA['split'] = KITTI_ALL_DATA['split']
+        except Exception as e:
+            logger.error(f"Error loading synthetic config: {e}")
+            return
+            
+        model, trainer = pretrain_pipeline(
+            ARCH, SYNTH_DATA, data_dir=args.synth_dir, 
+            pretrained_path=args.pretrained_path, return_trainer=True, 
+            skip_extractor=args.skip_extractor, resume_path=resume_dir, 
+            hdc_epochs=args.hdc_epochs, extractor_epochs=args.extractor_epochs
+        )
         
         if trainer is not None:
             opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')
             torch.save(trainer.optimizer.state_dict(), opt_path)
-            logger.info(f"Successfully pretrained model on KITTI. Optimizer state saved to {opt_path}")
-        
-        if args.method == 'd3ctta':
-            logger.info("D3CTTA method selected. Loading D3CTTA model...")
-            model = load_d3ctta_model(args.pretrained_path)
-    else:
-        if args.method == 'd3ctta':
-            logger.info(f"Loading pretrained feature extractor for D3CTTA from {args.pretrained_path}...")
-            model = load_d3ctta_model(args.pretrained_path)
-        else:
-            logger.info(f"Loading pretrained model from {args.pretrained_path}")
-            model = load_hdc_model(args.pretrained_path)
-
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    corruptions = ['beam', 'cross_sensor', 'crosstalk', 'fog', 'echo', 'motion', 'snow']
-    severities = [2, 3]
-
-    methods_to_run = ['frozen', 'density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
+            logger.info(f"Successfully pretrained model on Synth4D. Optimizer state saved to {opt_path}")
+            
+    sev = args.severity
+    methods_to_run = ['density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
     
     global_results = {
-        'mIoU': {m: {c: {} for c in corruptions} for m in methods_to_run},
-        'Accuracy': {m: {c: {} for c in corruptions} for m in methods_to_run},
-        'Baseline_mIoU': {},
-        'Baseline_Acc': {}
+        'mIoU': {m: {c: {} for c in CORRUPTIONS} for m in methods_to_run},
+        'Accuracy': {m: {c: {} for c in CORRUPTIONS} for m in methods_to_run},
     }
     
-    logger.info("Evaluating on clean baseline (Sunny/Original) dataset once...")
-    baseline_parser = Parser(root=data_dir,
+    # Load dataset once and partition it to find chunks
+    # Note on Protocol: D3CTTA divides the valid set into 7 disjoint chunks (1 per corruption).
+    # This evaluates each corruption on 1/7 of the validation set (e.g., ~581 frames) instead 
+    # of the full set. We are preserving this behavior to identically match their protocol. 
+    # Per-domain metrics will be noisier on 400 frames, so do not directly compare these 
+    # chunked metrics to full-set benchmarks.
+    logger.info("Initializing baseline dataset to calculate chunk sizes...")
+    parser_obj = Parser(root=KITTI_DATA_DIR,
                     train_sequences=DATA["split"]["train"],
                     valid_sequences=DATA["split"]["valid"],
                     test_sequences=None,
                     labels=DATA["labels"],
-                    color_map=DATA["color_map"],
+                    color_map=DATA.get("color_map", {}),
                     learning_map=DATA["learning_map"],
                     learning_map_inv=DATA["learning_map_inv"],
                     sensor=ARCH["dataset"]["sensor"],
@@ -480,111 +300,116 @@ def main():
                     workers=ARCH["train"]["workers"],
                     gt=True,
                     shuffle_train=False)
-    baseline_loader = DataLoader(baseline_parser.validloader.dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
     
-    # Load model just once for the sunny baseline
-    if args.method == 'd3ctta':
-        base_model = load_d3ctta_model(args.pretrained_path)
-    else:
-        base_model = load_hdc_model(args.pretrained_path)
-        
-    baseline_metrics = evaluate_and_adapt(base_model, baseline_loader, device, eval_only=True, dry_run=args.dry_run)
-    if len(baseline_metrics["mIoU"]) > 0:
-        global_b_miou = baseline_metrics['mIoU'][-1]
-        global_b_acc = baseline_metrics['Accuracy'][-1]
-        logger.info(f"Clean Baseline (Sunny): mIoU={global_b_miou:.4f}, Acc={global_b_acc:.4f}")
-    else:
-        global_b_miou = None
-        global_b_acc = None
+    target_dataset = parser_obj.validloader.dataset
+    total_len = len(target_dataset)
+    chunk_size = total_len // len(CORRUPTIONS)
+    
+    indices = list(range(total_len))
+    chunks = []
+    for i in range(len(CORRUPTIONS)):
+        start_idx = i * chunk_size
+        end_idx = (i + 1) * chunk_size if i < len(CORRUPTIONS) - 1 else total_len
+        chunks.append(indices[start_idx:end_idx])
 
     for current_method in methods_to_run:
-        logger.info(f"\n=========================================")
+        logger.info(f"=========================================")
         logger.info(f"Starting Evaluation for Method: {current_method}")
-        logger.info(f"=========================================\n")
+        logger.info(f"=========================================")
         
-        results_miou = {c: {} for c in corruptions}
-        results_acc = {c: {} for c in corruptions}
-        
-        if global_b_miou is not None:
-            global_results['Baseline_mIoU'][current_method] = global_b_miou
-            global_results['Baseline_Acc'][current_method] = global_b_acc
-    
-        for ctype in corruptions:
-            for sev in severities:
-                logger.info(f"Testing {ctype} severity {sev}")
+        results_miou = {c: {} for c in CORRUPTIONS}
+        results_acc = {c: {} for c in CORRUPTIONS}
+
+        model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
+
+        for i, ctype in enumerate(CORRUPTIONS):
+            logger.info(f"Testing {ctype} severity {sev} (Chunk {i+1}/7)")
+            
+            # Map severity integer to Robo3D folder name
+            sev_str = SEVERITY_MAP.get(sev, 'moderate')
+            
+            # NOTE (PLAN): The Parser natively expects a "sequences" folder inside root. 
+            # (e.g., SemanticKITTI-C/fog/moderate/sequences/08/velodyne)
+            # If the download layout is just SemanticKITTI-C/fog/moderate/velodyne, this will fail.
+            # Plan: We will either symlink the paths or create a custom KITTI-C Parser subclass
+            # that alters the root string logic once the exact directory layout is confirmed.
+            corruption_root = os.path.join(args.kittic_dir, ctype, sev_str)
+            seq_dir = os.path.join(corruption_root, "sequences")
+            if not os.path.exists(seq_dir):
+                logger.error(f"CRITICAL FIX NEEDED: Expected directory structure not found at {seq_dir}. "
+                             f"The Parser requires a 'sequences' folder to load frames. Either symlink it "
+                             f"or we must override the Parser pathing. Failing fast.")
+                raise FileNotFoundError(f"Missing sequences folder in {corruption_root}")
+            
+            try:
+                parser_obj = Parser(root=corruption_root,
+                                    train_sequences=None,
+                                    valid_sequences=DATA["split"]["valid"],
+                                    test_sequences=None,
+                                    labels=DATA["labels"],
+                                    color_map=DATA.get("color_map", {}),
+                                    learning_map=DATA["learning_map"],
+                                    learning_map_inv=DATA["learning_map_inv"],
+                                    sensor=ARCH["dataset"]["sensor"],
+                                    max_points=ARCH["dataset"]["max_points"],
+                                    batch_size=1,
+                                    workers=ARCH["train"]["workers"],
+                                    gt=True,
+                                    shuffle_train=False)
+                full_corruption_dataset = parser_obj.validloader.dataset
+            except Exception as e:
+                logger.error(f"Failed to load KITTI-C corruption dataset at {corruption_root}: {e}")
+                continue
+            
+            # Prevent silent misalignment bugs by ensuring corrupted frame count matches baseline clean chunk length
+            assert len(full_corruption_dataset) == total_len, (
+                f"Length mismatch: Clean baseline length is {total_len}, "
+                f"but {ctype}-{sev_str} length is {len(full_corruption_dataset)}. "
+                f"Chunks will misalign."
+            )
+            
+            chunk_dataset = torch.utils.data.Subset(full_corruption_dataset, chunks[i])
+            target_dataloader = DataLoader(chunk_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
+            
+            try:
+                metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
+            except Exception as e:
+                logger.error(f"FATAL ERROR during {ctype} sev {sev} ({current_method}): {e}")
+                logger.info("Skipping to next cell to protect the overnight run...")
+                continue
+            
+            if len(metrics["mIoU"]) > 0:
+                initial_miou = metrics["mIoU"][0]
+                final_miou = metrics["mIoU"][-1]
+                initial_acc = metrics["Accuracy"][0]
+                final_acc = metrics["Accuracy"][-1]
                 
-                parser_obj = Parser(root=data_dir,
-                                train_sequences=DATA["split"]["train"],
-                                valid_sequences=DATA["split"]["valid"],
-                                test_sequences=None,
-                                labels=DATA["labels"],
-                                color_map=DATA["color_map"],
-                                learning_map=DATA["learning_map"],
-                                learning_map_inv=DATA["learning_map_inv"],
-                                sensor=ARCH["dataset"]["sensor"],
-                                max_points=ARCH["dataset"]["max_points"],
-                                batch_size=1,
-                                workers=ARCH["train"]["workers"],
-                                gt=True,
-                                shuffle_train=False)
+                results_miou[ctype][sev] = (initial_miou, final_miou)
+                results_acc[ctype][sev] = (initial_acc, final_acc)
                 
-                target_dataset = parser_obj.validloader.dataset
-                corrupted_dataset = LiDARCorruptionWrapper(target_dataset, corruption_type=ctype, severity=sev)
-                target_dataloader = DataLoader(corrupted_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
+                global_results['mIoU'][current_method][ctype][sev] = (initial_miou, final_miou)
+                global_results['Accuracy'][current_method][ctype][sev] = (initial_acc, final_acc)
                 
-                if current_method == 'd3ctta':
-                    model = load_d3ctta_model(args.pretrained_path)
-                else:
-                    model = load_hdc_model(args.pretrained_path)
+                logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
+                suffix = f"_{current_method}"
                 
-                try:
-                    metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
-                except Exception as e:
-                    logger.error(f"FATAL ERROR during {ctype} sev {sev} ({current_method}): {e}")
-                    logger.info("Skipping to next cell to protect the overnight run...")
-                    continue
+                traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
+                with open(traj_json_path, 'w') as f:
+                    json.dump(metrics, f, indent=4)
+                    
+                save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.png'), f'{ctype} Sev {sev}', metrics)
                 
-                if len(metrics["mIoU"]) > 0:
-                    initial_miou = metrics["mIoU"][0]
-                    final_miou = metrics["mIoU"][-1]
-                    initial_acc = metrics["Accuracy"][0]
-                    final_acc = metrics["Accuracy"][-1]
+                with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
+                    json.dump({'mIoU': results_miou, 'Accuracy': results_acc}, f, indent=4)
                     
-                    results_miou[ctype][sev] = (initial_miou, final_miou)
-                    results_acc[ctype][sev] = (initial_acc, final_acc)
-                    
-                    global_results['mIoU'][current_method][ctype][sev] = (initial_miou, final_miou)
-                    global_results['Accuracy'][current_method][ctype][sev] = (initial_acc, final_acc)
-                    
-                    logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
-                    suffix = f"_{current_method}"
-                    
-                    traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
-                    with open(traj_json_path, 'w') as f:
-                        json.dump(metrics, f, indent=4)
-                        
-                    save_graphic(os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.png'), f'{ctype} Sev {sev}', metrics)
-                    
-                    # Incremental save of the method-specific results
-                    baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
-                    baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
-                    with open(os.path.join(args.log_dir, f'results{suffix}.json'), 'w') as f:
-                        json.dump({'mIoU': results_miou, 'Accuracy': results_acc, 'Baseline_mIoU': baseline_miou, 'Baseline_Acc': baseline_acc}, f, indent=4)
-                        
-                    # Incremental save of the global master dictionary
-                    with open(os.path.join(args.log_dir, 'global_results.json'), 'w') as f:
-                        json.dump(global_results, f, indent=4)
-                else:
-                    logger.info(f"No valid frames evaluated for {ctype}-{sev}")
+                with open(os.path.join(args.log_dir, 'global_results.json'), 'w') as f:
+                    json.dump(global_results, f, indent=4)
+            else:
+                logger.info(f"No valid frames evaluated for {ctype}-{sev}")
 
         suffix = f"_{current_method}"
-        
-        baseline_miou = baseline_metrics['mIoU'][-1] if len(baseline_metrics.get('mIoU', [])) > 0 else None
-        baseline_acc = baseline_metrics['Accuracy'][-1] if len(baseline_metrics.get('Accuracy', [])) > 0 else None
-        
-        
-        save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'KITTI-C', results_miou, metric='mIoU', baseline_val=baseline_miou)
-        save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'KITTI-C', results_acc, metric='Accuracy', baseline_val=baseline_acc)
+        save_degradation_plot(os.path.join(args.log_dir, f'degradation_miou{suffix}.png'), 'KITTI-C', results_miou, metric='mIoU', baseline_val=None)
+        save_degradation_plot(os.path.join(args.log_dir, f'degradation_acc{suffix}.png'), 'KITTI-C', results_acc, metric='Accuracy', baseline_val=None)
 
 if __name__ == "__main__":
     main()

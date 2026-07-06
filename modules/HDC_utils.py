@@ -622,26 +622,35 @@ class DensityModel(nn.Module):
         for class_id in range(self.num_classes):
             print(f"Processing class {class_id}...")
             class_embeddings = []
+            class_depths = []
             batch_indices = []
             total_samples = 0
             
             with torch.no_grad():
-                for batch_idx, (proj_in, _, proj_labels, _, _, _, _, _, _, _, _, _, _, _, _) in enumerate(dataloader):
+                for batch_idx, batch_data in enumerate(dataloader):
+                    proj_in = batch_data[0]
+                    proj_labels = batch_data[2]
+                    proj_xyz = batch_data[10] if len(batch_data) > 10 else None
                     
                     if isinstance(proj_in, dict): 
-                        # for AI Motive
                         proj_in = {k: v.to(self.device) if isinstance(v, torch.Tensor) else v for k, v in proj_in.items()}
                     else:
                         proj_in = proj_in.to(self.device)
                     
                     proj_labels = proj_labels.to(self.device).flatten()
+                    
+                    if proj_xyz is not None:
+                        depth = torch.norm(proj_xyz.to(self.device), dim=1).flatten()
+                    else:
+                        depth = torch.zeros_like(proj_labels, dtype=torch.float32)
 
                     valid_label_mask = proj_labels >= 0
                     if not valid_label_mask.any():
-                        del proj_in, proj_labels
+                        del proj_in, proj_labels, proj_xyz, depth
                         self._clear_memory()
                         continue
                     proj_labels = proj_labels[valid_label_mask]
+                    depth = depth[valid_label_mask]
                     enc, _, _ = self.encode(proj_in)
                     enc = enc[valid_label_mask]
 
@@ -650,13 +659,14 @@ class DensityModel(nn.Module):
                     if torch.any(class_mask):
                         class_enc = enc[class_mask].cpu().half()
                         class_embeddings.append(class_enc)
+                        class_depths.append(depth[class_mask].cpu())
                         batch_indices.extend([batch_idx] * class_enc.shape[0])
                         total_samples += class_enc.shape[0]
                     
-                    del proj_in, proj_labels
+                    del proj_in, proj_labels, proj_xyz, depth
                     self._clear_memory()
 
-                    if total_samples >= MAX_SAMPLES: # collect extra for better sampling
+                    if total_samples >= MAX_SAMPLES: 
                         break
             
             if not class_embeddings:
@@ -664,10 +674,12 @@ class DensityModel(nn.Module):
                 continue
             
             class_emb_cpu = torch.cat(class_embeddings, dim=0)
+            class_depths_cpu = torch.cat(class_depths, dim=0)
 
             if len(class_emb_cpu) > MAX_SAMPLES:
                 indices = torch.randperm(len(class_emb_cpu))[:MAX_SAMPLES]
                 class_emb_cpu = class_emb_cpu[indices]
+                class_depths_cpu = class_depths_cpu[indices]
             
             batch_indices = torch.as_tensor(batch_indices[:len(class_emb_cpu)])
             batch_indices = batch_indices.detach().clone()
@@ -683,35 +695,54 @@ class DensityModel(nn.Module):
                     raise ValueError(f"Unknown sampling strategy: {sampling_strategy}")
                 
                 class_emb_cpu = class_emb_cpu[indices]
+                class_depths_cpu = class_depths_cpu[indices]
                 print(f"  Sampled {len(class_emb_cpu)} from {len(batch_indices)} total samples using '{sampling_strategy}'")
             
             class_emb_np = class_emb_cpu.numpy()
+            class_depths_np = class_depths_cpu.numpy()
             
-            if bandwidth is None:
-                estimated_bandwidth = estimate_bandwidth_binary(
-                    class_emb_np, 
-                    quantile=self.quantile,
-                    n_samples=min(500, len(class_emb_np)), # just making it quicker (hopefully not an issue)
-                    bandwidth_multiplier=self.mult
-                )
-                print(f"  Estimated bandwidth for class {class_id}: {estimated_bandwidth:.4f}")
-                class_bandwidth = estimated_bandwidth
-            else:
-                class_bandwidth = bandwidth
-            
-            print(f"  Using {len(class_emb_np)} samples for clustering")
-            
-            del class_emb_cpu, class_embeddings
+            del class_emb_cpu, class_embeddings, class_depths_cpu, class_depths
             self._clear_memory()
-
-            subclusters_for_class = self._process_single_class(
-                class_emb_np, class_id, num_sub_per_cluster, class_bandwidth
-            )
             
-            all_subcluster_centers.extend(subclusters_for_class)
-            all_subcluster_classes.extend([class_id] * len(subclusters_for_class))
-            
-            del class_emb_np
+            has_depth = class_depths_np.sum() > 0
+            if has_depth:
+                bins = [(0, 20), (20, 40), (40, float('inf'))]
+                bin_names = ["Near", "Mid", "Far"]
+            else:
+                bins = [(0, float('inf'))]
+                bin_names = ["All"]
+                
+            for bin_idx, (low, high) in enumerate(bins):
+                mask = (class_depths_np >= low) & (class_depths_np < high)
+                bin_emb_np = class_emb_np[mask]
+                
+                if len(bin_emb_np) < 5:
+                    continue
+                    
+                print(f"  [{bin_names[bin_idx]}] Using {len(bin_emb_np)} samples for clustering")
+                
+                if bandwidth is None:
+                    estimated_bandwidth = estimate_bandwidth_binary(
+                        bin_emb_np, 
+                        quantile=self.quantile,
+                        n_samples=min(500, len(bin_emb_np)), 
+                        bandwidth_multiplier=self.mult
+                    )
+                    print(f"  [{bin_names[bin_idx]}] Estimated bandwidth: {estimated_bandwidth:.4f}")
+                    class_bandwidth = estimated_bandwidth
+                else:
+                    class_bandwidth = bandwidth
+                
+                bin_num_sub = max(1, num_sub_per_cluster // len(bins)) if has_depth else num_sub_per_cluster
+                
+                subclusters_for_bin = self._process_single_class(
+                    bin_emb_np, class_id, bin_num_sub, class_bandwidth
+                )
+                
+                all_subcluster_centers.extend(subclusters_for_bin)
+                all_subcluster_classes.extend([class_id] * len(subclusters_for_bin))
+                
+            del class_emb_np, class_depths_np
             self._clear_memory()
         
         self._load_subclusters(all_subcluster_centers, all_subcluster_classes)
@@ -911,7 +942,7 @@ class DensityModel(nn.Module):
         
         return max_similarities, absolute_indices
 
-    def inference_update(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
+    def inference_update(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], proj_xyz=None, **kwargs):
         self.eval()
         with torch.no_grad():
             enc, _, _ = self.encode(x)
@@ -1057,7 +1088,7 @@ class DensityModel(nn.Module):
                     selected_proto = F.normalize(self.classify.weight[chunk_preds])
                     sims = torch.sum(chunk_enc_norm * selected_proto, dim=1)
 
-    def inference_update_srp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
+    def inference_update_srp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], proj_xyz=None, **kwargs):
         """Subcluster-Regularized Pull Update"""
         self.eval()
         with torch.no_grad():
@@ -1125,7 +1156,7 @@ class DensityModel(nn.Module):
 
             return full_predictions
 
-    def inference_update_awd(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
+    def inference_update_awd(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], proj_xyz=None, **kwargs):
         """Activity-Weighted Distillation Update"""
         self.eval()
         with torch.no_grad():
@@ -1308,7 +1339,7 @@ class DensityModel(nn.Module):
 
             return full_predictions
 
-    def inference_update_psp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80]):
+    def inference_update_psp(self, x, beta=0.2, distance_sensitivity=1.0, learning_rate=0.01, chunk_size=-1, max_updates_per_class=-1, thresholds=[0.45, 0.80], proj_xyz=None, **kwargs):
         """Prototype-Subcluster Ping-Pong Update"""
         self.eval()
         with torch.no_grad():

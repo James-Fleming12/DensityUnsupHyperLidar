@@ -8,6 +8,8 @@ from modules.Basic_HD import DensityTrainer
 import torch.backends.cudnn as cudnn
 from dataset.kitti.parser import Parser
 
+from sklearn.cluster import MiniBatchKMeans
+
 class AugModel(DensityModel):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -77,9 +79,7 @@ class AugModel(DensityModel):
                 if class_embeddings.shape[0] > max_samples_per_class:
                     indices = torch.randperm(class_embeddings.shape[0])[:max_samples_per_class]
                     class_embeddings = class_embeddings[indices]
-                
-                # KNN Subclustering logic (same as HDC_utils)
-                from sklearn.cluster import MiniBatchKMeans
+
                 n_clusters = min(num_sub_per_cluster, class_embeddings.shape[0])
                 if n_clusters > 0:
                     kmeans = MiniBatchKMeans(n_clusters=n_clusters, n_init=3, batch_size=4096)

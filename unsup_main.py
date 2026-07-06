@@ -85,6 +85,8 @@ def train_hdc(ARCH, DATA, epochs=MAX_HDC_EPOCHS, data_dir=None, return_extractor
 
     for i in range(epochs - 1):
         trainer.retrain(dataloader, trainer.model, i+1, None)
+        # Save checkpoint after each epoch so training can be picked up if interrupted
+        torch.save(trainer.model, HDC_SAVE_PATH)
 
     model: DensityModel = trainer.model
     torch.save(model, HDC_SAVE_PATH)
