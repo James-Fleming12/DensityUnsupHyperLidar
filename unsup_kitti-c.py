@@ -238,10 +238,25 @@ def main():
     os.makedirs(args.log_dir, exist_ok=True)
     logger = setup_logger(os.path.join(args.log_dir, 'kitti_c.log'))
 
+    global NUM_CLASSES
+    if args.standard:
+        NUM_CLASSES = 17
+        # Automatically swap to the 17-class SemanticKITTI checkpoint if the user didn't override the 7-class default
+        if args.pretrained_path == 'logs/synth4d_pretrain/hdc_sub.pth':
+            args.pretrained_path = 'logs/kitti_pretrain/hdc_sub.pth'
+        
     try:
         ARCH = yaml.safe_load(open(CONFIG_ARCH, 'r'))
-        # Use D3CTTA mapping (7 classes)
-        DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI, 'r'))
+        KITTI_ALL_DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI_ALL, 'r'))
+        
+        if args.standard:
+            # Use 17-class standard taxonomy
+            DATA = KITTI_ALL_DATA
+        else:
+            # Use D3CTTA mapping (7 classes)
+            DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI, 'r'))
+            # Fix KeyError by injecting missing split definition from the standard config
+            DATA['split'] = KITTI_ALL_DATA['split']
     except Exception as e:
         logger.error(f"Error loading configs: {e}")
         return
