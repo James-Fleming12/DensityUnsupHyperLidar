@@ -283,6 +283,12 @@ def main():
         # Ensure we always use the fresh loaded model
         model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
 
+        # NuScenes FOV is different from KITTI (10 to -30 vs 3 to -25). 
+        # We must override the sensor params so the spherical projection doesn't cut off or squash the cars!
+        nusc_sensor = ARCH["dataset"]["sensor"].copy()
+        nusc_sensor["fov_up"] = 10.0
+        nusc_sensor["fov_down"] = -30.0
+
         logger.info(f"Initializing NuScenes Target Dataset...")
         try:
             parser_obj = Parser(root=args.nusc_dir,
@@ -293,7 +299,7 @@ def main():
                                 color_map=DATA_NUSC.get("color_map", {}),
                                 learning_map=DATA_NUSC["learning_map"],
                                 learning_map_inv=DATA_NUSC["learning_map_inv"],
-                                sensor=ARCH["dataset"]["sensor"],
+                                sensor=nusc_sensor,
                                 max_points=ARCH["dataset"]["max_points"],
                                 batch_size=1,
                                 workers=ARCH["train"]["workers"],
