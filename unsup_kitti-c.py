@@ -227,7 +227,7 @@ def main():
     parser.add_argument('--hdc_epochs', type=int, default=15, help='Number of epochs to train the HDC density model')
     parser.add_argument('--severity', type=int, default=3, help='Severity level for corruptions')
     parser.add_argument('--synth_dir', type=str, default='/mnt/alpha/jmfleming/Synth4D', help='Path to Synth4D dataset for pretraining')
-    parser.add_argument('--kittic_dir', type=str, default='/mnt/alpha/jmfleming/SemanticKITTI-C', help='Path to real SemanticKITTI-C dataset')
+    parser.add_argument('--kittic_dir', type=str, default='/mnt/bravo/jmfleming/OpenDataLab___SemanticKITTI-C', help='Path to real SemanticKITTI-C dataset')
     args = parser.parse_args()
 
     if args.continue_epochs > 0:
