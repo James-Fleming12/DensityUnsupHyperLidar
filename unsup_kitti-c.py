@@ -214,7 +214,8 @@ def load_hdc_model(path, num_classes=NUM_CLASSES):
 
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates on KITTI-C")
-    parser.add_argument('--pretrain', action='store_true', help='Pretrain the model on Synth4D dataset')
+    parser.add_argument('--pretrain', action='store_true', help='Run pretraining on Synth4D before evaluating')
+    parser.add_argument('--standard', action='store_true', help='Use standard protocol: full sequence per corruption, reset model between corruptions, 3-pass evaluation for true initial/final metrics (no running-total skew).')
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/synth4d_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
@@ -368,22 +369,58 @@ def main():
                 f"Chunks will misalign."
             )
             
-            chunk_dataset = torch.utils.data.Subset(full_corruption_dataset, chunks[i])
+            if args.standard:
+                # Standard protocol: full sequence, independent adaptation
+                chunk_dataset = full_corruption_dataset
+                # Reset model before each corruption
+                model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
+            else:
+                # D3CTTA protocol: chunks, continuous adaptation
+                chunk_dataset = torch.utils.data.Subset(full_corruption_dataset, chunks[i])
+            
             target_dataloader = DataLoader(chunk_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
             
             try:
-                metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
+                if args.standard:
+                    # Pass 1: True Initial (Frozen on full chunk)
+                    logger.info("  -> Pass 1: Computing True Initial metrics (Frozen)")
+                    init_metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=True, dry_run=args.dry_run)
+                    
+                    # Pass 2: Adapt (only if method is not frozen)
+                    if current_method != 'frozen':
+                        logger.info("  -> Pass 2: Adapting model weights")
+                        adapt_metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method=current_method, dry_run=args.dry_run)
+                    else:
+                        adapt_metrics = init_metrics
+                        
+                    # Pass 3: True Final (Frozen on full chunk using adapted weights)
+                    logger.info("  -> Pass 3: Computing True Final metrics (Frozen)")
+                    final_metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=True, dry_run=args.dry_run)
+                    
+                    # We only care about the absolute end of the frozen evaluations for the sequence
+                    metrics = adapt_metrics  # Just for the trajectory json
+                    if len(init_metrics["mIoU"]) > 0:
+                        initial_miou = init_metrics["mIoU"][-1]
+                        final_miou = final_metrics["mIoU"][-1]
+                        initial_acc = init_metrics["Accuracy"][-1]
+                        final_acc = final_metrics["Accuracy"][-1]
+                    else:
+                        initial_miou = final_miou = initial_acc = final_acc = 0.0
+                else:
+                    metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
+                    if len(metrics["mIoU"]) > 0:
+                        initial_miou = metrics["mIoU"][0]
+                        final_miou = metrics["mIoU"][-1]
+                        initial_acc = metrics["Accuracy"][0]
+                        final_acc = metrics["Accuracy"][-1]
+                    else:
+                        initial_miou = final_miou = initial_acc = final_acc = 0.0
             except Exception as e:
                 logger.error(f"FATAL ERROR during {ctype} sev {sev} ({current_method}): {e}")
                 logger.info("Skipping to next cell to protect the overnight run...")
                 continue
             
             if len(metrics["mIoU"]) > 0:
-                initial_miou = metrics["mIoU"][0]
-                final_miou = metrics["mIoU"][-1]
-                initial_acc = metrics["Accuracy"][0]
-                final_acc = metrics["Accuracy"][-1]
-                
                 results_miou[ctype][sev] = (initial_miou, final_miou)
                 results_acc[ctype][sev] = (initial_acc, final_acc)
                 
