@@ -35,8 +35,8 @@ CORRUPTIONS = [
 SEVERITY_MAP = {1: 'light', 2: 'moderate', 3: 'heavy', 4: 'extreme'}
 
 CONFIG_ARCH = "config/arch/senet-2048p.yml"
-CONFIG_LABELS_KITTI = "thirdparty/D3CTTA/utils/_resources/semantic-kitti.yaml"
-CONFIG_LABELS_SYNTH = "thirdparty/D3CTTA/utils/_resources/synthetic.yaml"
+CONFIG_LABELS_KITTI = "config/labels/d3-kitti.yaml"
+CONFIG_LABELS_SYNTH = "config/labels/d3-synthetic.yaml"
 CONFIG_LABELS_KITTI_ALL = "config/labels/semantic-kitti-all.yaml"
 
 def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density', dry_run=False):
