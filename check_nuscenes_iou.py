@@ -25,6 +25,7 @@ def main():
     nusc_sensor["fov_down"] = -30.0
     nusc_sensor["img_prop"] = nusc_sensor["img_prop"].copy()
     nusc_sensor["img_prop"]["height"] = 32
+    nusc_sensor["img_prop"]["width"] = 1024
 
     parser_obj = Parser(root="/mnt/alpha/jmfleming/nuscenes_kitti",
                         train_sequences=[854],

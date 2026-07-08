@@ -291,6 +291,9 @@ def main():
         nusc_sensor["fov_down"] = -30.0
         nusc_sensor["img_prop"] = nusc_sensor["img_prop"].copy()
         nusc_sensor["img_prop"]["height"] = 32
+        # NuScenes only has ~1000 points per revolution. Projecting into W=2048 means 50% horizontal sparsity!
+        # Shrinking the width to 1024 will pack the points tightly and restore horizontal continuity for the CNN.
+        nusc_sensor["img_prop"]["width"] = 1024
 
         logger.info(f"Initializing NuScenes Target Dataset...")
         try:
