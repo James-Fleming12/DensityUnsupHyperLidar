@@ -92,6 +92,11 @@ class LaserScan:
         # put in attribute
         points = scan[:, 0:3]  # get xyz
         remissions = scan[:, 3]  # get remission
+        
+        # Auto-normalize intensity/remission scale for cross-dataset compatibility
+        # KITTI uses [0, 1], NuScenes uses [0, 255]
+        if remissions.max() > 1.0:
+            remissions = remissions / 255.0
         if self.drop_points is not False:
             self.points_to_drop = np.random.randint(0, len(points)-1,int(len(points)*self.drop_points))
             points = np.delete(points,self.points_to_drop,axis=0)
