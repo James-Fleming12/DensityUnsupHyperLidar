@@ -78,28 +78,32 @@ def main():
             
             # Simulated Gating Logic
             gate_sims = sub_sims * 2.0 - 1.0
-            update_mask = (gate_sims > 0.35) & (preds != 0)
             
             # Oracle Check
             valid_indices = torch.nonzero(valid_enc_mask).squeeze(1)
             active_labels = proj_labels[valid_indices]
-            
             ignore_mask = (active_labels == 0)
-            update_mask = update_mask & ~ignore_mask
             
-            if update_mask.sum() > 0:
-                is_correct = (preds[update_mask] == active_labels[update_mask])
+            # Diagnostic Bypass: Let's see what the actual similarities are for semantic classes!
+            semantic_mask = (preds != 0) & ~ignore_mask
+            
+            if semantic_mask.sum() > 0:
+                is_correct = (preds[semantic_mask] == active_labels[semantic_mask])
+                
+                # Log similarities for correct/incorrect regardless of threshold
+                gated_sub_sims = gate_sims[semantic_mask]
+                correct_sims.append(gated_sub_sims[is_correct].mean().item() if is_correct.sum() > 0 else 0)
+                incorrect_sims.append(gated_sub_sims[~is_correct].mean().item() if (~is_correct).sum() > 0 else 0)
+                
+                # Also we'll just force the update mask to everything so we can see the class distribution
+                update_mask = semantic_mask
+                
                 total_gated += update_mask.sum().item()
                 total_correct_gated += is_correct.sum().item()
                 
                 # Class imbalance check
                 gated_preds = preds[update_mask]
                 class_gated_counts += torch.bincount(gated_preds, minlength=17)
-                
-                # Similarity Alignment Check
-                gated_sub_sims = gate_sims[update_mask]
-                correct_sims.append(gated_sub_sims[is_correct].mean().item() if is_correct.sum() > 0 else 0)
-                incorrect_sims.append(gated_sub_sims[~is_correct].mean().item() if (~is_correct).sum() > 0 else 0)
 
     print("\n" + "="*50)
     print("DIAGNOSTIC RESULTS: WHY IS ADAPTATION FAILING?")
