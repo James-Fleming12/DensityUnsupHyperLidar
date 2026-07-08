@@ -358,7 +358,10 @@ class AugModel(DensityModel):
                     
                     sub_sims[i:i+chunk_size] = max_sims.to(sub_sims.dtype)
                     
-                gate_sims = sub_sims
+                # Fix: sub_sims is in [0, 1] due to (cosine_sim + 1)/2 scaling.
+                # But the thresholds (e.g. 0.35) expect raw cosine similarity [-1, 1].
+                # We must map gate_sims back to [-1, 1] for the threshold check.
+                gate_sims = sub_sims * 2.0 - 1.0
             else:
                 # fall back to class-prototype similarity (the old behavior)
                 gate_sims = S_bundled.gather(1, preds.unsqueeze(1)).squeeze(1)
