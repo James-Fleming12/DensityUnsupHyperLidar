@@ -97,6 +97,10 @@ class LaserScan:
         # KITTI uses [0, 1], NuScenes uses [0, 255]
         if remissions.max() > 1.0:
             remissions = remissions / 255.0
+            
+            # NuScenes LiDAR is positioned ~0.43m higher than KITTI.
+            # We must shift the Z axis down to align the ground planes so the CNN doesn't think cars are floating.
+            points[:, 2] -= 0.43
         if self.drop_points is not False:
             self.points_to_drop = np.random.randint(0, len(points)-1,int(len(points)*self.drop_points))
             points = np.delete(points,self.points_to_drop,axis=0)
