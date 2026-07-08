@@ -104,5 +104,15 @@ def check_kitti_c_firerates():
     print(">>> This perfectly explains why the initial and final mIoUs were identically matching.")
 
 if __name__ == "__main__":
-    check_nuscenes_channels()
-    check_kitti_c_firerates()
+    import argparse
+    parser = argparse.ArgumentParser(description="Diagnostic tests for LiDAR geometry and HDC firing rates.")
+    parser.add_argument('--nuscenes', action='store_true', help="Run NuScenes geometry test")
+    parser.add_argument('--kitti_c', action='store_true', help="Run KITTI-C firing rate test")
+    parser.add_argument('--all', action='store_true', help="Run all tests")
+    args = parser.parse_args()
+
+    if args.nuscenes or args.all or (not args.nuscenes and not args.kitti_c):
+        check_nuscenes_channels()
+        
+    if args.kitti_c or args.all or (not args.nuscenes and not args.kitti_c):
+        check_kitti_c_firerates()
