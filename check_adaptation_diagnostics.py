@@ -78,7 +78,7 @@ def main():
             
             # Simulated Gating Logic
             gate_sims = sub_sims * 2.0 - 1.0
-            update_mask = (gate_sims > 0.35)
+            update_mask = (gate_sims > 0.35) & (preds != 0)
             
             # Oracle Check
             valid_indices = torch.nonzero(valid_enc_mask).squeeze(1)
