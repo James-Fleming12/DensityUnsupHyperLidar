@@ -283,11 +283,14 @@ def main():
         # Ensure we always use the fresh loaded model
         model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
 
-        # NuScenes FOV is different from KITTI (10 to -30 vs 3 to -25). 
         # We must override the sensor params so the spherical projection doesn't cut off or squash the cars!
+        # NuScenes only has 32 beams (vs KITTI's 64). If we project 32 beams into a 64-pixel high image,
+        # 75% of the image will be empty space (-1). We must reduce the projection height to 32 to maintain density.
         nusc_sensor = ARCH["dataset"]["sensor"].copy()
         nusc_sensor["fov_up"] = 10.0
         nusc_sensor["fov_down"] = -30.0
+        nusc_sensor["img_prop"] = nusc_sensor["img_prop"].copy()
+        nusc_sensor["img_prop"]["height"] = 32
 
         logger.info(f"Initializing NuScenes Target Dataset...")
         try:
