@@ -14,7 +14,8 @@ def main():
     ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
     DATA_NUSC = yaml.safe_load(open("config/labels/nuscenes_new.yaml", 'r'))
     KITTI_LABELS = yaml.safe_load(open("config/labels/semantic-kitti-all.yaml", 'r'))["labels"]
-    inv_map = DATA_NUSC["learning_map_inv"]
+    DATA_KITTI = yaml.safe_load(open("config/labels/semantic-kitti.yaml", 'r'))
+    inv_map = DATA_KITTI["learning_map_inv"]
     
     pretrained_path = "logs/kitti_pretrain/hdc_sub.pth"
     model = AugModel(ARCH, os.path.dirname(pretrained_path), 'rp', 0, 0, 17, device, subcluster_type='continuous')
@@ -22,24 +23,17 @@ def main():
     model.to(device)
     model.eval()
 
-    nusc_sensor = ARCH["dataset"]["sensor"].copy()
-    nusc_sensor["fov_up"] = 10.0
-    nusc_sensor["fov_down"] = -30.0
-    nusc_sensor["img_prop"] = nusc_sensor["img_prop"].copy()
-    nusc_sensor["img_prop"]["height"] = 32
-    nusc_sensor["img_prop"]["width"] = 1024
-
-    print("Initializing NuScenes Dataset...")
-    parser_obj = Parser(root="/mnt/alpha/jmfleming/nuscenes_kitti",
-                        train_sequences=[854], valid_sequences=[854], test_sequences=None,
-                        labels=DATA_NUSC["labels"], color_map=DATA_NUSC.get("color_map", {}),
-                        learning_map=DATA_NUSC["learning_map"], learning_map_inv=DATA_NUSC["learning_map_inv"],
-                        sensor=nusc_sensor, max_points=ARCH["dataset"]["max_points"],
+    print("Initializing KITTI-C Dataset...")
+    parser_obj = Parser(root="/mnt/bravo/jmfleming/OpenDataLab___SemanticKITTI-C/SemanticKITTI-C/fog/heavy",
+                        train_sequences=[8], valid_sequences=[8], test_sequences=None,
+                        labels=DATA_KITTI["labels"], color_map=DATA_KITTI.get("color_map", {}),
+                        learning_map=DATA_KITTI["learning_map"], learning_map_inv=DATA_KITTI["learning_map_inv"],
+                        sensor=ARCH["dataset"]["sensor"], max_points=ARCH["dataset"]["max_points"],
                         batch_size=1, workers=1, gt=True, shuffle_train=False)
                         
     dataloader = DataLoader(parser_obj.validloader.dataset, batch_size=1, shuffle=False)
 
-    print("\nRunning Gating Diagnostics on NuScenes (10 Frames)...")
+    print("\nRunning Gating Diagnostics on KITTI-C Fog Heavy (10 Frames)...")
     
     total_gated = 0
     total_correct_gated = 0
