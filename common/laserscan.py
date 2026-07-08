@@ -82,7 +82,12 @@ class LaserScan:
 
         # if all goes well, open pointcloud
         scan = np.fromfile(filename, dtype=np.float32)
-        scan = scan.reshape((-1, 4))
+        
+        # Auto-detect 5-channel point clouds (NuScenes format: x, y, z, intensity, ring)
+        if scan.shape[0] % 5 == 0 and scan.shape[0] % 4 != 0:
+            scan = scan.reshape((-1, 5))[:, :4] # Drop the 5th channel (ring index)
+        else:
+            scan = scan.reshape((-1, 4))
 
         # put in attribute
         points = scan[:, 0:3]  # get xyz
