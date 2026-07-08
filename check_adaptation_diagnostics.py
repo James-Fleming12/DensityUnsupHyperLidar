@@ -48,6 +48,9 @@ def main():
     
     correct_sims = []
     incorrect_sims = []
+    
+    correct_proto_sims = []
+    incorrect_proto_sims = []
 
     for batch_idx, batch_data in enumerate(dataloader):
         if batch_idx >= 10:
@@ -76,6 +79,9 @@ def main():
             masked_similarity = torch.where(valid_mask, base_similarity, torch.tensor(0.0, device=device))
             sub_sims, _ = torch.max(masked_similarity, dim=1)
             
+            # PROTOTYPE SIMILARITY CALCULATION
+            proto_sims = (raw_base @ prototypes.T).gather(1, preds.unsqueeze(1)).squeeze(1)
+            
             # Simulated Gating Logic
             gate_sims = sub_sims * 2.0 - 1.0
             
@@ -92,8 +98,13 @@ def main():
                 
                 # Log similarities for correct/incorrect regardless of threshold
                 gated_sub_sims = gate_sims[semantic_mask]
+                gated_proto_sims = proto_sims[semantic_mask]
+                
                 correct_sims.append(gated_sub_sims[is_correct].mean().item() if is_correct.sum() > 0 else 0)
                 incorrect_sims.append(gated_sub_sims[~is_correct].mean().item() if (~is_correct).sum() > 0 else 0)
+                
+                correct_proto_sims.append(gated_proto_sims[is_correct].mean().item() if is_correct.sum() > 0 else 0)
+                incorrect_proto_sims.append(gated_proto_sims[~is_correct].mean().item() if (~is_correct).sum() > 0 else 0)
                 
                 # Also we'll just force the update mask to everything so we can see the class distribution
                 update_mask = semantic_mask
@@ -131,16 +142,20 @@ def main():
         print("   >>> Fix: We need Class-Balanced Weighting or separate per-class thresholds.")
         
     # 3. Subcluster Health
-    mean_corr = sum(correct_sims)/len([x for x in correct_sims if x > 0]) if any(x > 0 for x in correct_sims) else 0
-    mean_incorr = sum(incorrect_sims)/len([x for x in incorrect_sims if x > 0]) if any(x > 0 for x in incorrect_sims) else 0
-    print(f"\n3. SUBCLUSTER HEALTH:")
+    mean_corr = sum(correct_sims)/len([x for x in correct_sims if x != 0]) if any(x != 0 for x in correct_sims) else 0
+    mean_incorr = sum(incorrect_sims)/len([x for x in incorrect_sims if x != 0]) if any(x != 0 for x in incorrect_sims) else 0
+    
+    mean_corr_proto = sum(correct_proto_sims)/len([x for x in correct_proto_sims if x != 0]) if any(x != 0 for x in correct_proto_sims) else 0
+    mean_incorr_proto = sum(incorrect_proto_sims)/len([x for x in incorrect_proto_sims if x != 0]) if any(x != 0 for x in incorrect_proto_sims) else 0
+    
+    print(f"\n3. SUBCLUSTER vs PROTOTYPE HEALTH:")
+    print(f"   [Subclusters (KITTI space)]")
     print(f"   - Avg Similarity of CORRECT points:   {mean_corr:.3f}")
     print(f"   - Avg Similarity of INCORRECT points: {mean_incorr:.3f}")
-    if mean_incorr > mean_corr:
-        print("   >>> FAIL: The subclusters are flawed. Incorrect predictions are CLOSER to the")
-        print("   >>> subclusters than correct predictions. The gating is inherently broken.")
-    else:
-        print("   >>> PASS: Subclusters are healthy. Correct points map better than incorrect ones.")
+    
+    print(f"   [Prototypes (Linear Layer)]")
+    print(f"   - Avg Similarity of CORRECT points:   {mean_corr_proto:.3f}")
+    print(f"   - Avg Similarity of INCORRECT points: {mean_incorr_proto:.3f}")
 
 if __name__ == "__main__":
     main()
