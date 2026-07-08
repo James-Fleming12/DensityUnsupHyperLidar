@@ -352,10 +352,10 @@ def main():
             corruption_root = os.path.join(args.kittic_dir, ctype, sev_str)
             seq_dir = os.path.join(corruption_root, "sequences")
             if not os.path.exists(seq_dir):
-                logger.error(f"CRITICAL FIX NEEDED: Expected directory structure not found at {seq_dir}. "
-                             f"The Parser requires a 'sequences' folder to load frames. Either symlink it "
-                             f"or we must override the Parser pathing. Failing fast.")
-                raise FileNotFoundError(f"Missing sequences folder in {corruption_root}")
+                logger.info(f"Directory structure doesn't match standard KITTI. Creating 'sequences/08' symlink in {corruption_root}...")
+                os.makedirs(seq_dir, exist_ok=True)
+                # Create sequences/08 that points to the parent directory (corruption_root)
+                os.symlink("..", os.path.join(seq_dir, "08"))
             
             try:
                 parser_obj = Parser(root=corruption_root,
