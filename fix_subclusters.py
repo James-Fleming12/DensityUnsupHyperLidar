@@ -2,7 +2,7 @@ import torch
 import os
 import yaml
 from modules.aug_model import AugModel
-from data.parser import Parser
+from dataset.kitti.parser import Parser
 from torch.utils.data import DataLoader
 
 def main():
