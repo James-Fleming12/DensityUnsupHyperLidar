@@ -866,30 +866,27 @@ class DensityModel(nn.Module):
         print(f"Loading {total_centers} subclusters into model (type: {self.subcluster_type})...")
 
         with torch.no_grad():
-            batch_size = 100
-            for i in range(0, total_centers, batch_size):
-                end_idx = min(i + batch_size, total_centers)
-
+            class_offsets = {c: 0 for c in range(self.num_classes)}
+            for i, (center, c_id) in enumerate(zip(centers_list, classes_list)):
+                # Determine the correct slot in the 170-element tensor
+                slot_offset = class_offsets[c_id]
+                if slot_offset >= self.num_subclusters:
+                    continue # Exceeded max subclusters for this class
+                
+                absolute_idx = (c_id * self.num_subclusters) + slot_offset
+                class_offsets[c_id] += 1
+                
                 if self.subcluster_type == 'bipolar':
-                    batch = torch.stack([self._make_bipolar(c.to(self.device)) for c in centers_list[i:end_idx]])
+                    tensor = self._make_bipolar(center.to(self.device))
                 elif self.subcluster_type == 'continuous':
-                    batch = torch.stack([c.to(self.device) if c.device.type == 'cpu' else c for c in centers_list[i:end_idx]])
-                    batch = F.normalize(batch, dim=1)
-
-                    norms = torch.norm(batch, dim=1)
-                    expected_norms = torch.ones(len(batch), device=self.device, dtype=batch.dtype)
-                    assert torch.allclose(norms, expected_norms, atol=1e-3), f"Continuous subclusters must be unit norm! Got norms: {norms}"                
+                    tensor = center.to(self.device) if center.device.type == 'cpu' else center
+                    tensor = F.normalize(tensor, dim=0)
                 else:
                     raise ValueError(f"Unknown subcluster_type: {self.subcluster_type}")
+                    
+                self.subclusters.data[absolute_idx] = tensor
 
-                self.subclusters.data[i:end_idx] = batch
-
-                del batch
-                if i % 500 == 0:
-                    self._clear_memory()
-                    print(f"  Loaded {end_idx}/{total_centers} subclusters")
-
-        print("All subclusters loaded")
+        print("All subclusters loaded into correct class slots")
 
     def _make_bipolar(self, tensor):
         """Convert tensor to bipolar {-1, +1}, mapping 0 -> 1."""
