@@ -35,9 +35,8 @@ CORRUPTIONS = [
 SEVERITY_MAP = {1: 'light', 2: 'moderate', 3: 'heavy', 4: 'extreme'}
 
 CONFIG_ARCH = "config/arch/senet-2048p.yml"
-CONFIG_LABELS_KITTI = "config/labels/d3-kitti.yaml"
-CONFIG_LABELS_SYNTH = "config/labels/d3-synthetic.yaml"
-CONFIG_LABELS_KITTI_ALL = "config/labels/semantic-kitti-all.yaml"
+CONFIG_LABELS_KITTI = "config/labels/semantic-kitti.yaml"  # The 7-class mapped version from D3CTTA
+CONFIG_LABELS_KITTI_ALL = "config/labels/semantic-kitti-all.yaml"  # Standard 17 classes
 
 def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density', dry_run=False):
     miou_history = []
@@ -217,10 +216,10 @@ def load_hdc_model(path, num_classes=NUM_CLASSES):
 
 def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates on KITTI-C")
-    parser.add_argument('--pretrain', action='store_true', help='Run pretraining on Synth4D before evaluating')
+    parser.add_argument('--pretrain', action='store_true', help='Run pretraining on SemanticKITTI before evaluating')
     parser.add_argument('--standard', action='store_true', help='Use standard protocol: full sequence per corruption, reset model between corruptions, 3-pass evaluation for true initial/final metrics (no running-total skew).')
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
-    parser.add_argument('--pretrained_path', type=str, default='logs/synth4d_pretrain/hdc_sub.pth', help='Path to load pretrained model')
+    parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
     parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'all'], default='density', help='Method to test.')
     parser.add_argument('--dry_run', action='store_true', help='Run only 2 batches per condition to quickly verify no crashes will occur.')
@@ -229,7 +228,7 @@ def main():
     parser.add_argument('--extractor_epochs', type=int, default=60, help='Number of epochs to train the feature extractor')
     parser.add_argument('--hdc_epochs', type=int, default=15, help='Number of epochs to train the HDC density model')
     parser.add_argument('--severity', type=int, default=3, help='Severity level for corruptions')
-    parser.add_argument('--synth_dir', type=str, default='/mnt/alpha/jmfleming/Synth4D', help='Path to Synth4D dataset for pretraining')
+    parser.add_argument('--kitti_dir', type=str, default='/mnt/alpha/jmfleming/KITTI', help='Path to SemanticKITTI dataset for pretraining')
     parser.add_argument('--kittic_dir', type=str, default='/mnt/bravo/jmfleming/OpenDataLab___SemanticKITTI-C/SemanticKITTI-C', help='Path to real SemanticKITTI-C dataset')
     args = parser.parse_args()
 
@@ -242,24 +241,11 @@ def main():
     logger = setup_logger(os.path.join(args.log_dir, 'kitti_c.log'))
 
     global NUM_CLASSES
-    if args.standard:
-        NUM_CLASSES = 17
-        # Automatically swap to the 17-class SemanticKITTI checkpoint if the user didn't override the 7-class default
-        if args.pretrained_path == 'logs/synth4d_pretrain/hdc_sub.pth':
-            args.pretrained_path = 'logs/kitti_pretrain/hdc_sub.pth'
+    NUM_CLASSES = 17
         
     try:
         ARCH = yaml.safe_load(open(CONFIG_ARCH, 'r'))
-        KITTI_ALL_DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI_ALL, 'r'))
-        
-        if args.standard:
-            # Use 17-class standard taxonomy
-            DATA = KITTI_ALL_DATA
-        else:
-            # Use D3CTTA mapping (7 classes)
-            DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI, 'r'))
-            # Fix KeyError by injecting missing split definition from the standard config
-            DATA['split'] = KITTI_ALL_DATA['split']
+        DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI_ALL, 'r'))
     except Exception as e:
         logger.error(f"Error loading configs: {e}")
         return
@@ -267,19 +253,11 @@ def main():
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     if args.pretrain:
-        logger.info(f"Starting Pretraining on Synth4D at {args.synth_dir}...")
+        logger.info(f"Starting Pretraining on SemanticKITTI at {args.kitti_dir}...")
         resume_dir = os.path.dirname(args.pretrained_path) if args.continue_pretrain else None
-        
-        try:
-            SYNTH_DATA = yaml.safe_load(open(CONFIG_LABELS_SYNTH, 'r'))
-            KITTI_ALL_DATA = yaml.safe_load(open(CONFIG_LABELS_KITTI_ALL, 'r'))
-            SYNTH_DATA['split'] = KITTI_ALL_DATA['split']
-        except Exception as e:
-            logger.error(f"Error loading synthetic config: {e}")
-            return
             
         model, trainer = pretrain_pipeline(
-            ARCH, SYNTH_DATA, data_dir=args.synth_dir, 
+            ARCH, DATA, data_dir=args.kitti_dir, 
             pretrained_path=args.pretrained_path, return_trainer=True, 
             skip_extractor=args.skip_extractor, resume_path=resume_dir, 
             hdc_epochs=args.hdc_epochs, extractor_epochs=args.extractor_epochs
@@ -288,7 +266,7 @@ def main():
         if trainer is not None:
             opt_path = os.path.join(os.path.dirname(args.pretrained_path), 'feature_optimizer.pth')
             torch.save(trainer.optimizer.state_dict(), opt_path)
-            logger.info(f"Successfully pretrained model on Synth4D. Optimizer state saved to {opt_path}")
+            logger.info(f"Successfully pretrained model on SemanticKITTI. Optimizer state saved to {opt_path}")
             
     sev = args.severity
     methods_to_run = ['density', 'exp_a_anchor_off'] if args.method == 'all' else [args.method]
