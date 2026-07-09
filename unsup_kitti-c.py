@@ -93,6 +93,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                     model.inference_update_soft_consensus(
                         proj_in,
                         learning_rate=0.001,
+                        thresholds=[0.80, 0.95],
                         use_consensus_gate=True,
                         use_volume_weight=True,
                         use_subcluster_gate=True,
@@ -102,6 +103,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                     model.inference_update_soft_consensus(
                         proj_in,
                         learning_rate=0.001,
+                        thresholds=[0.80, 0.95],
                         use_consensus_gate=True,
                         use_volume_weight=True,
                         use_subcluster_gate=True,
@@ -112,6 +114,7 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                     model.inference_update_soft_consensus(
                         proj_in,
                         learning_rate=0.001,
+                        thresholds=[0.80, 0.95],
                         use_consensus_gate=True,
                         use_volume_weight=True,
                         use_subcluster_gate=True,
