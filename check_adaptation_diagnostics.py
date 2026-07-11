@@ -9,7 +9,15 @@ from dataset.kitti.parser import Parser
 from torch.utils.data import DataLoader
 import torch.nn.functional as F
 
+import argparse
+import sys
+
 def main():
+    parser = argparse.ArgumentParser(description="Diagnostics for adaptation gating")
+    parser.add_argument('--data_dir', type=str, default='/mnt/bravo/jmfleming/OpenDataLab___SemanticKITTI-C/SemanticKITTI-C/fog/moderate', help='Path to dataset/corruption')
+    parser.add_argument('--seq', type=int, default=8, help='Sequence number')
+    args = parser.parse_args()
+
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
     DATA_NUSC = yaml.safe_load(open("config/labels/nuscenes_new.yaml", 'r'))
@@ -29,9 +37,16 @@ def main():
     nusc_sensor["img_prop"]["height"] = 32
     nusc_sensor["img_prop"]["width"] = 1024
 
-    print("Initializing NuScenes Dataset...")
-    parser_obj = Parser(root="/mnt/alpha/jmfleming/nuscenes_kitti",
-                        train_sequences=[854], valid_sequences=[854], test_sequences=None,
+    print(f"Initializing Dataset from {args.data_dir}...")
+    
+    # Check if sequences dir exists, otherwise symlink (KITTI-C format)
+    seq_dir = os.path.join(args.data_dir, "sequences")
+    if not os.path.exists(seq_dir):
+        os.makedirs(seq_dir, exist_ok=True)
+        os.symlink("..", os.path.join(seq_dir, f"{args.seq:02d}"))
+        
+    parser_obj = Parser(root=args.data_dir,
+                        train_sequences=[args.seq], valid_sequences=[args.seq], test_sequences=None,
                         labels=DATA_NUSC["labels"], color_map=DATA_NUSC.get("color_map", {}),
                         learning_map=DATA_NUSC["learning_map"], learning_map_inv=DATA_NUSC["learning_map_inv"],
                         sensor=nusc_sensor, max_points=ARCH["dataset"]["max_points"],
@@ -39,7 +54,7 @@ def main():
                         
     dataloader = DataLoader(parser_obj.validloader.dataset, batch_size=1, shuffle=False)
 
-    print("\nRunning Gating Diagnostics on NuScenes (10 Frames)...")
+    print(f"\nRunning Gating Diagnostics on {args.data_dir} (10 Frames)...")
     
     total_gated = 0
     total_correct_gated = 0
