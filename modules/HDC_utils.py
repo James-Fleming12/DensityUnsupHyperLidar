@@ -990,13 +990,16 @@ class DensityModel(nn.Module):
             
             if not hasattr(self, '_firing_log'):
                 self._firing_log = []
-            if len(valid_enc_mask) > 0:
-                self._firing_log.append(update_mask.float().mean().item())
+
+            # We will calculate the true firing count inside the loop
+            final_firing_count = 0
 
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = predictions
 
             if not torch.any(update_mask):
+                if len(valid_enc_mask) > 0:
+                    self._firing_log.append(0.0)
                 return full_predictions
 
             valid_indices_in_active = torch.nonzero(update_mask).squeeze(1)
@@ -1042,6 +1045,11 @@ class DensityModel(nn.Module):
                 self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
                 updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                
+                final_firing_count += valid_mask.sum().item()
+
+            if len(valid_enc_mask) > 0:
+                self._firing_log.append(final_firing_count / num_total_samples)
 
             return full_predictions
 

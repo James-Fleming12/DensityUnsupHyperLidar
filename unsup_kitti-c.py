@@ -340,7 +340,7 @@ def main():
             logger.info(f"Successfully pretrained model on SemanticKITTI. Optimizer state saved to {opt_path}")
             
     sev = args.severity
-    methods_to_run = ['density', 'exp_a_safe'] if args.method == 'all' else [args.method]
+    methods_to_run = ['density', 'exp_density_hybrid', 'exp_a', 'exp_a_v2'] if args.method == 'all' else [args.method]
     
     global_results = {
         'mIoU': {m: {c: {} for c in CORRUPTIONS} for m in methods_to_run},
