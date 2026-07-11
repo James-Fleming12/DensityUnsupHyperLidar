@@ -273,7 +273,8 @@ class AugModel(DensityModel):
     def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65],
                                          proj_xyz=None, distance_sensitivity=1.5,
                                          use_consensus_gate=True, use_volume_weight=True,
-                                         use_subcluster_gate=True, use_anchor=True, **kwargs):
+                                         use_subcluster_gate=True, use_anchor=True, 
+                                         use_percentile_gate=False, percentiles=[0.10, 0.95], min_points=10, **kwargs):
         """Soft Multi-View Consensus (Experiment A), subcluster-gauged.
 
         Restores the paper's core mechanism: the confidence used to gate each
@@ -371,10 +372,21 @@ class AugModel(DensityModel):
             # CRITICAL FIX: Explicitly ban the 'unlabeled' class (0) from gating.
             # If the model gets confused, it confidently predicts '0' (noise) for everything.
             # Allowing updates on class 0 creates a feedback loop that destroys all other classes.
-            if len(thresholds) > 1:
-                update_mask = (gate_sims > thresholds[0]) & (gate_sims < thresholds[1]) & (agreement_weight > 0) & (preds != 0)
+            if use_percentile_gate:
+                valid_sims = gate_sims[(preds != 0) & (agreement_weight > 0)]
+                if len(valid_sims) > 1:
+                    lo = torch.quantile(valid_sims, percentiles[0])
+                    hi = torch.quantile(valid_sims, percentiles[1])
+                    update_mask = (gate_sims > lo) & (gate_sims < hi) & (agreement_weight > 0) & (preds != 0)
+                    if hi > lo:
+                        thresholds = [lo.item(), hi.item()]
+                else:
+                    update_mask = torch.zeros_like(gate_sims, dtype=torch.bool)
             else:
-                update_mask = (gate_sims > thresholds[0]) & (agreement_weight > 0) & (preds != 0)
+                if len(thresholds) > 1:
+                    update_mask = (gate_sims > thresholds[0]) & (gate_sims < thresholds[1]) & (agreement_weight > 0) & (preds != 0)
+                else:
+                    update_mask = (gate_sims > thresholds[0]) & (agreement_weight > 0) & (preds != 0)
 
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
@@ -396,6 +408,8 @@ class AugModel(DensityModel):
             for class_id in unique_classes:
                 c_id = class_id.item()
                 class_mask = (preds == c_id) & update_mask
+                if class_mask.sum() < min_points:
+                    continue
 
                 sample_encs = bundled_target[class_mask]
                 sample_gate = gate_sims[class_mask]
