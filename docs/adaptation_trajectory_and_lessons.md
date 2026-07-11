@@ -17,10 +17,17 @@ During early testing, the `density` baseline (which uses simple linear prototype
 - **Findings:** `F.dropout2d` was being used to simulate beam-missing. However, it was dropping out random feature channels across the spatial dimension, completely scrambling the semantic embeddings. 
 - **Action:** Replaced dropout with a geometric depth scaling (`x * 0.95`), stabilizing the consensus logic.
 
-### Test 2: Update Magnitude (Volume Weighting)
+### Test 2: Update Magnitude (Volume Weighting) & The Overnight Test
 - **Why:** Even with healthy augmentations, `exp_a` continued to collapse. We suspected the mathematical magnitude of the updates was too aggressive compared to the baseline.
 - **Findings:** `exp_a` used `use_volume_weight=True`, which scaled the update vector by `log(number of points passing the gate)`. Since a full scene can have tens of thousands of points, this was multiplying the update magnitude by ~10x *per frame*, completely overwhelming the prototypes.
 - **Action:** Created `exp_a_safe` to disable volume weighting and align the update math with the stable `density` baseline, then ran an overnight A/B test.
+
+**Overnight A/B Test Results (mIoU Change):**
+The `density` baseline proved universally superior to `exp_a_safe` across corruptions, conclusively showing that Subcluster Gating was mathematically flawed:
+- **Snow:** `density` (+11.8%) vs `exp_a_safe` (+9.3%)
+- **Motion Blur:** `density` (+7.6%) vs `exp_a_safe` (+6.5%)
+- **Wet Ground:** `density` (+2.4%) vs `exp_a_safe` (+1.4%)
+- **Fog:** `density` (stable) vs `exp_a_safe` (catastrophic collapse: `0.0358 -> 0.0019`)
 
 ### Test 3: The Gating Diagnostics (The Breakthrough)
 - **Why:** The overnight test revealed that `exp_a_safe` *still* collapsed on Fog and Cross-Sensor corruptions, while `density` excelled. We wrote `check_adaptation_diagnostics.py` to peek into the exact similarity scores the model was seeing during adaptation.
