@@ -371,7 +371,10 @@ class AugModel(DensityModel):
             # CRITICAL FIX: Explicitly ban the 'unlabeled' class (0) from gating.
             # If the model gets confused, it confidently predicts '0' (noise) for everything.
             # Allowing updates on class 0 creates a feedback loop that destroys all other classes.
-            update_mask = (gate_sims > thresholds[0]) & (agreement_weight > 0) & (preds != 0)
+            if len(thresholds) > 1:
+                update_mask = (gate_sims > thresholds[0]) & (gate_sims < thresholds[1]) & (agreement_weight > 0) & (preds != 0)
+            else:
+                update_mask = (gate_sims > thresholds[0]) & (agreement_weight > 0) & (preds != 0)
 
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = preds
