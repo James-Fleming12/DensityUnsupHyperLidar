@@ -42,7 +42,7 @@ $$ P_c^{(t+1)} = \frac{P_c^{(t)} + \eta \vec{v}_c}{\| P_c^{(t)} + \eta \vec{v}_c
 The generalized class prototypes in the baseline are highly susceptible to "mode collapse" when facing severe domain gaps (e.g., heavy fog). This method introduces fine-grained Subclusters, multi-view consensus, and a drift anchor to guarantee robust adaptation.
 
 ### 2.1 Multi-View Consensus Bundling
-Instead of relying on a single view, the input $X$ is subjected to $M$ geometric augmentations (e.g., base, yaw-shifted, and scaled). Let $Z_i^{(m)}$ be the unit-normalized feature encoding for view $m$. 
+Instead of relying on a single view, the input $X$ is subjected to $M$ geometric augmentations (e.g., base, yaw-shifted, and depth-scaled). Crucially, destructive augmentations like dropout are avoided to ensure the bundled representation remains topologically stable. Let $Z_i^{(m)}$ be the unit-normalized feature encoding for view $m$. 
 
 The views are aggregated into a robust bundled representation:
 $$ Z_{bundle, i} = \frac{\sum_{m=1}^M Z_i^{(m)}}{\| \sum_{m=1}^M Z_i^{(m)} \|_2} $$
@@ -66,8 +66,16 @@ $$ W_i = w_{conf, i} \cdot w_{agree, i} \cdot w_{dist, i} $$
 The direction vector $\vec{d}_c$ for class $c$ is the weighted center of mass:
 $$ \vec{d}_c = \frac{\sum_{i: \hat{y}_i=c} W_i Z_{bundle, i}}{\sum_{i: \hat{y}_i=c} W_i} $$
 
-To prevent small clusters of confident points from pulling the prototype too far, the magnitude of the update is scaled logarithmically by the total mass (Volume Weighting):
-$$ \vec{v}_c = \vec{d}_c \cdot \log\left(1 + \sum_{i: \hat{y}_i=c} W_i\right) $$
+To prevent small clusters of confident points from pulling the prototype too far, the magnitude of the update is scaled logarithmically by the total mass (Volume Weighting). Let the volume scale be $V_c = \log\left(1 + \sum_{i: \hat{y}_i=c} W_i\right)$:
+$$ \vec{v}_c = \vec{d}_c \cdot V_c $$
 
-Finally, to prevent **Catastrophic Forgetting** over long sequences, a static Drift Anchor $A_c$ (a frozen copy of the source prototype $P_c^{(0)}$) exerts a constant restoring force $\lambda$:
-$$ P_c^{(t+1)} = \frac{P_c^{(t)} + \eta \vec{v}_c + \lambda (A_c - P_c^{(t)})}{\| P_c^{(t)} + \eta \vec{v}_c + \lambda (A_c - P_c^{(t)}) \|_2} $$
+Finally, to prevent **Catastrophic Forgetting** over long sequences, a static Drift Anchor $A_c$ (a frozen copy of the source prototype $P_c^{(0)}$) exerts a restoring force $\lambda$. To prevent the volume-weighted pull vector from mathematically overwhelming the anchor, the anchor's strength is scaled proportionally with the volume $V_c$:
+$$ P_c^{(t+1)} = \frac{P_c^{(t)} + \eta \vec{v}_c + \lambda V_c (A_c - P_c^{(t)})}{\| P_c^{(t)} + \eta \vec{v}_c + \lambda V_c (A_c - P_c^{(t)}) \|_2} $$
+
+---
+
+## 3. Firing Rate and Gating Expectations
+The percentage of points in a given frame that successfully pass the strict threshold gating ($\tau$) is called the **Firing Rate**.
+
+* **Normal Adaptation (4% - 10% Firing Rate):** Under moderate corruption, the model identifies thousands of highly confident points per frame. Updating on just the top ~5% of points provides an incredibly strong signal while keeping out noise.
+* **Severe Corruption (0.00% Firing Rate):** When the corruption is so severe that it scrambles the underlying geometry (e.g., dense fog or massive sensor crosstalk), the firing rate will drop to `0.00%`. **This is by design and highly desirable.** The gating mechanism correctly identifies that the entire frame is out-of-distribution garbage, rejecting it entirely. By skipping the update, the model preserves its learned weights instead of adapting to noise and collapsing.
