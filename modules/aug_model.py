@@ -274,7 +274,8 @@ class AugModel(DensityModel):
                                          proj_xyz=None, distance_sensitivity=1.5,
                                          use_consensus_gate=True, use_volume_weight=True,
                                          use_subcluster_gate=True, use_anchor=True, 
-                                         use_percentile_gate=False, percentiles=[0.10, 0.95], min_points=10, **kwargs):
+                                         use_percentile_gate=False, percentiles=[0.10, 0.95], min_points=10, 
+                                         use_centered_sims=False, use_adaptive_subclusters=False, **kwargs):
         """Soft Multi-View Consensus (Experiment A), subcluster-gauged.
 
         Restores the paper's core mechanism: the confidence used to gate each
@@ -287,6 +288,11 @@ class AugModel(DensityModel):
         """
         if not hasattr(self, 'source_prototypes'):
             self.source_prototypes = self.classify.weight.detach().clone()
+        if not hasattr(self, 'source_subclusters'):
+            if hasattr(self, 'subclusters') and self.subclusters is not None:
+                self.source_subclusters = self.subclusters.detach().clone()
+            else:
+                self.source_subclusters = None
 
         with torch.no_grad():
             enc_base, _, _ = self.encode(x)
@@ -344,11 +350,24 @@ class AugModel(DensityModel):
             if use_subcluster_gate:
                 sub_sims = torch.zeros(bundled_target.shape[0], device=self.device, dtype=bundled_target.dtype)
                 
+                if use_adaptive_subclusters:
+                    sub_indices = torch.zeros(bundled_target.shape[0], device=self.device, dtype=torch.long)
+                else:
+                    sub_indices = None
+                
+                if use_centered_sims and self.source_subclusters is not None:
+                    mu_t = bundled_target.mean(dim=0, keepdim=True)
+                    bundled_centered = F.normalize(bundled_target - mu_t, dim=1)
+                    mu_s = self.source_subclusters.to(bundled_target.dtype).mean(dim=0, keepdim=True)
+                    sub_norm = F.normalize(self.subclusters.to(bundled_target.dtype) - mu_s, dim=1)
+                else:
+                    bundled_centered = bundled_target
+                    sub_norm = F.normalize(self.subclusters.to(bundled_target.dtype), dim=1)
+                
                 # Vectorized chunked computation to avoid per-class Python loop overhead
-                sub_norm = F.normalize(self.subclusters.to(bundled_target.dtype), dim=1)
                 chunk_size = 10000
                 for i in range(0, bundled_target.shape[0], chunk_size):
-                    chunk_target = bundled_target[i:i+chunk_size]
+                    chunk_target = bundled_centered[i:i+chunk_size]
                     chunk_preds = preds[i:i+chunk_size]
                     
                     cosine_sim = chunk_target @ sub_norm.T
@@ -357,9 +376,11 @@ class AugModel(DensityModel):
                     valid_mask = (self.subcluster_to_class.unsqueeze(0) == chunk_preds.unsqueeze(1))
                     masked_similarity = torch.where(valid_mask, base_similarity, torch.tensor(0.0, device=self.device))
                     
-                    max_sims, _ = torch.max(masked_similarity, dim=1)
+                    max_sims, max_idx = torch.max(masked_similarity, dim=1)
                     
                     sub_sims[i:i+chunk_size] = max_sims.to(sub_sims.dtype)
+                    if use_adaptive_subclusters:
+                        sub_indices[i:i+chunk_size] = max_idx
                     
                 # Fix: sub_sims is in [0, 1] due to (cosine_sim + 1)/2 scaling.
                 # But the thresholds (e.g. 0.35) expect raw cosine similarity [-1, 1].
@@ -446,6 +467,23 @@ class AugModel(DensityModel):
                     updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
                 
                 self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+
+            if use_adaptive_subclusters and torch.any(update_mask):
+                eta = learning_rate * 0.1
+                valid_indices = sub_indices[update_mask]
+                valid_encs = bundled_target[update_mask]
+                
+                unique_subs = torch.unique(valid_indices)
+                for s_id in unique_subs:
+                    s_mask = (valid_indices == s_id)
+                    s_encs = valid_encs[s_mask]
+                    if s_encs.shape[0] > 0:
+                        s_mean = s_encs.mean(dim=0)
+                        new_sub = self.subclusters[s_id] + eta * s_mean
+                        if use_anchor and self.source_subclusters is not None:
+                            anchor_pull = self.source_subclusters[s_id] - self.subclusters[s_id]
+                            new_sub = new_sub + eta * 0.5 * anchor_pull
+                        self.subclusters[s_id] = F.normalize(new_sub.unsqueeze(0), dim=1).squeeze(0)
 
             return full_predictions
 
