@@ -275,7 +275,8 @@ class AugModel(DensityModel):
                                          use_consensus_gate=True, use_volume_weight=True,
                                          use_subcluster_gate=True, use_anchor=True, 
                                          use_percentile_gate=False, percentiles=[0.10, 0.95], min_points=10, 
-                                         use_centered_sims=False, use_adaptive_subclusters=False, **kwargs):
+                                         use_centered_sims=False, use_adaptive_subclusters=False, 
+                                         use_margin_gate=False, **kwargs):
         """Soft Multi-View Consensus (Experiment A), subcluster-gauged.
 
         Restores the paper's core mechanism: the confidence used to gate each
@@ -376,11 +377,18 @@ class AugModel(DensityModel):
                     valid_mask = (self.subcluster_to_class.unsqueeze(0) == chunk_preds.unsqueeze(1))
                     masked_similarity = torch.where(valid_mask, base_similarity, torch.tensor(0.0, device=self.device))
                     
-                    max_sims, max_idx = torch.max(masked_similarity, dim=1)
-                    
-                    sub_sims[i:i+chunk_size] = max_sims.to(sub_sims.dtype)
-                    if use_adaptive_subclusters:
-                        sub_indices[i:i+chunk_size] = max_idx
+                    if use_margin_gate:
+                        # Extract the top 2 similarities to compute the peak-to-second-peak margin
+                        top2_sims, top2_idx = torch.topk(masked_similarity, k=2, dim=1)
+                        margin = top2_sims[:, 0] - top2_sims[:, 1]
+                        sub_sims[i:i+chunk_size] = margin.to(sub_sims.dtype)
+                        if use_adaptive_subclusters:
+                            sub_indices[i:i+chunk_size] = top2_idx[:, 0]
+                    else:
+                        max_sims, max_idx = torch.max(masked_similarity, dim=1)
+                        sub_sims[i:i+chunk_size] = max_sims.to(sub_sims.dtype)
+                        if use_adaptive_subclusters:
+                            sub_indices[i:i+chunk_size] = max_idx
                     
                 # Fix: sub_sims is in [0, 1] due to (cosine_sim + 1)/2 scaling.
                 # But the thresholds (e.g. 0.35) expect raw cosine similarity [-1, 1].
