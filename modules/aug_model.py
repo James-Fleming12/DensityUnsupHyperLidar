@@ -312,24 +312,24 @@ class AugModel(DensityModel):
             raw_jitter = F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype)
             del x_yaw, enc_yaw
 
-            x_drop = F.dropout2d(x, p=0.15)
-            enc_drop, _, _ = self.encode(x_drop)
-            raw_drop = F.normalize(enc_drop[valid_enc_mask]).to(prototypes.dtype)
-            del x_drop, enc_drop
+            x_scale = x * 0.95
+            enc_scale, _, _ = self.encode(x_scale)
+            raw_scale = F.normalize(enc_scale[valid_enc_mask]).to(prototypes.dtype)
+            del x_scale, enc_scale
 
             # Per-view predictions come from class prototypes (cheap, only used
             # to decide which class each point belongs to, not to gauge confidence).
             pred_base = (raw_base @ prototypes.T).argmax(dim=1)
             if use_consensus_gate:
                 pred_jitter = (raw_jitter @ prototypes.T).argmax(dim=1)
-                pred_drop = (raw_drop @ prototypes.T).argmax(dim=1)
-                agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_drop).float()
+                pred_scale = (raw_scale @ prototypes.T).argmax(dim=1)
+                agreement_count = (pred_base == pred_jitter).float() + (pred_base == pred_scale).float()
                 agreement_weight = agreement_count / 2.0
             else:
                 agreement_weight = torch.ones(raw_base.shape[0], device=self.device)
 
-            bundled_target = F.normalize(raw_base + raw_jitter + raw_drop)
-            del raw_jitter, raw_drop
+            bundled_target = F.normalize(raw_base + raw_jitter + raw_scale)
+            del raw_jitter, raw_scale
 
             S_bundled = bundled_target @ prototypes.T
             preds = S_bundled.argmax(dim=1)
@@ -419,8 +419,10 @@ class AugModel(DensityModel):
 
                 if use_anchor:
                     # Drift anchor: Blend with a small pull back toward the frozen source prototype
+                    # Scale anchor strength with volume to prevent it from being overwhelmed
                     anchor_pull = self.source_prototypes[c_id] - self.classify.weight[c_id]
-                    anchor_strength = 0.1 * learning_rate  # small constant restoring force
+                    v_scale = volume_scale if use_volume_weight else 1.0
+                    anchor_strength = 0.5 * learning_rate * v_scale
                     updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector + anchor_strength * anchor_pull
                 else:
                     updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
