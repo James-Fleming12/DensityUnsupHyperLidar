@@ -375,8 +375,9 @@ class AugModel(DensityModel):
             if use_percentile_gate:
                 valid_sims = gate_sims[(preds != 0) & (agreement_weight > 0)]
                 if len(valid_sims) > 1:
-                    lo = torch.quantile(valid_sims, percentiles[0])
-                    hi = torch.quantile(valid_sims, percentiles[1])
+                    valid_sims_float = valid_sims.float()
+                    lo = torch.quantile(valid_sims_float, percentiles[0])
+                    hi = torch.quantile(valid_sims_float, percentiles[1])
                     update_mask = (gate_sims > lo) & (gate_sims < hi) & (agreement_weight > 0) & (preds != 0)
                     if hi > lo:
                         thresholds = [lo.item(), hi.item()]
