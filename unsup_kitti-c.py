@@ -184,7 +184,13 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                         use_anchor=True,
                         proj_xyz=proj_xyz
                     )
-    return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history}
+    
+    avg_firing_rate = 0.0
+    if hasattr(model, '_firing_log') and len(model._firing_log) > 0:
+        avg_firing_rate = sum(model._firing_log) / len(model._firing_log)
+        model._firing_log = []
+        
+    return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history, "FiringRate": avg_firing_rate}
 
 
 def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=15, extractor_epochs=60):
@@ -282,6 +288,7 @@ def main():
     parser = argparse.ArgumentParser(description="Test Unsupervised Updates on KITTI-C")
     parser.add_argument('--pretrain', action='store_true', help='Run pretraining on SemanticKITTI before evaluating')
     parser.add_argument('--standard', action='store_true', help='Use standard protocol: full sequence per corruption, reset model between corruptions, 3-pass evaluation for true initial/final metrics (no running-total skew).')
+    parser.add_argument('--reset_per_corruption', action='store_true', help='Reset the model to the clean pretrained weights before adapting on each corruption (even when using chunks).')
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
@@ -384,7 +391,11 @@ def main():
         model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
 
         for i, ctype in enumerate(CORRUPTIONS):
-            logger.info(f"Testing {ctype} severity {sev} (Chunk {i+1}/7)")
+            if args.reset_per_corruption and not args.standard:
+                logger.info("Resetting model to clean pretrained weights for this corruption.")
+                model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
+                
+            logger.info(f"Testing {ctype} severity {sev} (Chunk {i+1}/{len(CORRUPTIONS)})")
             
             # Map severity integer to Robo3D folder name
             sev_str = SEVERITY_MAP.get(sev, 'moderate')
@@ -466,6 +477,10 @@ def main():
                         final_acc = final_metrics["Accuracy"][-1]
                     else:
                         initial_miou = final_miou = initial_acc = final_acc = 0.0
+                        
+                    firing_rate_str = ""
+                    if "FiringRate" in adapt_metrics:
+                        firing_rate_str = f", FiringRate={adapt_metrics['FiringRate']*100:.2f}%"
                 else:
                     metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
                     if len(metrics["mIoU"]) > 0:
@@ -475,6 +490,10 @@ def main():
                         final_acc = metrics["Accuracy"][-1]
                     else:
                         initial_miou = final_miou = initial_acc = final_acc = 0.0
+                        
+                    firing_rate_str = ""
+                    if "FiringRate" in metrics:
+                        firing_rate_str = f", FiringRate={metrics['FiringRate']*100:.2f}%"
             except Exception as e:
                 logger.error(f"FATAL ERROR during {ctype} sev {sev} ({current_method}): {e}")
                 logger.info("Skipping to next cell to protect the overnight run...")
@@ -487,7 +506,7 @@ def main():
                 global_results['mIoU'][current_method][ctype][sev] = (initial_miou, final_miou)
                 global_results['Accuracy'][current_method][ctype][sev] = (initial_acc, final_acc)
                 
-                logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}")
+                logger.info(f"Result for {ctype}-{sev}: Initial mIoU={initial_miou:.4f} -> Final={final_miou:.4f}, Initial Acc={initial_acc:.4f} -> Final={final_acc:.4f}{firing_rate_str}")
                 suffix = f"_{current_method}"
                 
                 traj_json_path = os.path.join(args.log_dir, f'traj_{ctype}_{sev}{suffix}.json')
