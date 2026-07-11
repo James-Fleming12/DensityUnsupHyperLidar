@@ -20,9 +20,9 @@ def main():
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     ARCH = yaml.safe_load(open("config/arch/senet-2048p.yml", 'r'))
-    DATA_NUSC = yaml.safe_load(open("config/labels/nuscenes_new.yaml", 'r'))
-    KITTI_LABELS = yaml.safe_load(open("config/labels/semantic-kitti-all.yaml", 'r'))["labels"]
-    inv_map = DATA_NUSC["learning_map_inv"]
+    DATA_KITTI = yaml.safe_load(open("config/labels/semantic-kitti-all.yaml", 'r'))
+    KITTI_LABELS = DATA_KITTI["labels"]
+    inv_map = DATA_KITTI["learning_map_inv"]
     
     pretrained_path = "logs/kitti_pretrain/hdc_sub.pth"
     model = AugModel(ARCH, os.path.dirname(pretrained_path), 'rp', 0, 0, 17, device, subcluster_type='continuous')
@@ -30,12 +30,7 @@ def main():
     model.to(device)
     model.eval()
 
-    nusc_sensor = ARCH["dataset"]["sensor"].copy()
-    nusc_sensor["fov_up"] = 10.0
-    nusc_sensor["fov_down"] = -30.0
-    nusc_sensor["img_prop"] = nusc_sensor["img_prop"].copy()
-    nusc_sensor["img_prop"]["height"] = 32
-    nusc_sensor["img_prop"]["width"] = 1024
+    sensor_config = ARCH["dataset"]["sensor"]
 
     print(f"Initializing Dataset from {args.data_dir}...")
     
@@ -47,9 +42,9 @@ def main():
         
     parser_obj = Parser(root=args.data_dir,
                         train_sequences=[args.seq], valid_sequences=[args.seq], test_sequences=None,
-                        labels=DATA_NUSC["labels"], color_map=DATA_NUSC.get("color_map", {}),
-                        learning_map=DATA_NUSC["learning_map"], learning_map_inv=DATA_NUSC["learning_map_inv"],
-                        sensor=nusc_sensor, max_points=ARCH["dataset"]["max_points"],
+                        labels=DATA_KITTI["labels"], color_map=DATA_KITTI.get("color_map", {}),
+                        learning_map=DATA_KITTI["learning_map"], learning_map_inv=DATA_KITTI["learning_map_inv"],
+                        sensor=sensor_config, max_points=ARCH["dataset"]["max_points"],
                         batch_size=1, workers=1, gt=True, shuffle_train=False)
                         
     dataloader = DataLoader(parser_obj.validloader.dataset, batch_size=1, shuffle=False)
