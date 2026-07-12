@@ -64,7 +64,8 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
     model.eval()
     
     # Create K=1 Subclusters (class centroids from subclusters)
-    k1_subclusters = torch.zeros((17, ARCH["model"]["hd_dim"]), device=device)
+    hd_dim = model.classify.weight.shape[1]
+    k1_subclusters = torch.zeros((17, hd_dim), device=device)
     for c_id in range(17):
         mask = model.subcluster_to_class == c_id
         if mask.sum() > 0:
