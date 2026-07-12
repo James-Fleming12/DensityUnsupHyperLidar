@@ -990,9 +990,13 @@ class DensityModel(nn.Module):
             
             if not hasattr(self, '_firing_log'):
                 self._firing_log = []
+            if not hasattr(self, '_update_magnitude_log'):
+                self._update_magnitude_log = []
 
             # We will calculate the true firing count inside the loop
             final_firing_count = 0
+            total_magnitude = 0.0
+            classes_updated = 0
 
             full_predictions = torch.zeros(num_total_samples, device=self.device, dtype=torch.long)
             full_predictions[valid_enc_mask] = predictions
@@ -1000,6 +1004,7 @@ class DensityModel(nn.Module):
             if not torch.any(update_mask):
                 if len(valid_enc_mask) > 0:
                     self._firing_log.append(0.0)
+                    self._update_magnitude_log.append(0.0)
                 return full_predictions
 
             valid_indices_in_active = torch.nonzero(update_mask).squeeze(1)
@@ -1044,12 +1049,20 @@ class DensityModel(nn.Module):
                 current_weight = self.classify.weight[c_id]
                 self.proto_momentum[c_id] = 0.9 * self.proto_momentum[c_id] + 0.1 * weighted_pull_vector
                 updated_weight = (1.0 - effective_lr) * current_weight + effective_lr * self.proto_momentum[c_id]
-                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                updated_weight_norm = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                mag = torch.norm(updated_weight_norm - current_weight).item()
+                self.classify.weight[c_id] = updated_weight_norm
                 
                 final_firing_count += valid_mask.sum().item()
+                total_magnitude += mag
+                classes_updated += 1
 
             if len(valid_enc_mask) > 0:
                 self._firing_log.append(final_firing_count / (valid_enc_mask.sum().item() + 1e-6))
+                if classes_updated > 0:
+                    self._update_magnitude_log.append(total_magnitude / classes_updated)
+                else:
+                    self._update_magnitude_log.append(0.0)
 
             return full_predictions
 

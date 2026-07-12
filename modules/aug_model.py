@@ -560,8 +560,11 @@ class AugModel(DensityModel):
             if not torch.any(update_mask):
                 if not hasattr(self, '_firing_log'):
                     self._firing_log = []
+                if not hasattr(self, '_update_magnitude_log'):
+                    self._update_magnitude_log = []
                 if len(valid_enc_mask) > 0:
                     self._firing_log.append(0.0)
+                    self._update_magnitude_log.append(0.0)
                 return full_predictions
                 
             # --- SAFETY CHECK ---
@@ -570,6 +573,8 @@ class AugModel(DensityModel):
             
             if not hasattr(self, '_firing_log'):
                 self._firing_log = []
+            if not hasattr(self, '_update_magnitude_log'):
+                self._update_magnitude_log = []
             self._firing_log.append(firing_rate.item())
             
             safe_rate_threshold = 0.20
@@ -580,6 +585,9 @@ class AugModel(DensityModel):
                 
             valid_indices = torch.nonzero(update_mask).squeeze(1)
             unique_classes = torch.unique(preds[valid_indices])
+            
+            total_magnitude = 0.0
+            classes_updated = 0
             
             for class_id in unique_classes:
                 c_id = class_id.item()
@@ -596,7 +604,18 @@ class AugModel(DensityModel):
                 pull_vector = (sample_encs * final_weights.unsqueeze(1)).mean(dim=0)
                 
                 updated_weight = self.classify.weight[c_id] + learning_rate * pull_vector
-                self.classify.weight[c_id] = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                current_weight = self.classify.weight[c_id]
+                updated_weight_norm = F.normalize(updated_weight.unsqueeze(0), dim=1).squeeze(0)
+                mag = torch.norm(updated_weight_norm - current_weight).item()
+                self.classify.weight[c_id] = updated_weight_norm
+                
+                total_magnitude += mag
+                classes_updated += 1
+                
+            if classes_updated > 0:
+                self._update_magnitude_log.append(total_magnitude / classes_updated)
+            else:
+                self._update_magnitude_log.append(0.0)
                 
             return full_predictions
 

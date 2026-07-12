@@ -201,7 +201,12 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
         avg_firing_rate = sum(model._firing_log) / len(model._firing_log)
         model._firing_log = []
         
-    return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history, "FiringRate": avg_firing_rate}
+    avg_update_magnitude = 0.0
+    if hasattr(model, '_update_magnitude_log') and len(model._update_magnitude_log) > 0:
+        avg_update_magnitude = sum(model._update_magnitude_log) / len(model._update_magnitude_log)
+        model._update_magnitude_log = []
+        
+    return {"mIoU": miou_history, "Accuracy": acc_history, "IoU_per_class": iou_per_class_history, "FiringRate": avg_firing_rate, "UpdateMagnitude": avg_update_magnitude}
 
 
 def pretrain_pipeline(ARCH, DATA, data_dir, pretrained_path, return_trainer=False, skip_extractor=False, resume_path=None, hdc_epochs=15, extractor_epochs=60):
@@ -463,8 +468,8 @@ def main():
             target_dataloader = DataLoader(chunk_dataset, batch_size=1, shuffle=False, num_workers=ARCH["train"]["workers"])
             
             try:
-                if args.standard:
-                    # Pass 1: True Initial (Frozen on full chunk)
+                if args.standard or args.reset_per_corruption:
+                    # Pass 1: True Initial (Frozen on chunk)
                     logger.info("  -> Pass 1: Computing True Initial metrics (Frozen)")
                     init_metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=True, dry_run=args.dry_run)
                     
@@ -475,7 +480,7 @@ def main():
                     else:
                         adapt_metrics = init_metrics
                         
-                    # Pass 3: True Final (Frozen on full chunk using adapted weights)
+                    # Pass 3: True Final (Frozen on chunk using adapted weights)
                     logger.info("  -> Pass 3: Computing True Final metrics (Frozen)")
                     final_metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=True, dry_run=args.dry_run)
                     
@@ -492,7 +497,10 @@ def main():
                     firing_rate_str = ""
                     if "FiringRate" in adapt_metrics:
                         firing_rate_str = f", FiringRate={adapt_metrics['FiringRate']*100:.2f}%"
+                        if "UpdateMagnitude" in adapt_metrics:
+                            firing_rate_str += f", UpdateMag={adapt_metrics['UpdateMagnitude']:.4f}"
                 else:
+                    # Original single-pass continuous evaluation
                     metrics = evaluate_and_adapt(model, target_dataloader, device, eval_only=(current_method == 'frozen'), update_method=current_method, dry_run=args.dry_run)
                     if len(metrics["mIoU"]) > 0:
                         initial_miou = metrics["mIoU"][0]
@@ -505,6 +513,8 @@ def main():
                     firing_rate_str = ""
                     if "FiringRate" in metrics:
                         firing_rate_str = f", FiringRate={metrics['FiringRate']*100:.2f}%"
+                        if "UpdateMagnitude" in metrics:
+                            firing_rate_str += f", UpdateMag={metrics['UpdateMagnitude']:.4f}"
             except Exception as e:
                 logger.error(f"FATAL ERROR during {ctype} sev {sev} ({current_method}): {e}")
                 logger.info("Skipping to next cell to protect the overnight run...")
