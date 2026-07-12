@@ -38,7 +38,7 @@ CONFIG_ARCH = "config/arch/senet-2048p.yml"
 CONFIG_LABELS_KITTI = "config/labels/semantic-kitti.yaml"  # The 7-class mapped version from D3CTTA
 CONFIG_LABELS_KITTI_ALL = "config/labels/semantic-kitti-all.yaml"  # Standard 17 classes
 
-def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density', dry_run=False):
+def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update_method='density', dry_run=False, custom_update_fn=None):
     miou_history = []
     acc_history = []
     iou_per_class_history = []
@@ -80,7 +80,9 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
             # Adapt: Inference Update
             if not eval_only:
                 model.eval()
-                if update_method == 'density':
+                if update_method == 'custom' and custom_update_fn is not None:
+                    custom_update_fn(model, proj_in, proj_xyz=proj_xyz)
+                elif update_method == 'density':
                     model.inference_update(
                         proj_in,
                         learning_rate=0.001,
@@ -317,6 +319,7 @@ def main():
     parser.add_argument('--severity', type=int, default=3, help='Severity level for corruptions')
     parser.add_argument('--kitti_dir', type=str, default='/mnt/alpha/jmfleming/KITTI', help='Path to SemanticKITTI dataset for pretraining')
     parser.add_argument('--kittic_dir', type=str, default='/mnt/bravo/jmfleming/OpenDataLab___SemanticKITTI-C/SemanticKITTI-C', help='Path to real SemanticKITTI-C dataset')
+    parser.add_argument('--corruptions', type=str, default=None, help='Comma separated list of corruptions to test. Defaults to all 8.')
     args = parser.parse_args()
 
     if args.continue_epochs > 0:
@@ -401,17 +404,21 @@ def main():
         logger.info(f"Starting Evaluation for Method: {current_method}")
         logger.info(f"=========================================")
         
-        results_miou = {c: {} for c in CORRUPTIONS}
-        results_acc = {c: {} for c in CORRUPTIONS}
+        active_corruptions = CORRUPTIONS
+        if args.corruptions:
+            active_corruptions = [c.strip() for c in args.corruptions.split(',')]
+
+        results_miou = {c: {} for c in active_corruptions}
+        results_acc = {c: {} for c in active_corruptions}
 
         model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
 
-        for i, ctype in enumerate(CORRUPTIONS):
+        for i, ctype in enumerate(active_corruptions):
             if args.reset_per_corruption and not args.standard:
                 logger.info("Resetting model to clean pretrained weights for this corruption.")
                 model = load_hdc_model(args.pretrained_path, num_classes=NUM_CLASSES)
                 
-            logger.info(f"Testing {ctype} severity {sev} (Chunk {i+1}/{len(CORRUPTIONS)})")
+            logger.info(f"Testing {ctype} severity {sev} (Chunk {i+1}/{len(active_corruptions)})")
             
             # Map severity integer to Robo3D folder name
             sev_str = SEVERITY_MAP.get(sev, 'moderate')
