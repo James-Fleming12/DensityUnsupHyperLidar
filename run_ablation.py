@@ -4,7 +4,7 @@ import torch
 import torch.nn.functional as F
 import yaml
 from torch.utils.data import DataLoader
-from modules.HDC_utils import HDCSegmentationModel
+from modules.aug_model import AugModel
 from unsup_kitti_c import evaluate_and_adapt, setup_logger, NUM_CLASSES
 from datasets.semantic_kitti.parser import Parser
 
@@ -152,9 +152,8 @@ def main():
         print(f"\n--- Running Level {level} ---")
         
         # Fresh model
-        model = HDCSegmentationModel(17, hd_dim=ARCH["model"]["hd_dim"], 
-                                     num_subclusters=ARCH["model"]["num_subclusters"],
-                                     subcluster_type=ARCH["model"]["subcluster_type"])
+        modeldir = os.path.dirname('logs/kitti_pretrain/hdc_sub.pth')
+        model = AugModel(ARCH, modeldir, 'rp', 0, 0, 17, device, subcluster_type='continuous')
         checkpoint = torch.load('logs/kitti_pretrain/hdc_sub.pth', map_location='cpu')
         model.load_state_dict(checkpoint, strict=False)
         model = model.to(device)
