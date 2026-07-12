@@ -114,12 +114,12 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
             filtered_raw_base = raw_base[valid_labels_mask]
             
             is_correct = (filtered_preds == filtered_oracle).cpu().numpy()
-            all_is_correct.extend(is_correct)
+            all_is_correct.append(is_correct)
             
             # 1. Prototype Similarity for predicted class
             selected_proto = prototypes[filtered_preds]
             proto_sims = torch.sum(filtered_raw_base * selected_proto, dim=1).cpu().numpy()
-            all_proto_sims.extend(proto_sims)
+            all_proto_sims.append(proto_sims)
             
             # 2. Subcluster Similarity (K=1)
             k1_sims = torch.zeros(filtered_raw_base.shape[0], device=device)
@@ -130,7 +130,7 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
                 
                 c_k1_proto = F.normalize(k1_subclusters[c_id_item].unsqueeze(0), dim=1)
                 k1_sims[c_mask] = torch.sum(c_encs * c_k1_proto, dim=1)
-            all_sub_sims_k1.extend(k1_sims.cpu().numpy())
+            all_sub_sims_k1.append(k1_sims.cpu().numpy())
             
             # 3. Subcluster Similarity (K=64)
             sub_sims = torch.zeros(filtered_raw_base.shape[0], device=device)
@@ -140,7 +140,7 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
                 c_encs = filtered_raw_base[c_mask]
                 c_sub_sims, _ = model.get_max_subcluster_similarity(c_encs, c_id_item, distance_sensitivity=1.0)
                 sub_sims[c_mask] = c_sub_sims
-            all_sub_sims_k64.extend(sub_sims.cpu().numpy())
+            all_sub_sims_k64.append(sub_sims.cpu().numpy())
             
             if batch_idx > 0 and batch_idx % 50 == 0:
                 print(f"Processed {batch_idx} frames...")
@@ -148,6 +148,12 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
     if len(all_is_correct) == 0:
         print("No valid points found to evaluate.")
         return
+        
+    # Concatenate chunked arrays
+    all_is_correct = np.concatenate(all_is_correct)
+    all_proto_sims = np.concatenate(all_proto_sims)
+    all_sub_sims_k1 = np.concatenate(all_sub_sims_k1)
+    all_sub_sims_k64 = np.concatenate(all_sub_sims_k64)
         
     try:
         proto_auroc = roc_auc_score(all_is_correct, all_proto_sims)
