@@ -38,7 +38,8 @@ def test_occupancy(dataset_root, pretrained_path, yaml_labels, yaml_arch, device
     model = model.to(device)
     model.eval()
     
-    num_subclusters = ARCH["model"]["num_subclusters"]
+    # Dynamically determine num_subclusters per class
+    num_subclusters = (model.subcluster_to_class == 0).sum().item()
     
     # Track occupancy per class.
     # occupancy[class_id] will be an array of size `num_subclusters`
