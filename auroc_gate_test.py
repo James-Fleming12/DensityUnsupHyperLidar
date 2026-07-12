@@ -6,30 +6,54 @@ import torch
 import torch.nn.functional as F
 import yaml
 from torch.utils.data import DataLoader
-from sklearn.metrics import roc_auc_score
 from modules.aug_model import AugModel
 from dataset.kitti.parser import Parser
 
-def compute_precision_coverage(is_correct, sims):
-    """
-    Computes precise precision and coverage arrays by sorting similarities.
-    is_correct: boolean array of whether pseudo-label is correct
-    sims: similarity scores
-    """
+BINS = 20000
+BIN_EDGES = np.linspace(-1.0, 1.0, BINS + 1)
+
+def update_hists(is_correct, sims, hist_correct, hist_incorrect):
     is_correct = np.array(is_correct, dtype=bool)
-    sims = np.array(sims)
+    sims = np.array(sims, dtype=np.float32)
     
-    # Sort descending by similarity
-    sorted_indices = np.argsort(-sims)
-    sorted_correct = is_correct[sorted_indices]
+    c_sims = sims[is_correct]
+    i_sims = sims[~is_correct]
     
-    N = len(is_correct)
-    cumulative_correct = np.cumsum(sorted_correct)
+    hc, _ = np.histogram(c_sims, bins=BIN_EDGES)
+    hi, _ = np.histogram(i_sims, bins=BIN_EDGES)
     
-    coverage = np.arange(1, N + 1) / N
-    precision = cumulative_correct / np.arange(1, N + 1)
+    hist_correct += hc
+    hist_incorrect += hi
+
+def compute_metrics_from_hist(hist_correct, hist_incorrect):
+    cum_correct = np.cumsum(hist_correct[::-1])[::-1]
+    cum_incorrect = np.cumsum(hist_incorrect[::-1])[::-1]
+    cum_total = cum_correct + cum_incorrect
     
-    return coverage, precision
+    total_correct = cum_correct[0]
+    total_incorrect = cum_incorrect[0]
+    
+    tpr = cum_correct / max(total_correct, 1)
+    fpr = cum_incorrect / max(total_incorrect, 1)
+    
+    # AUC uses trapezoidal rule. FPR and TPR are decreasing as we sweep threshold from +1 to -1.
+    # We must sort them ascending for np.trapz, or just take negative.
+    # fpr[::-1] is ascending
+    auroc = np.trapz(tpr[::-1], fpr[::-1])
+    
+    coverage = cum_total / max(cum_total[0], 1)
+    precision = np.zeros_like(coverage)
+    valid = cum_total > 0
+    precision[valid] = cum_correct[valid] / cum_total[valid]
+    
+    # Filter out empty bins for clean plotting
+    valid_plot = np.where(cum_total > 0)[0]
+    if len(valid_plot) > 0:
+        first_valid = valid_plot[0]
+        coverage = coverage[first_valid:]
+        precision = precision[first_valid:]
+        
+    return auroc, coverage, precision
 
 def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch, device, corruption_name, output_dir):
     DATA = yaml.safe_load(open(yaml_labels, 'r'))
@@ -70,12 +94,19 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
         mask = model.subcluster_to_class == c_id
         if mask.sum() > 0:
             c_subs = model.subclusters[mask].float()
-            k1_subclusters[c_id] = c_subs.mean(dim=0)
+            k1_subclusters[c_id] = c_subs.mean(dim=0).to(k1_subclusters.dtype)
     
-    all_is_correct = []
-    all_proto_sims = []
-    all_sub_sims_k1 = []
-    all_sub_sims_k64 = []
+    h_corr_proto = np.zeros(BINS, dtype=np.int64)
+    h_incorr_proto = np.zeros(BINS, dtype=np.int64)
+    
+    h_corr_k1 = np.zeros(BINS, dtype=np.int64)
+    h_incorr_k1 = np.zeros(BINS, dtype=np.int64)
+    
+    h_corr_k64 = np.zeros(BINS, dtype=np.int64)
+    h_incorr_k64 = np.zeros(BINS, dtype=np.int64)
+    
+    total_points = 0
+    total_correct_points = 0
     
     print(f"\n--- Running AUROC Gate-Quality Test on {corruption_name} ---")
     
@@ -103,7 +134,6 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
             S_base = raw_base @ prototypes.T
             preds = S_base.argmax(dim=1)
             
-            # Filter valid (labels mapped to 0-16, ignore unlabeled/unknown)
             valid_labels_mask = (active_oracle > 0) & (active_oracle < 17) & (preds > 0)
             
             if not torch.any(valid_labels_mask):
@@ -114,12 +144,14 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
             filtered_raw_base = raw_base[valid_labels_mask]
             
             is_correct = (filtered_preds == filtered_oracle).cpu().numpy()
-            all_is_correct.append(is_correct)
             
-            # 1. Prototype Similarity for predicted class
+            total_points += len(is_correct)
+            total_correct_points += np.sum(is_correct)
+            
+            # 1. Prototype
             selected_proto = prototypes[filtered_preds]
             proto_sims = torch.sum(filtered_raw_base * selected_proto, dim=1).cpu().numpy()
-            all_proto_sims.append(proto_sims)
+            update_hists(is_correct, proto_sims, h_corr_proto, h_incorr_proto)
             
             # 2. Subcluster Similarity (K=1)
             k1_sims = torch.zeros(filtered_raw_base.shape[0], device=device)
@@ -130,7 +162,7 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
                 
                 c_k1_proto = F.normalize(k1_subclusters[c_id_item].unsqueeze(0), dim=1)
                 k1_sims[c_mask] = torch.sum(c_encs * c_k1_proto, dim=1)
-            all_sub_sims_k1.append(k1_sims.cpu().numpy())
+            update_hists(is_correct, k1_sims.cpu().numpy(), h_corr_k1, h_incorr_k1)
             
             # 3. Subcluster Similarity (K=64)
             sub_sims = torch.zeros(filtered_raw_base.shape[0], device=device)
@@ -140,38 +172,27 @@ def test_auroc_on_chunk(corruption_root, pretrained_path, yaml_labels, yaml_arch
                 c_encs = filtered_raw_base[c_mask]
                 c_sub_sims, _ = model.get_max_subcluster_similarity(c_encs, c_id_item, distance_sensitivity=1.0)
                 sub_sims[c_mask] = c_sub_sims
-            all_sub_sims_k64.append(sub_sims.cpu().numpy())
+            update_hists(is_correct, sub_sims.cpu().numpy(), h_corr_k64, h_incorr_k64)
             
-            if batch_idx > 0 and batch_idx % 50 == 0:
+            if batch_idx > 0 and batch_idx % 100 == 0:
                 print(f"Processed {batch_idx} frames...")
                 
-    if len(all_is_correct) == 0:
+    if total_points == 0:
         print("No valid points found to evaluate.")
         return
         
-    # Concatenate chunked arrays
-    all_is_correct = np.concatenate(all_is_correct)
-    all_proto_sims = np.concatenate(all_proto_sims)
-    all_sub_sims_k1 = np.concatenate(all_sub_sims_k1)
-    all_sub_sims_k64 = np.concatenate(all_sub_sims_k64)
-        
     try:
-        proto_auroc = roc_auc_score(all_is_correct, all_proto_sims)
-        sub_k1_auroc = roc_auc_score(all_is_correct, all_sub_sims_k1)
-        sub_k64_auroc = roc_auc_score(all_is_correct, all_sub_sims_k64)
+        proto_auroc, cov_proto, prec_proto = compute_metrics_from_hist(h_corr_proto, h_incorr_proto)
+        sub_k1_auroc, cov_k1, prec_k1 = compute_metrics_from_hist(h_corr_k1, h_incorr_k1)
+        sub_k64_auroc, cov_k64, prec_k64 = compute_metrics_from_hist(h_corr_k64, h_incorr_k64)
         
         print("\n=== AUROC RESULTS ===")
-        print(f"Total Points Evaluated: {len(all_is_correct)}")
-        print(f"Base Accuracy of Pseudo-Labels: {sum(all_is_correct) / len(all_is_correct):.2%}")
+        print(f"Total Points Evaluated: {total_points:,}")
+        print(f"Base Accuracy of Pseudo-Labels: {total_correct_points / total_points:.2%}")
         print(f"AUROC (Prototype):          {proto_auroc:.4f}")
         print(f"AUROC (Subcluster K=1):     {sub_k1_auroc:.4f}")
         print(f"AUROC (Subcluster K=64):    {sub_k64_auroc:.4f}")
         print("=====================\n")
-        
-        # Plot Precision-vs-Coverage
-        cov_proto, prec_proto = compute_precision_coverage(all_is_correct, all_proto_sims)
-        cov_k1, prec_k1 = compute_precision_coverage(all_is_correct, all_sub_sims_k1)
-        cov_k64, prec_k64 = compute_precision_coverage(all_is_correct, all_sub_sims_k64)
         
         plt.figure(figsize=(10, 6))
         plt.plot(cov_proto, prec_proto, label=f'Prototype (AUROC={proto_auroc:.3f})', linewidth=2)
