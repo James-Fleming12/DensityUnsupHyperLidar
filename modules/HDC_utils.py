@@ -1049,7 +1049,7 @@ class DensityModel(nn.Module):
                 final_firing_count += valid_mask.sum().item()
 
             if len(valid_enc_mask) > 0:
-                self._firing_log.append(final_firing_count / num_total_samples)
+                self._firing_log.append(final_firing_count / (valid_enc_mask.sum().item() + 1e-6))
 
             return full_predictions
 

@@ -183,18 +183,19 @@ class AugModel(DensityModel):
 
             bundled_target = raw_base.clone()
             
-            x_yaw = torch.roll(x, shifts=14, dims=3)
-            enc_yaw, _, _ = self.encode(x_yaw)
-            del x_yaw
-            bundled_target.add_(F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype))
-            del enc_yaw
-            
-            x_scale = x * 0.95
-            enc_scale, _, _ = self.encode(x_scale)
-            del x_scale
-            bundled_target.add_(F.normalize(enc_scale[valid_enc_mask]).to(prototypes.dtype))
-            del enc_scale
-            
+            if use_bundling:
+                x_yaw = torch.roll(x, shifts=14, dims=3)
+                enc_yaw, _, _ = self.encode(x_yaw)
+                del x_yaw
+                bundled_target.add_(F.normalize(enc_yaw[valid_enc_mask]).to(prototypes.dtype))
+                del enc_yaw
+                
+                x_scale = x * 0.95
+                enc_scale, _, _ = self.encode(x_scale)
+                del x_scale
+                bundled_target.add_(F.normalize(enc_scale[valid_enc_mask]).to(prototypes.dtype))
+                del enc_scale
+                
             bundled_target = F.normalize(bundled_target)
             
             # The Decision: Calculate cosine similarity against prototypes using bundled features
@@ -271,12 +272,11 @@ class AugModel(DensityModel):
 
 
     def inference_update_soft_consensus(self, x, learning_rate=0.001, thresholds=[0.35, 0.65],
-                                         proj_xyz=None, distance_sensitivity=1.5,
-                                         use_consensus_gate=True, use_volume_weight=True,
-                                         use_subcluster_gate=True, use_anchor=True, 
-                                         use_percentile_gate=False, percentiles=[0.10, 0.95], min_points=10, 
-                                         use_centered_sims=False, use_adaptive_subclusters=False, 
-                                         use_margin_gate=False, **kwargs):
+                                        distance_sensitivity=3.0, use_consensus_gate=True,
+                                        use_volume_weight=True, use_subcluster_gate=True,
+                                        use_anchor=True, use_percentile_gate=False, percentiles=[0.1, 0.95],
+                                        min_points=10, use_centered_sims=False, use_adaptive_subclusters=False,
+                                        use_margin_gate=False, proj_xyz=None, use_bundling=True, **kwargs):
         """Soft Multi-View Consensus (Experiment A), subcluster-gauged.
 
         Restores the paper's core mechanism: the confidence used to gate each
@@ -558,6 +558,10 @@ class AugModel(DensityModel):
             full_predictions[valid_enc_mask] = preds
             
             if not torch.any(update_mask):
+                if not hasattr(self, '_firing_log'):
+                    self._firing_log = []
+                if len(valid_enc_mask) > 0:
+                    self._firing_log.append(0.0)
                 return full_predictions
                 
             # --- SAFETY CHECK ---

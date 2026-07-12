@@ -98,6 +98,17 @@ def evaluate_and_adapt(model, target_dataloader, device, eval_only=False, update
                         use_subcluster_gate=True,
                         proj_xyz=proj_xyz
                     )
+                elif update_method == 'exp_a_single':
+                    model.inference_update_soft_consensus(
+                        proj_in,
+                        learning_rate=0.001,
+                        thresholds=[0.35, 0.65],
+                        use_consensus_gate=True,
+                        use_volume_weight=True,
+                        use_subcluster_gate=True,
+                        use_bundling=False,
+                        proj_xyz=proj_xyz
+                    )
                 elif update_method == 'exp_a_anchor_off':
                     model.inference_update_soft_consensus(
                         proj_in,
@@ -292,7 +303,7 @@ def main():
     parser.add_argument('--skip_extractor', action='store_true', help='Skip feature extractor pretraining and only retrain the HDC model')
     parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model')
     parser.add_argument('--log_dir', type=str, default='logs/kitti_c_test', help='Directory to save logs and graphics')
-    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_anchor_off', 'exp_a_anchor_on', 'exp_a_safe', 'exp_a_v2', 'exp_a_v3', 'exp_a_v4', 'exp_density_hybrid', 'all'], default='density', help='Method to test.')
+    parser.add_argument('--method', type=str, choices=['frozen', 'density', 'exp_a', 'exp_a_single', 'exp_a_anchor_off', 'exp_a_anchor_on', 'exp_a_safe', 'exp_a_v2', 'exp_a_v3', 'exp_a_v4', 'exp_density_hybrid', 'all'], default='density', help='Method to test.')
     parser.add_argument('--dry_run', action='store_true', help='Run only 2 batches per condition to quickly verify no crashes will occur.')
     parser.add_argument('--continue_pretrain', action='store_true', help='Resume pretraining from the existing pretrained_path')
     parser.add_argument('--continue', dest='continue_epochs', type=int, default=0, help='Continue feature extractor training for this many epochs, reinitialize HDC, and perform adaptation')
