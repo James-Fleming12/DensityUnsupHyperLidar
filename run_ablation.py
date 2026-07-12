@@ -6,7 +6,7 @@ import yaml
 from torch.utils.data import DataLoader
 from modules.aug_model import AugModel
 from unsup_kitti_c import evaluate_and_adapt, setup_logger, NUM_CLASSES
-from datasets.semantic_kitti.parser import Parser
+from dataset.kitti.parser import Parser
 
 def inference_update_ablation(self, x, beta=0.2, distance_sensitivity=3.0, learning_rate=0.01, thresholds=[0.35, 0.65], proj_xyz=None, level=0, **kwargs):
     self.eval()

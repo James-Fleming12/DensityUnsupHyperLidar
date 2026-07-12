@@ -8,7 +8,7 @@ import yaml
 from torch.utils.data import DataLoader
 from sklearn.metrics import roc_auc_score
 from modules.aug_model import AugModel
-from datasets.semantic_kitti.parser import Parser
+from dataset.kitti.parser import Parser
 
 def compute_precision_coverage(is_correct, sims):
     """
