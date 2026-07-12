@@ -7,7 +7,7 @@ import torch.nn.functional as F
 import yaml
 from torch.utils.data import DataLoader
 from modules.aug_model import AugModel
-from datasets.semantic_kitti.parser import Parser
+from dataset.kitti.parser import Parser
 from collections import defaultdict
 
 def test_occupancy(dataset_root, pretrained_path, yaml_labels, yaml_arch, device, output_dir):
