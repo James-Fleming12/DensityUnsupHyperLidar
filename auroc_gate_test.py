@@ -197,8 +197,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    yaml_labels = 'configs/semantic-kitti-all.yaml'
-    yaml_arch = 'configs/semantic-kitti.yaml'
+    yaml_labels = 'config/labels/semantic-kitti-all.yaml'
+    yaml_arch = 'config/arch/senet-2048p.yml'
     
     SEVERITY_MAP = {1: 'light', 2: 'moderate', 3: 'heavy', 4: 'extreme'}
     sev_str = SEVERITY_MAP.get(args.severity, 'moderate')

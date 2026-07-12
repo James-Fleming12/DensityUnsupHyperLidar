@@ -124,8 +124,8 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # Load dataset
-    DATA = yaml.safe_load(open('configs/semantic-kitti-all.yaml', 'r'))
-    ARCH = yaml.safe_load(open('configs/semantic-kitti.yaml', 'r'))
+    DATA = yaml.safe_load(open('config/labels/semantic-kitti-all.yaml', 'r'))
+    ARCH = yaml.safe_load(open('config/arch/senet-2048p.yml', 'r'))
     
     corruption_root = '/mnt/bravo/jmfleming/OpenDataLab___SemanticKITTI-C/SemanticKITTI-C/wet_ground/severe'
     
