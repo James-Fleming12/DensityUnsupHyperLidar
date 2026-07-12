@@ -118,9 +118,9 @@ def extract_clean_features(kitti_dir, model, device, DATA, ARCH):
         else:
             final_features[c] = np.zeros((0, raw_base.shape[1]))
             
-    return final_features
+    return final_features, raw_base.shape[1]
 
-def build_oracle_subclusters(final_features, K_list=[1, 2, 4, 8, 16]):
+def build_oracle_subclusters(final_features, hd_dim, K_list=[1, 2, 4, 8, 16]):
     print("\n--- Phase 2: Running K-Means to build Oracle Subclusters ---")
     oracle_subs = {K: {} for K in K_list}
     
@@ -133,7 +133,7 @@ def build_oracle_subclusters(final_features, K_list=[1, 2, 4, 8, 16]):
                 if n_samples > 0:
                     centroids = np.vstack([feats.mean(axis=0)] * K)
                 else:
-                    centroids = np.zeros((K, 2048))
+                    centroids = np.zeros((K, hd_dim))
                 oracle_subs[K][c] = centroids
                 continue
                 
@@ -299,10 +299,10 @@ def main():
     model = model.to(device)
     model.eval()
     
-    final_features = extract_clean_features(args.kitti_dir, model, device, DATA, ARCH)
+    final_features, hd_dim = extract_clean_features(args.kitti_dir, model, device, DATA, ARCH)
     
     K_list = [1, 2, 4, 8, 16]
-    oracle_subs = build_oracle_subclusters(final_features, K_list=K_list)
+    oracle_subs = build_oracle_subclusters(final_features, hd_dim, K_list=K_list)
     
     SEVERITY_MAP = {1: 'light', 2: 'moderate', 3: 'heavy', 4: 'extreme'}
     sev_str = SEVERITY_MAP.get(args.severity, 'moderate')
