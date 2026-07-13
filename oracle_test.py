@@ -140,6 +140,12 @@ def build_oracle_subclusters(final_features, hd_dim, K_list=[1, 2, 4, 8, 16]):
             kmeans = KMeans(n_clusters=K, random_state=42, n_init='auto')
             kmeans.fit(feats)
             
+            labels = kmeans.labels_
+            cluster_sizes = np.bincount(labels, minlength=K)
+            min_sz = cluster_sizes.min()
+            if min_sz < 100 and K > 1:
+                print(f"  [Size Warning] Class {c} K={K} has a mode with {min_sz} points (mean={cluster_sizes.mean():.1f}, total={n_samples})")
+
             cents = kmeans.cluster_centers_
             norms = np.linalg.norm(cents, axis=1, keepdims=True)
             cents = np.divide(cents, norms, out=np.zeros_like(cents), where=norms!=0)
