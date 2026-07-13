@@ -111,7 +111,7 @@ def spectrum_report(model, loader, device, max_per_class=5000, q=512):
         print("  The covariance is anisotropic enough for the construction to bite.")
         print("  Proceed to the gate-quality experiment.")
 
-    print(\"\"\"
+    print("""
 IF YOU NEED TO LOWER tau:
   tau is a FREE PARAMETER. The paper sets tau = d^{1/4} to optimize a WORST-CASE
   volume bound (their Sec 2.2, balancing losses (ii) and (iii)) -- not to be
@@ -131,7 +131,7 @@ IF YOU NEED TO LOWER tau:
   non-expansion and bounded distortion) but select r by a spectral criterion (e.g.
   the r_90 column above) instead of an absolute threshold. Same geometry, data-driven
   rank. This is a defensible modification and arguably the honest one.
-\"\"\")
+""")
     return summary
 
 def main():
