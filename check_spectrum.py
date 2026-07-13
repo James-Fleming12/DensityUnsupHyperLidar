@@ -164,7 +164,7 @@ def main():
         learning_map_inv=DATA["learning_map_inv"],
         sensor=ARCH["dataset"]["sensor"],
         max_points=ARCH["dataset"]["max_points"],
-        batch_size=8,
+        batch_size=1,
         workers=ARCH["train"]["workers"],
         gt=True,
         shuffle_train=False
