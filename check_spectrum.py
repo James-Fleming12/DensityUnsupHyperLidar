@@ -136,7 +136,7 @@ IF YOU NEED TO LOWER tau:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--pretrained_path', type=str, default='/home/james/Research/SEE/DensityUnsupHyperLidar/logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model weights')
+    parser.add_argument('--pretrained_path', type=str, default='logs/kitti_pretrain/hdc_sub.pth', help='Path to load pretrained model weights')
     parser.add_argument('--kitti_dir', type=str, default='/mnt/alpha/jmfleming/KITTI', help='Path to KITTI data')
     args = parser.parse_args()
 
